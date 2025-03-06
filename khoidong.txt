@@ -1,0 +1,45 @@
+Lệnh chạy container docker vanilla
+docker run -d --name aerospike -p 3000-3002:3000-3002 aerospike/aerospike-server:latest
+
+Lệnh chạy aerospike custom, add file aerospike.conf
+docker run -d --name aerospike -p 3000-3002:3000-3002 -v /path/to/your/aerospike.conf:/etc/aerospike/aerospike.conf aerospike/aerospike-server:latest
+
+
+Chạy container aerospike Tool (Link thẳng vào container aerospike gốc) 
+docker run -it --rm --link aerospike:aerospike aerospike/aerospike-tools aql -h aerospike
+
+================================================================
+Test thử truy vấn bằnG lệnh 
+aql -h 127.0.0.1
+
+SHOW NAMESPACES;
+
+SELECT * FROM test.set LIMIT 10;
+
+Kiểm tra xem đã có 2 kafka hay chưa
+docker exec -it docker-zookeeper-1 zookeeper-shell localhost:2181 ls /brokers/ids
+
+
+===================================================================
+docker-compose down -v  # Dừng và xóa toàn bộ dữ liệu volume
+docker-compose up -d    # Khởi động lại cluster
+
+aql -h aerospike        # Truy cập vào cơ sở dữ liệu gốc để truy vấn
+=================================================================
+
+
+
+docker exec -it 63abbd3efa32 zookeeper-shell.sh localhost:2181 ls /brokers/ids
+
+
+=================================================================================
+end Buổi 2 
+
+Lưu ý: Dùng các KPI gì : miss, match, latency, ...
+=================================================================================
+
+Note buoi 3 : 
+cach cai dat source connector va sink connector 
+curl -L -o aerospike-sink-connector.zip https://www.confluent.io/hub/aerospike/kafka-connect-aerospike-sink/aerospike-kafka-connect-aerospike-sink-3.0.4.zip 
+
+https://www.confluent.io/hub/aerospike/kafka-connect-aerospike-sink/aerospike-kafka-connect-aerospike-sink-3.0.4.zip

@@ -1,0 +1,95 @@
+version: '2'
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.2
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - backend-net
+
+
+  kafka:
+    image: confluentinc/cp-kafka:7.3.2
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_METRIC_REPORTERS: ""
+      # KAFKA_METRIC_REPORTERS: "io.confluent.metrics.reporter.ConfluentMetricsReporter"
+      CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: "localhost:9092"
+      CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
+      CONFLUENT_METRICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    volumes:
+      - /usr/share/java/confluent-metrics:/usr/share/java/confluent-metrics
+    networks:
+      - backend-net
+    
+  control-center:
+    image: confluentinc/cp-enterprise-control-center:7.3.2
+    depends_on:
+      - kafka
+    ports:
+      - "9021:9021"
+    environment:
+      CONTROL_CENTER_BOOTSTRAP_SERVERS: "kafka:29092"
+      CONTROL_CENTER_ZOOKEEPER_CONNECT: "zookeeper:2181"
+      CONTROL_CENTER_STREAMS_NUM_STREAM_THREADS: 2
+      CONTROL_CENTER_CONSUMER_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      CONTROL_CENTER_REPLICATION_FACTOR: 1 
+      PORT: 9021
+    networks:
+      - backend-net
+    # Neu su dung codespace thi phai forward port 9021 ra ngoai
+    # Sau do truy cap vao https://glorious-funicular-5jj7q6j44x93pp7q-9021.app.github.dev/clusters 
+
+
+
+
+  aerospike:
+    image: aerospike/aerospike-server:latest
+    container_name: aerospike
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+      - "3002:3002"
+    volumes:
+      - ./aerospike.conf:/etc/aerospike/aerospike.conf
+      - ./aerospike_data:/opt/aerospike/data  # Gắn thư mục dữ liệu vào container
+    command: ["--config-file", "/etc/aerospike/aerospike.conf"]
+    networks:
+      - backend-net
+    # Kiem tra container xem file config co dung khong
+    # docker exec -it aerospike /bin/bash
+    # cat /etc/aerospike/aerospike.conf
+
+    # Copyfile aerospike.conf vao container
+    # docker cp aerospike.conf aerospike:/etc/aerospike/aerospike.conf
+    # docker restart aerospike
+
+
+  aerospike-tools:
+    image: aerospike/aerospike-tools:latest
+    container_name: aerospike-tools
+    depends_on:
+      - aerospike
+    networks:
+      - backend-net
+    entrypoint: [ "sleep", "infinity" ]
+  # docker exec -it aerospike-tools aql -h aerospike
+  # Để truy cập vào aql của DB, để kiểm thử
+
+
+networks:
+  backend-net:
+    driver: bridge
