@@ -1,30 +1,84 @@
-Mar 12, 2025 10:54:24 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Inserted 0 records in the last second.
-Mar 12, 2025 10:54:25 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Inserted 2468 records in the last second.
-Mar 12, 2025 10:54:26 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Inserted 2470 records in the last second.
-Mar 12, 2025 10:54:27 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Inserted 1614 records in the last second.
-Mar 12, 2025 10:54:28 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Inserted 2849 records in the last second.
-Mar 12, 2025 10:54:29 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Inserted 2602 records in the last second.
-Mar 12, 2025 10:54:30 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Inserted 2045 records in the last second.
-Mar 12, 2025 10:54:31 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Inserted 2017 records in the last second.
-Mar 12, 2025 10:54:32 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Inserted 2968 records in the last second.
-Mar 12, 2025 10:54:33 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Inserted 3879 records in the last second.
-Mar 12, 2025 10:54:34 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Inserted 4627 records in the last second.
-Mar 12, 2025 10:54:35 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Inserted 4813 records in the last second.
-Mar 12, 2025 10:54:36 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Inserted 2376 records in the last second.
-Mar 12, 2025 10:54:37 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Inserted 3876 records in the last second.
-Mar 12, 2025 10:54:38 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Inserted 3574 records in the last second.
+Mar 12, 2025 11:19:43 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 79 records in the last second.
+Mar 12, 2025 11:19:44 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 1040 records in the last second.
+Mar 12, 2025 11:19:45 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 2738 records in the last second.
+Mar 12, 2025 11:19:46 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 2211 records in the last second.
+Mar 12, 2025 11:19:47 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 2082 records in the last second.
+Mar 12, 2025 11:19:48 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 2108 records in the last second.
+Mar 12, 2025 11:19:49 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 3173 records in the last second.
+Mar 12, 2025 11:19:50 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 2018 records in the last second.
+Mar 12, 2025 11:19:51 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 780 records in the last second.
+Mar 12, 2025 11:19:52 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 2362 records in the last second.
+Mar 12, 2025 11:19:53 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 2684 records in the last second.
+Mar 12, 2025 11:19:54 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 2365 records in the last second.
+Mar 12, 2025 11:19:55 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 3777 records in the last second.
+Mar 12, 2025 11:19:56 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 3431 records in the last second.
+Mar 12, 2025 11:26:21 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 403 records in the last second.
+Mar 12, 2025 11:26:22 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 735 records in the last second.
+Mar 12, 2025 11:26:23 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 2724 records in the last second.
+Mar 12, 2025 11:26:24 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 2767 records in the last second.
+Mar 12, 2025 11:26:25 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 3321 records in the last second.
+Mar 12, 2025 11:26:26 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 3010 records in the last second.
+Mar 12, 2025 11:26:27 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 2739 records in the last second.
+Mar 12, 2025 11:26:28 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 2118 records in the last second.
+Mar 12, 2025 11:26:29 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 2947 records in the last second.
+Mar 12, 2025 11:26:30 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 4545 records in the last second.
+Mar 12, 2025 11:26:31 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 1729 records in the last second.
+Mar 12, 2025 11:26:32 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 2070 records in the last second.
+Mar 12, 2025 11:26:33 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 3953 records in the last second.
+Mar 12, 2025 11:26:34 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 1966 records in the last second.
+Mar 12, 2025 11:26:35 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 3297 records in the last second.
+Mar 12, 2025 11:26:36 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 3508 records in the last second.
+Mar 12, 2025 11:26:37 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 3394 records in the last second.
+Mar 12, 2025 11:26:38 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 3170 records in the last second.
+Mar 12, 2025 11:26:39 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 2948 records in the last second.
+Mar 12, 2025 11:26:40 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 2882 records in the last second.
+Mar 12, 2025 11:26:41 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 4481 records in the last second.
+Mar 12, 2025 11:26:42 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 1467 records in the last second.
+Mar 12, 2025 11:26:43 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 1571 records in the last second.
+Mar 12, 2025 11:26:44 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 3100 records in the last second.
+Mar 12, 2025 11:26:45 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 1818 records in the last second.
+Mar 12, 2025 11:26:46 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 1259 records in the last second.
+Mar 12, 2025 11:26:47 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 2632 records in the last second.
+Mar 12, 2025 11:26:48 AM com.vertx.KafkaToAerospikeVerticle lambda$0
+INFO: Inserted 1739 records in the last second.

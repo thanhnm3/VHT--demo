@@ -5,6 +5,7 @@ import com.aerospike.client.policy.ClientPolicy;
 import com.aerospike.client.policy.ScanPolicy;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Promise;
+import io.vertx.core.Vertx;
 import io.vertx.kafka.client.producer.KafkaProducer;
 import io.vertx.kafka.client.producer.KafkaProducerRecord;
 
@@ -29,6 +30,7 @@ public class AerospikeToKafkaVerticle extends AbstractVerticle {
 
     private AerospikeClient client;
     private KafkaProducer<String, byte[]> producer;
+    private static Vertx vertx;
     private AtomicInteger recordCount = new AtomicInteger(0);
     private static final Logger logger = Logger.getLogger(AerospikeToKafkaVerticle.class.getName());
 
@@ -37,15 +39,18 @@ public class AerospikeToKafkaVerticle extends AbstractVerticle {
         try {
             FileHandler fh = new FileHandler("log/aerospike_to_kafka.log", true);
             fh.setFormatter(new SimpleFormatter());
-            logger.addHandler(fh);
+            if (logger.getHandlers().length == 0) {
+                logger.addHandler(fh);
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
 
         // Kết nối Aerospike
         client = new AerospikeClient(new ClientPolicy(), AEROSPIKE_HOST, AEROSPIKE_PORT);
-        
-        // Cấu hình Kafka Producer
+
+        // Cấu hình Kafka Producer  
+        vertx = Vertx.vertx();
         Map<String, String> config = new HashMap<>();
         config.put("bootstrap.servers", KAFKA_BROKER);
         config.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
@@ -79,7 +84,7 @@ public class AerospikeToKafkaVerticle extends AbstractVerticle {
 
                 byte[] personBinary = (byte[]) record.getValue("personData");
                 KafkaProducerRecord<String, byte[]> kafkaRecord = KafkaProducerRecord.create(KAFKA_TOPIC, key.userKey.toString(), personBinary);
-                
+
                 producer.send(kafkaRecord, result -> {
                     if (result.failed()) {
                         logger.severe("Lỗi gửi Kafka: " + result.cause().getMessage());
@@ -103,4 +108,5 @@ public class AerospikeToKafkaVerticle extends AbstractVerticle {
             logger.info("Đã đóng tất cả kết nối.");
         }));
     }
+
 }
