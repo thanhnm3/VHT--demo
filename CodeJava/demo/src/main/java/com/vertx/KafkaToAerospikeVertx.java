@@ -74,20 +74,24 @@ public class KafkaToAerospikeVertx extends AbstractVerticle {
         // Consume messages from Kafka and store them in Aerospike
         consumer.handler(record -> {
             try {
-                byte[] key = record.key();
+                byte[] keyBytes = record.key();
                 byte[] value = record.value();
 
-                if (key == null || value == null) {
+                if (keyBytes == null || value == null) {
                     logger.warning("Received null key or value, skipping record.");
                     return;
                 }
 
+                // Convert key to string
+                String keyString = new String(keyBytes);
+
                 // Create Aerospike key and bins
-                Key aerospikeKey = new Key(NAMESPACE, SET_NAME, key);
-                Bin bin = new Bin("data", value);
+                Key aerospikeKey = new Key(NAMESPACE, SET_NAME, keyString);
+                Bin dataBin = new Bin("data", value);
+                Bin PKBin = new Bin("PK", keyString);
 
                 // Write to Aerospike
-                aerospikeClient.put(writePolicy, aerospikeKey, bin);
+                aerospikeClient.put(writePolicy, aerospikeKey,PKBin, dataBin);
                 insertCount.incrementAndGet();
             } catch (Exception e) {
                 logger.severe("Failed to process record: " + e.getMessage());

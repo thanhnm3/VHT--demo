@@ -43,3 +43,6 @@ cach cai dat source connector va sink connector
 curl -L -o aerospike-sink-connector.zip https://www.confluent.io/hub/aerospike/kafka-connect-aerospike-sink/aerospike-kafka-connect-aerospike-sink-3.0.4.zip 
 
 https://www.confluent.io/hub/aerospike/kafka-connect-aerospike-sink/aerospike-kafka-connect-aerospike-sink-3.0.4.zip
+
+
+Note buoi 7 : Source and Sink are Error, only for enterprise, please try again later.

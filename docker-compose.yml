@@ -16,6 +16,10 @@ services:
       retries: 5
     networks:
       - confluent
+      # docker exec -it broker /opt/kafka/bin/kafka-topics.sh --describe --topic person-topic --bootstrap-server localhost:9092
+
+
+
 
   broker:
     image: confluentinc/cp-server:7.3.2
@@ -41,6 +45,13 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_JMX_PORT: 9101
       KAFKA_JMX_HOSTNAME: localhost
+      KAFKA_HEAP_OPTS: "-Xmx4G -Xms4G"
+      KAFKA_LOG_RETENTION_HOURS: "48"
+      KAFKA_LOG_SEGMENT_BYTES: "1073741824"
+      KAFKA_NUM_NETWORK_THREADS: "3"
+      KAFKA_NUM_IO_THREADS: "8"
+      KAFKA_SOCKET_SEND_BUFFER_BYTES: "1048576"
+      KAFKA_SOCKET_RECEIVE_BUFFER_BYTES: "1048576"
       CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: broker:29092
       CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
       CONFLUENT_METRICS_ENABLE: 'true'
@@ -98,8 +109,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-    # Neu su dung codespace thi phai forward port 9021 ra ngoai
-    # Sau do truy cap vao https://glorious-funicular-5jj7q6j44x93pp7q-9021.app.github.dev/clusters 
 
 
 
