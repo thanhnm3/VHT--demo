@@ -1,0 +1,123 @@
+
+version: '3.8'
+services:
+  grafana:
+    image: "grafana/grafana:${GRAFANA_VERSION}"
+    ports:
+     - "8080:3000"
+    environment:
+      GF_PATHS_DATA : /var/lib/grafana
+      GF_SECURITY_ADMIN_PASSWORD : kafka
+    volumes:
+     - ./grafana/provisioning:/etc/grafana/provisioning
+     - ./grafana/dashboards:/var/lib/grafana/dashboards
+    container_name: grafana
+    depends_on:
+     - prometheus
+    networks:
+      - kafka-platform
+
+  prometheus:
+    image: "prom/prometheus:${PROMETHEUS_VERSION}"
+    ports:
+     - "9090:9090"
+    volumes:
+     - ./etc/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command: "--config.file=/etc/prometheus/prometheus.yml"
+    container_name: prometheus
+    networks:
+      - kafka-platform
+
+  jmx-kafka101:
+    image: "sscaling/jmx-prometheus-exporter"
+    ports:
+     - "5556:5556"
+    environment:
+     CONFIG_YML : "/etc/jmx_exporter/config.yml"
+    volumes:
+     - ./etc/jmx_exporter/config_kafka101.yml:/etc/jmx_exporter/config.yml
+    container_name: jmx-kafka101
+    depends_on:
+     - kafka101
+    networks:
+      - kafka-platform
+
+  zk1:
+    image: confluentinc/cp-zookeeper:${CONFLUENT_VERSION}
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+    ports:
+     - "2181:2181"
+    container_name: zookeeper1
+    networks:
+      - kafka-platform
+
+  kafka101:
+    image: confluentinc/cp-kafka:${CONFLUENT_VERSION}
+    depends_on:
+      - zk1
+    ports:
+      - "9092:9092"
+      - "9991:9991"
+    container_name: kafka101
+    environment:
+      KAFKA_BROKER_ID: 101
+      KAFKA_JMX_PORT: 9991
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper1:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka101:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_LOG_RETENTION_MS: 60000
+      CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: kafka101:29092
+      CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: zookeeper1:2181
+      CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
+      CONFLUENT_METRICS_ENABLE: 'false'
+      KAFKA_HEAP_OPTS: ${KAFKA_HEAP_OPTS}
+    networks:
+      - kafka-platform
+
+
+  aerospike:
+    image: aerospike/aerospike-server
+    container_name: aerospike
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+    volumes:
+      - ./aerospike.conf:/etc/aerospike/aerospike.conf
+      - ./aerospike_data:/opt/aerospike/data 
+    command: ["--config-file", "/etc/aerospike/aerospike.conf"]
+    networks:
+      - kafka-platform
+    # Kiem tra container xem file config co dung khong
+    # docker exec -it aerospike /bin/bash
+    # cat /etc/aerospike/aerospike.conf
+
+    # Copyfile aerospike.conf vao container
+    # docker cp aerospike.conf aerospike:/etc/aerospike/aerospike.conf
+    # docker restart aerospike
+
+
+  aerospike-tools:
+    image: aerospike/aerospike-tools
+    container_name: aerospike-tools
+    depends_on:
+      - aerospike
+    networks:
+      - kafka-platform
+    entrypoint: [ "sleep", "infinity" ]
+  # docker exec -it aerospike-tools aql -h aerospike
+  # Để truy cập vào aql của DB, để kiểm thử
+
+networks:
+  kafka-platform:
+    name: kafka-platform
+    driver: bridge
+
+  # docker-compose -f zk-kafka-single-node-stack.yml up -d
