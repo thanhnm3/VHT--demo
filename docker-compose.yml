@@ -1,4 +1,4 @@
-version: '2'
+version: '2.1'
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.3.2
@@ -34,30 +34,31 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      
+      # Cấu hình listener cho client
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:29092,PLAINTEXT_HOST://localhost:9092
-      KAFKA_METRIC_REPORTERS: io.confluent.metrics.reporter.ConfluentMetricsReporter
+      
+      # Cấu hình tối ưu message
+      KAFKA_NUM_PARTITIONS: 1
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_CONFLUENT_BALANCER_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_JMX_PORT: 9101
-      KAFKA_JMX_HOSTNAME: localhost
-      KAFKA_HEAP_OPTS: "-Xmx4G -Xms4G"
-      KAFKA_LOG_RETENTION_HOURS: "48"
-      KAFKA_LOG_SEGMENT_BYTES: "1073741824"
-      KAFKA_NUM_NETWORK_THREADS: "3"
-      KAFKA_NUM_IO_THREADS: "8"
-      KAFKA_SOCKET_SEND_BUFFER_BYTES: "1048576"
-      KAFKA_SOCKET_RECEIVE_BUFFER_BYTES: "1048576"
-      CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: broker:29092
-      CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
-      CONFLUENT_METRICS_ENABLE: 'true'
-      CONFLUENT_SUPPORT_CUSTOMER_ID: 'anonymous'
-      CONFLUENT_MONITORING_INTERCEPTOR_BOOTSTRAP_SERVERS: broker:29092
-      CONFLUENT_MONITORING_INTERCEPTOR_TOPIC_REPLICATION: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      
+      # Tối ưu hiệu suất
+      KAFKA_NUM_NETWORK_THREADS: 3
+      KAFKA_NUM_IO_THREADS: 8
+      KAFKA_SOCKET_SEND_BUFFER_BYTES: 512000 # Giảm để tránh chiếm nhiều tài nguyên
+      KAFKA_SOCKET_RECEIVE_BUFFER_BYTES: 512000
+      KAFKA_LOG_SEGMENT_BYTES: "536870912" # Giảm size log segment
+      KAFKA_LOG_RETENTION_HOURS: "24" # Giảm thời gian lưu log
+      KAFKA_LOG_CLEANER_ENABLE: "false"
+
+      # Giới hạn tài nguyên Kafka
+      KAFKA_HEAP_OPTS: "-Xmx2G -Xms2G" # Giảm heap để tránh dùng quá nhiều RAM
+
     networks:
       - confluent
     healthcheck:
@@ -65,50 +66,28 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      # Test toc do truy cap vao broker
+
+
+      # Kafka
+      # docker exec -it broker kafka-topics --list --bootstrap-server localhost:9092
+
+      # Xoa person-topic
+      # docker exec -it broker kafka-topics --delete --topic person-topic --bootstrap-server localhost:9092
 
       # Tao test topic
-      # docker exec -it broker kafka-topics --create --topic test-topic --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
+      # docker exec -it kafka101 kafka-topics --create --topic test-topic --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
 
 
       # Tao producer
-      # docker exec -it broker kafka-producer-perf-test --topic test-topic --num-records 5000000 --record-size 100 --throughput -1 --producer-props bootstrap.servers=localhost:9092 batch.size=65536 linger.ms=5
+      # docker exec -it kafka101 kafka-producer-perf-test --topic test-topic --num-records 5000000 --record-size 1000 --throughput -1 --producer-props bootstrap.servers=localhost:9092 batch.size=65536 linger.ms=5
 
-      # docker exec -it broker kafka-producer-perf-test --topic test-topic --num-records 500000 --record-size 1000 --throughput -1 --producer-props bootstrap.servers=localhost:9092
-      # docker exec -it broker kafka-producer-perf-test --topic test-topic --num-records 500000 --record-size 10000 --throughput -1 --producer-props bootstrap.servers=localhost:9092
+      # docker exec -it kafka101 kafka-producer-perf-test --topic test-topic --num-records 500000 --record-size 1000 --throughput -1 --producer-props bootstrap.servers=localhost:9092
+      # docker exec -it kafka101 kafka-producer-perf-test --topic test-topic --num-records 500000 --record-size 10000 --throughput -1 --producer-props bootstrap.servers=localhost:9092
 
       # Tao consumer
-      # docker exec -it broker kafka-consumer-perf-test --broker-list localhost:9092 --messages 5000000 --topic test-topic --num-fetch-threads 4 --show-detailed-stats
+      # docker exec -it kafka101 kafka-consumer-perf-test --broker-list localhost:9092 --messages 5000000 --topic test-topic --num-fetch-threads 4 --show-detailed-stats
       # Toc do tot nhat la 700Mb/s
       # Tham khao https://developer.confluent.io/learn/kafka-performance/
-
-
-  control-center:
-    image: confluentinc/cp-enterprise-control-center:7.3.2
-    hostname: control-center
-    container_name: control-center
-    depends_on:
-      broker:
-        condition: service_healthy
-    ports:
-      - "9021:9021"
-    environment:
-      CONTROL_CENTER_BOOTSTRAP_SERVERS: 'broker:29092'
-      CONTROL_CENTER_REPLICATION_FACTOR: 1
-      CONTROL_CENTER_INTERNAL_TOPICS_PARTITIONS: 1
-      CONTROL_CENTER_MONITORING_INTERCEPTOR_TOPIC_PARTITIONS: 1
-      CONFLUENT_METRICS_TOPIC_REPLICATION: 1
-      CONFLUENT_METRICS_ENABLE: 'true'
-      CONTROL_CENTER_MONITORING_INTERCEPTOR_BOOTSTRAP_SERVERS: 'broker:29092'
-      CONTROL_CENTER_MONITORING_INTERCEPTOR_TOPIC_REPLICATION: 1
-      PORT: 9021
-    networks:
-      - confluent
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:9021/health" ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
 
 
 
@@ -146,7 +125,49 @@ services:
   # docker exec -it aerospike-tools aql -h aerospike
   # Để truy cập vào aql của DB, để kiểm thử
 
+  kafka-exporter:
+    image: danielqsj/kafka-exporter
+    container_name: kafka-exporter
+    command:
+      - "--kafka.server=broker:29092"
+    ports:
+      - "9308:9308"
+    depends_on:
+      - broker
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9308"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
+    networks:
+      - confluent
+
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - confluent
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - "8080:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
+    networks:
+      - confluent
+  # URL Dashboard http://prometheus:9090
+  # Method GET
+  # id 7589
 networks:
   confluent:
     driver: bridge

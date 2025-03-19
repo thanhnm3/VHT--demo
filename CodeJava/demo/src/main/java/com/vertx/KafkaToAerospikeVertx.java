@@ -91,7 +91,7 @@ public class KafkaToAerospikeVertx extends AbstractVerticle {
                 Bin PKBin = new Bin("PK", keyString);
 
                 // Write to Aerospike
-                aerospikeClient.put(writePolicy, aerospikeKey,PKBin, dataBin);
+                aerospikeClient.put(writePolicy, aerospikeKey, PKBin, dataBin);
                 insertCount.incrementAndGet();
             } catch (Exception e) {
                 logger.severe("Failed to process record: " + e.getMessage());

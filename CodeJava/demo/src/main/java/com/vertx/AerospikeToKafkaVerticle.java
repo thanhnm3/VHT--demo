@@ -6,11 +6,14 @@ import com.aerospike.client.policy.ScanPolicy;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
+import io.vertx.core.VertxOptions;
 import io.vertx.kafka.client.producer.KafkaProducer;
 import io.vertx.kafka.client.producer.KafkaProducerRecord;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -27,12 +30,14 @@ public class AerospikeToKafkaVerticle extends AbstractVerticle {
     private static final String SET_NAME = "users";
     private static final String KAFKA_BROKER = "localhost:9092";
     private static final String KAFKA_TOPIC = "person-topic";
+    private static final int BATCH_SIZE = 500;  // Kích thước batch
 
     private AerospikeClient client;
     private KafkaProducer<String, byte[]> producer;
     private static Vertx vertx;
     private AtomicInteger recordCount = new AtomicInteger(0);
     private static final Logger logger = Logger.getLogger(AerospikeToKafkaVerticle.class.getName());
+    private List<KafkaProducerRecord<String, byte[]>> batch = new ArrayList<>();
 
     @Override
     public void start(Promise<Void> startPromise) {
@@ -50,7 +55,8 @@ public class AerospikeToKafkaVerticle extends AbstractVerticle {
         client = new AerospikeClient(new ClientPolicy(), AEROSPIKE_HOST, AEROSPIKE_PORT);
 
         // Cấu hình Kafka Producer  
-        vertx = Vertx.vertx();
+        vertx = Vertx.vertx(new VertxOptions().setWorkerPoolSize(Runtime.getRuntime().availableProcessors() * 2));
+        logger.info("🔄 KafkaToAerospikeVerticle sử dụng Vertx với Worker Pool Size: " + (Runtime.getRuntime().availableProcessors() * 2));
         Map<String, String> config = new HashMap<>();
         config.put("bootstrap.servers", KAFKA_BROKER);
         config.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
@@ -62,7 +68,7 @@ public class AerospikeToKafkaVerticle extends AbstractVerticle {
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
         scheduler.scheduleAtFixedRate(() -> {
             int count = recordCount.getAndSet(0);
-            logger.info("Đã gửi " + count + " bản ghi trong giây vừa qua.");
+            logger.info("Aerospike ----------> " + count + " records ----------> Kafka");
         }, 1, 1, TimeUnit.SECONDS);
 
         // Gửi dữ liệu lên Kafka
@@ -85,14 +91,12 @@ public class AerospikeToKafkaVerticle extends AbstractVerticle {
                 byte[] personBinary = (byte[]) record.getValue("personData");
                 KafkaProducerRecord<String, byte[]> kafkaRecord = KafkaProducerRecord.create(KAFKA_TOPIC, key.userKey.toString(), personBinary);
 
-                producer.send(kafkaRecord, result -> {
-                    if (result.failed()) {
-                        logger.severe("Lỗi gửi Kafka: " + result.cause().getMessage());
-                    } else {
-                        recordCount.incrementAndGet();
+                synchronized (batch) {
+                    batch.add(kafkaRecord);
+                    if (batch.size() >= BATCH_SIZE) {
+                        sendBatch();
                     }
-                });
-
+                }
             } catch (Exception e) {
                 logger.severe("Lỗi xử lý record: " + e.getMessage());
                 e.printStackTrace();
@@ -109,4 +113,21 @@ public class AerospikeToKafkaVerticle extends AbstractVerticle {
         }));
     }
 
+    private void sendBatch() {
+        List<KafkaProducerRecord<String, byte[]>> batchToSend;
+        synchronized (batch) {
+            batchToSend = new ArrayList<>(batch);
+            batch.clear();
+        }
+
+        for (KafkaProducerRecord<String, byte[]> record : batchToSend) {
+            producer.send(record, result -> {
+                if (result.failed()) {
+                    logger.severe("Lỗi gửi Kafka: " + result.cause().getMessage());
+                } else {
+                    recordCount.incrementAndGet();
+                }
+            });
+        }
+    }
 }

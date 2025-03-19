@@ -23,12 +23,12 @@ public class AerospikeInsertProtoRandomBatch {
         String setName = "users";
         Random random = new Random();
 
-        int numThreads = 4; // Số lượng luồng
+        int numThreads = 2; // Số lượng luồng
         ExecutorService executor = Executors.newFixedThreadPool(numThreads);
 
         long startTime = System.currentTimeMillis();
         int duration = 10_000; // Chạy trong 10 giây
-        int batchSize = 400; // Kích thước batch
+        int batchSize = 1000; // Kích thước batch
 
         AtomicInteger totalCount = new AtomicInteger(0); // Tổng số bản ghi đã insert
 
@@ -38,8 +38,8 @@ public class AerospikeInsertProtoRandomBatch {
                     List<Key> keys = new ArrayList<>();
                     List<Bin[]> binsList = new ArrayList<>();
                     for (int j = 0; j < batchSize; j++) {
-                        // 🟢 Tạo dữ liệu ngẫu nhiên với kích thước từ 1 byte đến 100 byte
-                        byte[] personBytes = generateRandomBytes(random, 1, 100);
+                        // 🟢 Tạo dữ liệu ngẫu nhiên với kích thước từ 10 byte đến 1000 byte
+                        byte[] personBytes = generateRandomBytes(random, 1000, 10000);
                         
                         // 🟢 Sinh UUID
                         String userId = UUID.randomUUID().toString();
