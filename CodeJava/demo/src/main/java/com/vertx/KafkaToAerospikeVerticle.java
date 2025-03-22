@@ -7,7 +7,6 @@ import com.aerospike.client.policy.WritePolicy;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
-import io.vertx.core.VertxOptions;
 import io.vertx.kafka.client.consumer.KafkaConsumer;
 import io.vertx.kafka.client.consumer.KafkaConsumerRecord;
 
@@ -33,13 +32,17 @@ public class KafkaToAerospikeVerticle extends AbstractVerticle {
     private static final String KAFKA_BROKER = "localhost:9092";
     private static final String KAFKA_TOPIC = "person-topic";
     private static final String GROUP_ID = "aerospike-consumer-group";
-    private static final int BATCH_SIZE = 500;  // Kích thước batch
+    private static final int BATCH_SIZE = 10;  // Kích thước batch
 
     private AerospikeClient aerospikeClient;
     private KafkaConsumer<byte[], byte[]> consumer;
     private AtomicInteger insertCount = new AtomicInteger(0);
     private static final Logger logger = Logger.getLogger(KafkaToAerospikeVerticle.class.getName());
     private List<KafkaConsumerRecord<byte[], byte[]>> batch = new ArrayList<>();
+
+    public KafkaToAerospikeVerticle(Vertx vertx) {
+        this.vertx = vertx;
+    }
 
     @Override
     public void start(Promise<Void> startPromise) {
@@ -52,7 +55,7 @@ public class KafkaToAerospikeVerticle extends AbstractVerticle {
         }
 
         // Tạo một instance Vertx riêng với cấu hình worker pool khác
-        Vertx vertx2 = Vertx.vertx(new VertxOptions().setWorkerPoolSize(Runtime.getRuntime().availableProcessors() * 4));
+        // Vertx vertx2 = Vertx.vertx(new VertxOptions().setWorkerPoolSize(Runtime.getRuntime().availableProcessors() * 4));
         logger.info("🔄 KafkaToAerospikeVerticle sử dụng Vertx với Worker Pool Size: " + (Runtime.getRuntime().availableProcessors() * 4));
 
         // Initialize Aerospike client
@@ -73,7 +76,7 @@ public class KafkaToAerospikeVerticle extends AbstractVerticle {
         // config.put("fetch.max.bytes", "10485760"); // Giới hạn kích thước message  
         config.put("max.poll.interval.ms", "300000"); // Tránh bị Kafka kick nếu xử lý chậm  
 
-        consumer = KafkaConsumer.create(vertx2, config); // Sử dụng vertx2 cho Kafka consumer
+        consumer = KafkaConsumer.create(this.vertx, config); // Sử dụng vertx2 cho Kafka consumer
         consumer.subscribe(KAFKA_TOPIC);
 
         // Scheduled task to log insert count every second

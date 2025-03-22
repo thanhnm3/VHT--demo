@@ -72,20 +72,22 @@ services:
       # docker exec -it broker kafka-topics --list --bootstrap-server localhost:9092
 
       # Xoa person-topic
-      # docker exec -it broker kafka-topics --delete --topic person-topic --bootstrap-server localhost:9092
+      # docker exec -it kafka101 kafka-topics --delete --topic person-topic --bootstrap-server localhost:9092
 
       # Tao test topic
       # docker exec -it kafka101 kafka-topics --create --topic test-topic --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
+      # Tao Person topic
+      # docker exec -it kafka101 kafka-topics --create --topic person-topic --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
 
 
       # Tao producer
-      # docker exec -it kafka101 kafka-producer-perf-test --topic test-topic --num-records 5000000 --record-size 1000 --throughput -1 --producer-props bootstrap.servers=localhost:9092 batch.size=65536 linger.ms=5
+      # docker exec -it kafka101 kafka-producer-perf-test --topic test-topic --num-records 5000000 --record-size 100 --throughput -1 --producer-props bootstrap.servers=localhost:9092 batch.size=65536 linger.ms=5
 
       # docker exec -it kafka101 kafka-producer-perf-test --topic test-topic --num-records 500000 --record-size 1000 --throughput -1 --producer-props bootstrap.servers=localhost:9092
       # docker exec -it kafka101 kafka-producer-perf-test --topic test-topic --num-records 500000 --record-size 10000 --throughput -1 --producer-props bootstrap.servers=localhost:9092
 
       # Tao consumer
-      # docker exec -it kafka101 kafka-consumer-perf-test --broker-list localhost:9092 --messages 5000000 --topic test-topic --num-fetch-threads 4 --show-detailed-stats
+      # docker exec -it kafka101 kafka-consumer-perf-test --broker-list localhost:9092 --messages 5000000 --topic test-topic --show-detailed-stats
       # Toc do tot nhat la 700Mb/s
       # Tham khao https://developer.confluent.io/learn/kafka-performance/
 

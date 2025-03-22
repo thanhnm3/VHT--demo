@@ -45,12 +45,14 @@ whitelistObjectNames:
   - kafka.network:type=Processor,*
   - kafka.network:type=SocketServer,*
   - kafka.network:type=RequestMetrics,*
-#  - kafka.network:type=RequestMetrics,name=*,request=OffsetCommit,version=*
-#  - kafka.network:type=RequestMetrics,name=*,request=FetchConsumer,version=*
+  - kafka.network:type=RequestMetrics,name=*,request=OffsetCommit,version=*
+  - kafka.network:type=RequestMetrics,name=*,request=FetchConsumer,version=*
 #  - kafka.network:type=RequestMetrics,name=*,request=FetchFollower,version=*
 #  - kafka.network:type=RequestMetrics,name=*,request=Produce,version=*
 #  - kafka.network:type=RequestMetrics,name=*,request=Metadata,version=*
   - kafka.coordinator.group:*
+  - kafka.consumer:type=consumer-fetch-manager-metrics,*
+  - kafka.consumer:type=consumer-coordinator-metrics,*
 blacklistObjectNames:
   - java.lang:type=ClassLoading,*
   - java.lang:type=Compilation,*
@@ -501,4 +503,28 @@ rules:
     name: kafka_jvm_os_$1
     labels:
       service: kafka-broker
+      env: cluster-demo
+  #-------------------------------------------------------------------------------------------------------
+  # Consumer Metrics: Đo lường hiệu suất của Kafka Consumer
+  #
+  # - Consumer Lag: Số lượng message mà consumer chưa xử lý (records-lag)
+  # - Consumer Fetch Rate: Tốc độ fetch message từ Kafka (fetch-rate)
+  #-------------------------------------------------------------------------------------------------------
+
+  # Consumer Lag: Độ trễ của Consumer so với Producer (số message chưa được tiêu thụ)
+  - pattern: kafka.consumer<type=consumer-fetch-manager-metrics, client-id=([^,]+), topic=([^,]+), partition=([^,]+)><>records-lag
+    name: kafka_consumer_records_lag
+    labels:
+      client_id: $1    # ID của consumer
+      topic: $2        # Tên topic đang được consumer tiêu thụ
+      partition: $3    # Partition cụ thể trong topic
+      service: kafka-consumer
+      env: cluster-demo
+
+  # Consumer Fetch Rate: Số lần consumer fetch message từ Kafka mỗi giây
+  - pattern: kafka.consumer<type=consumer-fetch-manager-metrics, client-id=([^,]+)><>fetch-rate
+    name: kafka_consumer_fetch_rate
+    labels:
+      client_id: $1    # ID của consumer
+      service: kafka-consumer
       env: cluster-demo

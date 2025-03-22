@@ -115,9 +115,28 @@ services:
   # docker exec -it aerospike-tools aql -h aerospike
   # Để truy cập vào aql của DB, để kiểm thử
 
+  # aerospike-prometheus-exporter:
+  #   image: aerospike/aerospike-prometheus-exporter:1.21.1
+
+  #   container_name: aerospike-prometheus-exporter
+  #   ports:
+  #     - "9145:9145" # Port mặc định của Aerospike Prometheus Exporter
+  #   environment:
+  #     AEROSPIKE_HOST: aerospike # Tên container Aerospike
+  #   depends_on:
+  #     - aerospike
+  #   networks:
+  #     - kafka-platform 
+
+
 networks:
   kafka-platform:
     name: kafka-platform
     driver: bridge
 
   # docker-compose -f zk-kafka-single-node-stack.yml up -d
+
+  # https://grafana.com/grafana/dashboards/20860-aerospike-batch-transactions-view/
+  # Grafana dashboard for Aerospike
+  # Updating ...
+  
