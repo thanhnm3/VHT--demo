@@ -1,0 +1,4 @@
+com/vertx/Main.class
+com/vertx/AerospikeToKafkaVerticle.class
+com/vertx/MainVertxApp.class
+com/vertx/KafkaToAerospikeVerticle.class

@@ -34,13 +34,14 @@ services:
      - "5556:5556"
     environment:
      CONFIG_YML : "/etc/jmx_exporter/config.yml"
-    # volumes:
-    #  - ./etc/jmx_exporter/config_kafka101.yml:/etc/jmx_exporter/config.yml
+    volumes:
+     - ./etc/jmx_exporter/config_kafka101.yml:/etc/jmx_exporter/config.yml
     container_name: jmx-kafka101
     depends_on:
      - kafka101
     networks:
       - kafka-platform
+
 
   zk1:
     image: confluentinc/cp-zookeeper:${CONFLUENT_VERSION}
@@ -112,6 +113,8 @@ services:
 
     # Copyfile aerospike.conf vao container
     # docker cp aerospike.conf aerospike:/etc/aerospike/aerospike.conf
+    # docker cp aerospike2.conf aerospike2:/etc/aerospike/aerospike.conf
+
     # docker restart aerospike
 
 
