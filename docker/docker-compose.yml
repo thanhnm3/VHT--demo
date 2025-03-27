@@ -28,6 +28,18 @@ services:
     networks:
       - kafka-platform
 
+  # kafka-exporter:
+  #   image: danielqsj/kafka-exporter
+  #   command:
+  #     - "--kafka.server=kafka101:9092" 
+  #   ports:
+  #     - "9308:9308"
+  #   container_name: kafka-exporter
+  #   depends_on:
+  #     - kafka101
+  #   networks:
+  #     - kafka-platform
+
   jmx-kafka101:
     image: "sscaling/jmx-prometheus-exporter"
     ports:
@@ -74,7 +86,7 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_LOG_RETENTION_MS: 60000
+      KAFKA_LOG_RETENTION_MS: 600000
       CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: kafka101:29092
       CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: zookeeper1:2181
       CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1

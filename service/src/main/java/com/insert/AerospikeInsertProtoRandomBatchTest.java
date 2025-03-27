@@ -21,7 +21,7 @@ public class AerospikeInsertProtoRandomBatchTest {
         String setName = "users";
         Random random = new Random();
 
-        int numThreads = 2; // Số lượng luồng song song
+        int numThreads = 8; // Số lượng luồng song song
         ExecutorService executor = Executors.newFixedThreadPool(numThreads);
 
         long startTime = System.currentTimeMillis();
