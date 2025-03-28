@@ -5,21 +5,22 @@ import io.vertx.core.VertxOptions;
 
 public class MainVertxApp {
     public static void main(String[] args) {
-        // Tạo Vertx instance cho tác vụ đọc (ít threads hơn)
-        Vertx vertx1 = Vertx.vertx(new VertxOptions().setWorkerPoolSize(Runtime.getRuntime().availableProcessors() * 1));
-        vertx1.deployVerticle(new AerospikeToKafkaVerticle(vertx1), res -> { // Truyền vertx1 vào constructor
+        // Tạo Vertx instance với số lượng event loop hợp lý
+        Vertx vertx = Vertx.vertx(new VertxOptions().setEventLoopPoolSize(Runtime.getRuntime().availableProcessors() * 2));
+
+        // Triển khai AerospikeToKafkaVerticle (tác vụ đọc)
+        vertx.deployVerticle(new AerospikeToKafkaVerticle(vertx), res -> {
             if (res.succeeded()) {
-                System.out.println("AerospikeToKafkaVerticle deployment id is: " + res.result());
+                System.out.println("AerospikeToKafkaVerticle deployed successfully");
             } else {
                 System.out.println("AerospikeToKafkaVerticle deployment failed!");
             }
         });
 
-        // Tạo Vertx instance cho tác vụ ghi (nhiều threads hơn)
-        Vertx vertx2 = Vertx.vertx(new VertxOptions().setWorkerPoolSize(Runtime.getRuntime().availableProcessors() * 4));
-        vertx2.deployVerticle(new KafkaToAerospikeVerticle(vertx2), res -> { // Truyền vertx2 vào constructor
+        // Triển khai KafkaToAerospikeVerticle (tác vụ ghi)
+        vertx.deployVerticle(new KafkaToAerospikeVerticle(vertx), res -> {
             if (res.succeeded()) {
-                System.out.println("KafkaToAerospikeVerticle deployment id is: " + res.result());
+                System.out.println("KafkaToAerospikeVerticle deployed successfully");
             } else {
                 System.out.println("KafkaToAerospikeVerticle deployment failed!");
             }

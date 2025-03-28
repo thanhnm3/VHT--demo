@@ -1,168 +1,40 @@
-Mar 27, 2025 3:49:37 AM com.vertx.KafkaToAerospikeVerticle start
-INFO: 🔄 KafkaToAerospikeVerticle sử dụng Vertx với Worker Pool Size: 16
-Mar 27, 2025 3:49:38 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
-Mar 27, 2025 3:49:39 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 1555 records ----------> Aerospike
-Mar 27, 2025 3:49:40 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 3325 records ----------> Aerospike
-Mar 27, 2025 3:49:41 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 3250 records ----------> Aerospike
-Mar 27, 2025 3:49:42 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 2000 records ----------> Aerospike
-Mar 27, 2025 3:49:43 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 3480 records ----------> Aerospike
-Mar 27, 2025 3:49:44 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 3250 records ----------> Aerospike
-Mar 27, 2025 3:49:45 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 3437 records ----------> Aerospike
-Mar 27, 2025 3:49:46 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 3359 records ----------> Aerospike
-Mar 27, 2025 3:49:47 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 3300 records ----------> Aerospike
-Mar 27, 2025 3:49:48 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 3728 records ----------> Aerospike
-Mar 27, 2025 3:49:49 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 3530 records ----------> Aerospike
-Mar 27, 2025 3:49:50 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 3606 records ----------> Aerospike
-Mar 27, 2025 3:49:51 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 2350 records ----------> Aerospike
-Mar 27, 2025 3:49:52 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 4465 records ----------> Aerospike
-Mar 27, 2025 3:49:53 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 2675 records ----------> Aerospike
-Mar 27, 2025 3:49:54 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 3545 records ----------> Aerospike
-Mar 27, 2025 3:49:55 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 2735 records ----------> Aerospike
-Mar 27, 2025 3:49:56 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 3740 records ----------> Aerospike
-Mar 27, 2025 3:49:57 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 2444 records ----------> Aerospike
-Mar 27, 2025 3:49:58 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 4296 records ----------> Aerospike
-Mar 27, 2025 3:49:59 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 3640 records ----------> Aerospike
-Mar 27, 2025 3:50:00 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 3680 records ----------> Aerospike
-Mar 27, 2025 3:50:01 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 5020 records ----------> Aerospike
-Mar 27, 2025 3:50:02 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 3705 records ----------> Aerospike
-Mar 27, 2025 3:50:03 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 4658 records ----------> Aerospike
-Mar 27, 2025 3:50:04 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 3888 records ----------> Aerospike
-Mar 27, 2025 3:50:05 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 4041 records ----------> Aerospike
-Mar 27, 2025 3:50:06 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 4598 records ----------> Aerospike
-Mar 27, 2025 3:50:07 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 3510 records ----------> Aerospike
-Mar 27, 2025 3:50:08 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 8221 records ----------> Aerospike
-Mar 27, 2025 3:50:09 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 6967 records ----------> Aerospike
-Mar 27, 2025 3:50:10 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 8424 records ----------> Aerospike
-Mar 27, 2025 3:50:11 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 8793 records ----------> Aerospike
-Mar 27, 2025 3:50:12 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 7869 records ----------> Aerospike
-Mar 27, 2025 3:50:13 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 7861 records ----------> Aerospike
-Mar 27, 2025 3:50:14 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 8112 records ----------> Aerospike
-Mar 27, 2025 3:50:15 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 8581 records ----------> Aerospike
-Mar 27, 2025 3:50:16 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 7862 records ----------> Aerospike
-Mar 27, 2025 3:50:17 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 8522 records ----------> Aerospike
-Mar 27, 2025 3:50:18 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 7020 records ----------> Aerospike
-Mar 27, 2025 3:50:19 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 7337 records ----------> Aerospike
-Mar 27, 2025 3:50:20 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 8165 records ----------> Aerospike
-Mar 27, 2025 3:50:21 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 8487 records ----------> Aerospike
-Mar 27, 2025 3:50:22 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 8663 records ----------> Aerospike
-Mar 27, 2025 3:50:23 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 8332 records ----------> Aerospike
-Mar 27, 2025 3:50:24 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 6919 records ----------> Aerospike
-Mar 27, 2025 3:50:25 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 8186 records ----------> Aerospike
-Mar 27, 2025 3:50:26 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 8743 records ----------> Aerospike
-Mar 27, 2025 3:50:27 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 7834 records ----------> Aerospike
-Mar 27, 2025 3:50:28 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 7730 records ----------> Aerospike
-Mar 27, 2025 3:50:29 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 8415 records ----------> Aerospike
-Mar 27, 2025 3:50:30 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 8434 records ----------> Aerospike
-Mar 27, 2025 3:50:31 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 8749 records ----------> Aerospike
-Mar 27, 2025 3:50:32 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 5964 records ----------> Aerospike
-Mar 27, 2025 3:50:33 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
-Mar 27, 2025 3:50:34 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
-Mar 27, 2025 3:50:35 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
-Mar 27, 2025 3:50:36 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
-Mar 27, 2025 3:50:37 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
-Mar 27, 2025 3:50:38 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
-Mar 27, 2025 3:50:39 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
-Mar 27, 2025 3:50:40 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
-Mar 27, 2025 3:50:41 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
-Mar 27, 2025 3:50:42 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
-Mar 27, 2025 3:50:43 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
-Mar 27, 2025 3:50:44 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
-Mar 27, 2025 3:50:45 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
-Mar 27, 2025 3:50:46 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
-Mar 27, 2025 3:50:47 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
-Mar 27, 2025 3:50:48 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
-Mar 27, 2025 3:50:49 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
-Mar 27, 2025 3:50:50 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
-Mar 27, 2025 3:50:51 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
-Mar 27, 2025 3:50:52 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
-Mar 27, 2025 3:50:53 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
-Mar 27, 2025 3:50:54 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
-Mar 27, 2025 3:50:55 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
-Mar 27, 2025 3:50:56 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
-Mar 27, 2025 3:50:57 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
-Mar 27, 2025 3:50:58 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
-Mar 27, 2025 3:50:59 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
-Mar 27, 2025 3:51:00 AM com.vertx.KafkaToAerospikeVerticle lambda$0
-INFO: Kafka ----------> 0 records ----------> Aerospike
+2025-03-27 11:28:21: 🔄 KafkaToAerospikeVerticle sử dụng Vertx với Worker Pool Size: 16
+2025-03-27 11:28:22: So message da gui trong 1 giay : 0
+2025-03-27 11:28:24: So message da gui trong 1 giay : 1844
+2025-03-27 11:28:24: So message da gui trong 1 giay : 157
+2025-03-27 11:28:24: Offset committed successfully.
+2025-03-27 11:28:24: Offset committed successfully.
+2025-03-27 11:28:26: So message da gui trong 1 giay : 8407
+2025-03-27 11:28:27: So message da gui trong 1 giay : 81
+2025-03-27 11:28:27: Offset committed successfully.
+2025-03-27 11:28:27: Offset committed successfully.
+2025-03-27 11:28:28: So message da gui trong 1 giay : 7059
+2025-03-27 11:28:28: So message da gui trong 1 giay : 500
+2025-03-27 11:28:28: Offset committed successfully.
+2025-03-27 11:28:28: Offset committed successfully.
+2025-03-27 11:28:32: So message da gui trong 1 giay : 20156
+2025-03-27 11:28:32: So message da gui trong 1 giay : 85
+2025-03-27 11:28:32: Offset committed successfully.
+2025-03-27 11:28:32: So message da gui trong 1 giay : 88
+2025-03-27 11:28:32: Offset committed successfully.
+2025-03-27 11:28:32: So message da gui trong 1 giay : 500
+2025-03-27 11:28:32: Offset committed successfully.
+2025-03-27 11:28:32: Offset committed successfully.
+2025-03-27 11:28:36: So message da gui trong 1 giay : 20468
+2025-03-27 11:28:36: So message da gui trong 1 giay : 500
+2025-03-27 11:28:36: Offset committed successfully.
+2025-03-27 11:28:36: So message da gui trong 1 giay : 500
+2025-03-27 11:28:36: Offset committed successfully.
+2025-03-27 11:28:36: So message da gui trong 1 giay : 500
+2025-03-27 11:28:36: Offset committed successfully.
+2025-03-27 11:28:36: Offset committed successfully.
+2025-03-27 11:28:39: So message da gui trong 1 giay : 15558
+2025-03-27 11:28:39: So message da gui trong 1 giay : 263
+2025-03-27 11:28:39: Offset committed successfully.
+2025-03-27 11:28:39: So message da gui trong 1 giay : 500
+2025-03-27 11:28:40: Offset committed successfully.
+2025-03-27 11:28:40: Offset committed successfully.
+2025-03-27 11:28:41: So message da gui trong 1 giay : 6230
+2025-03-27 11:28:41: So message da gui trong 1 giay : 225
+2025-03-27 11:28:41: Offset committed successfully.
+2025-03-27 11:28:41: Offset committed successfully.

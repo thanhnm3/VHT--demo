@@ -28,18 +28,6 @@ services:
     networks:
       - kafka-platform
 
-  # kafka-exporter:
-  #   image: danielqsj/kafka-exporter
-  #   command:
-  #     - "--kafka.server=kafka101:9092" 
-  #   ports:
-  #     - "9308:9308"
-  #   container_name: kafka-exporter
-  #   depends_on:
-  #     - kafka101
-  #   networks:
-  #     - kafka-platform
-
   jmx-kafka101:
     image: "sscaling/jmx-prometheus-exporter"
     ports:
