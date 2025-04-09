@@ -28,11 +28,4 @@ scrape_configs:
     static_configs:
     - targets: ['jmx-kafka101:5556','jmx-kafka102:5556', 'jmx-kafka103:5556']
 
-  - job_name: 'kafka-exporter'
-
-    # metrics_path defaults to '/metrics'
-    # scheme defaults to 'http'.
-
-    static_configs:
-    - targets: ['kafka-exporter:9308']
 

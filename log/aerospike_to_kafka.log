@@ -1,172 +1,193 @@
-Mar 27, 2025 3:49:37 AM com.vertx.AerospikeToKafkaVerticle start
-INFO: 🔄 KafkaToAerospikeVerticle sử dụng Vertx với Worker Pool Size: 8
-Mar 27, 2025 3:49:38 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 340 records ----------> Kafka
-Mar 27, 2025 3:49:38 AM com.vertx.AerospikeToKafkaVerticle lambda$3
-INFO: Hoàn thành quét dữ liệu từ Aerospike.
-Mar 27, 2025 3:49:39 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 4246 records ----------> Kafka
-Mar 27, 2025 3:49:40 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 11453 records ----------> Kafka
-Mar 27, 2025 3:49:41 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 10172 records ----------> Kafka
-Mar 27, 2025 3:49:42 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 10334 records ----------> Kafka
-Mar 27, 2025 3:49:43 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 9059 records ----------> Kafka
-Mar 27, 2025 3:49:44 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 7357 records ----------> Kafka
-Mar 27, 2025 3:49:45 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 7166 records ----------> Kafka
-Mar 27, 2025 3:49:46 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 9100 records ----------> Kafka
-Mar 27, 2025 3:49:47 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 12739 records ----------> Kafka
-Mar 27, 2025 3:49:48 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 10599 records ----------> Kafka
-Mar 27, 2025 3:49:49 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 10283 records ----------> Kafka
-Mar 27, 2025 3:49:50 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 11750 records ----------> Kafka
-Mar 27, 2025 3:49:51 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 8228 records ----------> Kafka
-Mar 27, 2025 3:49:52 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 6241 records ----------> Kafka
-Mar 27, 2025 3:49:53 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 8951 records ----------> Kafka
-Mar 27, 2025 3:49:54 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 9001 records ----------> Kafka
-Mar 27, 2025 3:49:55 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 7338 records ----------> Kafka
-Mar 27, 2025 3:49:56 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 9377 records ----------> Kafka
-Mar 27, 2025 3:49:57 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 9510 records ----------> Kafka
-Mar 27, 2025 3:49:58 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 11508 records ----------> Kafka
-Mar 27, 2025 3:49:59 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 9975 records ----------> Kafka
-Mar 27, 2025 3:50:00 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 12662 records ----------> Kafka
-Mar 27, 2025 3:50:01 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 12662 records ----------> Kafka
-Mar 27, 2025 3:50:02 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 12631 records ----------> Kafka
-Mar 27, 2025 3:50:03 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 14497 records ----------> Kafka
-Mar 27, 2025 3:50:04 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 14639 records ----------> Kafka
-Mar 27, 2025 3:50:05 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 14970 records ----------> Kafka
-Mar 27, 2025 3:50:06 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 13917 records ----------> Kafka
-Mar 27, 2025 3:50:07 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 10295 records ----------> Kafka
-Mar 27, 2025 3:50:08 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:09 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:10 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:11 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:12 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:13 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:14 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:15 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:16 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:17 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:18 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:19 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:20 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:21 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:22 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:23 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:24 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:25 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:26 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:27 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:28 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:29 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:30 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:31 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:32 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:33 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:34 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:35 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:36 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:37 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:38 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:39 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:40 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:41 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:42 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:43 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:44 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:45 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:46 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:47 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:48 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:49 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:50 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:51 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:52 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:53 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:54 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:55 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:56 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:57 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:58 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:50:59 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:51:00 AM com.vertx.AerospikeToKafkaVerticle lambda$0
-INFO: Aerospike ----------> 0 records ----------> Kafka
-Mar 27, 2025 3:51:01 AM com.vertx.AerospikeToKafkaVerticle lambda$4
-INFO: Đang đóng kết nối...
+2025-03-27 11:28:21: 🔄 KafkaToAerospikeVerticle sử dụng Vertx với Worker Pool Size: 8
+2025-03-27 11:28:22: Tổng số message đã gửi trong 1 giây: 0
+2025-03-27 11:28:22: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:22: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:23: Tổng số message đã gửi trong 1 giây: 1670
+2025-03-27 11:28:23: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:23: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:23: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:23: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:23: Hoàn thành quét dữ liệu từ Aerospike.
+2025-03-27 11:28:24: Tổng số message đã gửi trong 1 giây: 4871
+2025-03-27 11:28:24: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:24: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:24: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:24: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:24: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:24: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:24: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:24: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:25: Tổng số message đã gửi trong 1 giây: 3867
+2025-03-27 11:28:25: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:25: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:25: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:25: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:25: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:25: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:25: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:25: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:26: Tổng số message đã gửi trong 1 giây: 5975
+2025-03-27 11:28:26: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:26: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:26: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:26: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:26: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:26: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:26: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:26: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:27: Tổng số message đã gửi trong 1 giây: 6776
+2025-03-27 11:28:27: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:27: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:27: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:27: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:27: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:27: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:27: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:27: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:28: Tổng số message đã gửi trong 1 giây: 7224
+2025-03-27 11:28:28: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:28: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:28: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:28: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:28: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:28: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:28: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:28: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:29: Tổng số message đã gửi trong 1 giây: 6834
+2025-03-27 11:28:29: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:29: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:29: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:29: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:29: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:29: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:29: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:29: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:30: Tổng số message đã gửi trong 1 giây: 8241
+2025-03-27 11:28:30: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:30: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:30: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:30: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:30: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:30: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:30: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:30: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:31: Tổng số message đã gửi trong 1 giây: 7420
+2025-03-27 11:28:31: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:31: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:31: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:31: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:31: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:31: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:31: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:31: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:32: Tổng số message đã gửi trong 1 giây: 7410
+2025-03-27 11:28:32: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:32: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:32: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:32: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:32: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:32: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:32: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:32: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:33: Tổng số message đã gửi trong 1 giây: 6463
+2025-03-27 11:28:33: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:33: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:33: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:33: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:33: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:33: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:33: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:34: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:34: Tổng số message đã gửi trong 1 giây: 5389
+2025-03-27 11:28:34: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:34: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:34: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:34: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:34: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:34: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:34: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:34: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:35: Tổng số message đã gửi trong 1 giây: 6892
+2025-03-27 11:28:35: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:35: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:35: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:35: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:35: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:35: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:35: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:35: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:36: Tổng số message đã gửi trong 1 giây: 7287
+2025-03-27 11:28:36: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:36: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:36: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:36: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:36: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:36: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:36: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:36: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:37: Tổng số message đã gửi trong 1 giây: 6532
+2025-03-27 11:28:37: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:37: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:37: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:37: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:37: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:37: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:37: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:37: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:38: Tổng số message đã gửi trong 1 giây: 7963
+2025-03-27 11:28:38: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:38: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:38: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:38: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:38: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:38: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:38: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:38: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:39: Tổng số message đã gửi trong 1 giây: 5460
+2025-03-27 11:28:39: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:39: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:39: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:39: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:39: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:39: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:39: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:39: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:40: Tổng số message đã gửi trong 1 giây: 5135
+2025-03-27 11:28:40: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:40: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:40: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:40: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:40: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:40: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:40: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:40: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:41: Tổng số message đã gửi trong 1 giây: 7298
+2025-03-27 11:28:41: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:41: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:41: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:41: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:41: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:41: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:41: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:41: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:42: Tổng số message đã gửi trong 1 giây: 7707
+2025-03-27 11:28:42: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:42: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:42: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:42: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:42: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:42: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:42: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:42: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:43: Tổng số message đã gửi trong 1 giây: 8354
+2025-03-27 11:28:43: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:43: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:43: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:43: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:43: Đã gửi 5000 message trong 1 giây.
+2025-03-27 11:28:43: Đã gửi 4000 message trong 1 giây.
+2025-03-27 11:28:44: Tổng số message đã gửi trong 1 giây: 9517
+2025-03-27 11:28:44: Đã gửi 0 message trong 1 giây.
+2025-03-27 11:28:45: Tổng số message đã gửi trong 1 giây: 10989
+2025-03-27 11:28:45: Đã gửi 0 message trong 1 giây.
+2025-03-27 11:28:46: Đang đóng kết nối...
