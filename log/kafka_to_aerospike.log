@@ -1,40 +1,227 @@
-2025-03-27 11:28:21: 🔄 KafkaToAerospikeVerticle sử dụng Vertx với Worker Pool Size: 16
-2025-03-27 11:28:22: So message da gui trong 1 giay : 0
-2025-03-27 11:28:24: So message da gui trong 1 giay : 1844
-2025-03-27 11:28:24: So message da gui trong 1 giay : 157
-2025-03-27 11:28:24: Offset committed successfully.
-2025-03-27 11:28:24: Offset committed successfully.
-2025-03-27 11:28:26: So message da gui trong 1 giay : 8407
-2025-03-27 11:28:27: So message da gui trong 1 giay : 81
-2025-03-27 11:28:27: Offset committed successfully.
-2025-03-27 11:28:27: Offset committed successfully.
-2025-03-27 11:28:28: So message da gui trong 1 giay : 7059
-2025-03-27 11:28:28: So message da gui trong 1 giay : 500
-2025-03-27 11:28:28: Offset committed successfully.
-2025-03-27 11:28:28: Offset committed successfully.
-2025-03-27 11:28:32: So message da gui trong 1 giay : 20156
-2025-03-27 11:28:32: So message da gui trong 1 giay : 85
-2025-03-27 11:28:32: Offset committed successfully.
-2025-03-27 11:28:32: So message da gui trong 1 giay : 88
-2025-03-27 11:28:32: Offset committed successfully.
-2025-03-27 11:28:32: So message da gui trong 1 giay : 500
-2025-03-27 11:28:32: Offset committed successfully.
-2025-03-27 11:28:32: Offset committed successfully.
-2025-03-27 11:28:36: So message da gui trong 1 giay : 20468
-2025-03-27 11:28:36: So message da gui trong 1 giay : 500
-2025-03-27 11:28:36: Offset committed successfully.
-2025-03-27 11:28:36: So message da gui trong 1 giay : 500
-2025-03-27 11:28:36: Offset committed successfully.
-2025-03-27 11:28:36: So message da gui trong 1 giay : 500
-2025-03-27 11:28:36: Offset committed successfully.
-2025-03-27 11:28:36: Offset committed successfully.
-2025-03-27 11:28:39: So message da gui trong 1 giay : 15558
-2025-03-27 11:28:39: So message da gui trong 1 giay : 263
-2025-03-27 11:28:39: Offset committed successfully.
-2025-03-27 11:28:39: So message da gui trong 1 giay : 500
-2025-03-27 11:28:40: Offset committed successfully.
-2025-03-27 11:28:40: Offset committed successfully.
-2025-03-27 11:28:41: So message da gui trong 1 giay : 6230
-2025-03-27 11:28:41: So message da gui trong 1 giay : 225
-2025-03-27 11:28:41: Offset committed successfully.
-2025-03-27 11:28:41: Offset committed successfully.
+2025-04-10 10:56:27: 🔄 KafkaToAerospikeVerticle sử dụng Vertx với Worker Pool Size: 16
+2025-04-10 10:56:29: Số message đã xử lý trong 1 giây: 254
+2025-04-10 10:56:29: ✅ Batch committed successfully: 254 records
+2025-04-10 10:56:30: Số message đã xử lý trong 1 giây: 2893
+2025-04-10 10:56:30: ✅ Batch committed successfully: 2893 records
+2025-04-10 10:56:31: Số message đã xử lý trong 1 giây: 1511
+2025-04-10 10:56:31: ✅ Batch committed successfully: 1511 records
+2025-04-10 10:56:32: Số message đã xử lý trong 1 giây: 1212
+2025-04-10 10:56:32: Số message đã xử lý trong 1 giây: 56
+2025-04-10 10:56:32: ✅ Batch committed successfully: 1212 records
+2025-04-10 10:56:33: ✅ Batch committed successfully: 56 records
+2025-04-10 10:56:34: Số message đã xử lý trong 1 giây: 4153
+2025-04-10 10:56:35: Số message đã xử lý trong 1 giây: 0
+2025-04-10 10:56:35: ✅ Batch committed successfully: 4153 records
+2025-04-10 10:56:36: Số message đã xử lý trong 1 giây: 1823
+2025-04-10 10:56:37: Số message đã xử lý trong 1 giây: 49
+2025-04-10 10:56:37: ✅ Batch committed successfully: 1823 records
+2025-04-10 10:56:37: ✅ Batch committed successfully: 49 records
+2025-04-10 10:56:38: Số message đã xử lý trong 1 giây: 3776
+2025-04-10 10:56:38: ✅ Batch committed successfully: 3776 records
+2025-04-10 10:56:38: Số message đã xử lý trong 1 giây: 1164
+2025-04-10 10:56:39: ✅ Batch committed successfully: 1164 records
+2025-04-10 10:56:40: Số message đã xử lý trong 1 giây: 1967
+2025-04-10 10:56:40: ✅ Batch committed successfully: 1967 records
+2025-04-10 10:56:40: Số message đã xử lý trong 1 giây: 165
+2025-04-10 10:56:41: ✅ Batch committed successfully: 165 records
+2025-04-10 10:56:42: Số message đã xử lý trong 1 giây: 2381
+2025-04-10 10:56:42: ✅ Batch committed successfully: 2381 records
+2025-04-10 10:56:42: Số message đã xử lý trong 1 giây: 911
+2025-04-10 10:56:43: ✅ Batch committed successfully: 911 records
+2025-04-10 10:56:44: Số message đã xử lý trong 1 giây: 1212
+2025-04-10 10:56:44: ✅ Batch committed successfully: 1212 records
+2025-04-10 10:56:45: Số message đã xử lý trong 1 giây: 3918
+2025-04-10 10:56:45: ✅ Batch committed successfully: 3918 records
+2025-04-10 10:56:45: Số message đã xử lý trong 1 giây: 920
+2025-04-10 10:56:46: ✅ Batch committed successfully: 920 records
+2025-04-10 10:56:46: Số message đã xử lý trong 1 giây: 875
+2025-04-10 10:56:47: ✅ Batch committed successfully: 875 records
+2025-04-10 10:56:48: Số message đã xử lý trong 1 giây: 2951
+2025-04-10 10:56:48: Số message đã xử lý trong 1 giây: 0
+2025-04-10 10:56:48: ✅ Batch committed successfully: 2951 records
+2025-04-10 10:56:50: Số message đã xử lý trong 1 giây: 1951
+2025-04-10 10:56:50: ✅ Batch committed successfully: 1951 records
+2025-04-10 10:56:50: Số message đã xử lý trong 1 giây: 1014
+2025-04-10 10:56:51: ✅ Batch committed successfully: 1014 records
+2025-04-10 10:56:52: Số message đã xử lý trong 1 giây: 2088
+2025-04-10 10:56:52: ✅ Batch committed successfully: 2088 records
+2025-04-10 10:56:52: Số message đã xử lý trong 1 giây: 974
+2025-04-10 10:56:53: ✅ Batch committed successfully: 974 records
+2025-04-10 10:56:54: Số message đã xử lý trong 1 giây: 1833
+2025-04-10 10:56:55: Số message đã xử lý trong 1 giây: 231
+2025-04-10 10:56:55: ✅ Batch committed successfully: 1833 records
+2025-04-10 10:56:55: ✅ Batch committed successfully: 231 records
+2025-04-10 10:56:56: Số message đã xử lý trong 1 giây: 3888
+2025-04-10 10:56:56: ✅ Batch committed successfully: 3888 records
+2025-04-10 10:56:56: Số message đã xử lý trong 1 giây: 1249
+2025-04-10 10:56:57: Số message đã xử lý trong 1 giây: 154
+2025-04-10 10:56:57: ✅ Batch committed successfully: 1249 records
+2025-04-10 10:56:57: ✅ Batch committed successfully: 154 records
+2025-04-10 10:56:59: Số message đã xử lý trong 1 giây: 2871
+2025-04-10 10:56:59: ✅ Batch committed successfully: 2871 records
+2025-04-10 10:56:59: Số message đã xử lý trong 1 giây: 877
+2025-04-10 10:57:00: ✅ Batch committed successfully: 877 records
+2025-04-10 10:57:01: Số message đã xử lý trong 1 giây: 2382
+2025-04-10 10:57:01: ✅ Batch committed successfully: 2382 records
+2025-04-10 10:57:02: Số message đã xử lý trong 1 giây: 2248
+2025-04-10 10:57:02: ✅ Batch committed successfully: 2248 records
+2025-04-10 10:57:02: Số message đã xử lý trong 1 giây: 943
+2025-04-10 10:57:03: ✅ Batch committed successfully: 943 records
+2025-04-10 10:57:04: Số message đã xử lý trong 1 giây: 2159
+2025-04-10 10:57:04: ✅ Batch committed successfully: 2159 records
+2025-04-10 10:57:05: Số message đã xử lý trong 1 giây: 1207
+2025-04-10 10:57:06: Số message đã xử lý trong 1 giây: 105
+2025-04-10 10:57:06: ✅ Batch committed successfully: 1207 records
+2025-04-10 10:57:07: Số message đã xử lý trong 1 giây: 116
+2025-04-10 10:57:07: ✅ Batch committed successfully: 105 records
+2025-04-10 10:57:07: ✅ Batch committed successfully: 116 records
+2025-04-10 10:57:08: Số message đã xử lý trong 1 giây: 5000
+2025-04-10 10:57:08: ✅ Batch committed successfully: 5000 records
+2025-04-10 10:57:09: Số message đã xử lý trong 1 giây: 2635
+2025-04-10 10:57:09: ✅ Batch committed successfully: 2635 records
+2025-04-10 10:57:10: Số message đã xử lý trong 1 giây: 1824
+2025-04-10 10:57:10: Số message đã xử lý trong 1 giây: 61
+2025-04-10 10:57:10: ✅ Batch committed successfully: 1824 records
+2025-04-10 10:57:10: ✅ Batch committed successfully: 61 records
+2025-04-10 10:57:12: Số message đã xử lý trong 1 giây: 2664
+2025-04-10 10:57:12: ✅ Batch committed successfully: 2664 records
+2025-04-10 10:57:12: Số message đã xử lý trong 1 giây: 1071
+2025-04-10 10:57:13: ✅ Batch committed successfully: 1071 records
+2025-04-10 10:57:14: Số message đã xử lý trong 1 giây: 2248
+2025-04-10 10:57:14: ✅ Batch committed successfully: 2248 records
+2025-04-10 10:57:15: Số message đã xử lý trong 1 giây: 1962
+2025-04-10 10:57:15: ✅ Batch committed successfully: 1962 records
+2025-04-10 10:57:15: Số message đã xử lý trong 1 giây: 983
+2025-04-10 10:57:16: ✅ Batch committed successfully: 983 records
+2025-04-10 10:57:17: Số message đã xử lý trong 1 giây: 2185
+2025-04-10 10:57:17: ✅ Batch committed successfully: 2185 records
+2025-04-10 10:57:18: Số message đã xử lý trong 1 giây: 1121
+2025-04-10 10:57:19: Số message đã xử lý trong 1 giây: 114
+2025-04-10 10:57:19: ✅ Batch committed successfully: 1121 records
+2025-04-10 10:57:20: Số message đã xử lý trong 1 giây: 128
+2025-04-10 10:57:20: ✅ Batch committed successfully: 114 records
+2025-04-10 10:57:20: ✅ Batch committed successfully: 128 records
+2025-04-10 10:57:21: Số message đã xử lý trong 1 giây: 5000
+2025-04-10 10:57:22: Số message đã xử lý trong 1 giây: 1459
+2025-04-10 10:57:22: ✅ Batch committed successfully: 5000 records
+2025-04-10 10:57:22: ✅ Batch committed successfully: 1459 records
+2025-04-10 10:57:23: Số message đã xử lý trong 1 giây: 2648
+2025-04-10 10:57:23: ✅ Batch committed successfully: 2648 records
+2025-04-10 10:57:24: Số message đã xử lý trong 1 giây: 2963
+2025-04-10 10:57:25: Số message đã xử lý trong 1 giây: 0
+2025-04-10 10:57:25: ✅ Batch committed successfully: 2963 records
+2025-04-10 10:57:26: Số message đã xử lý trong 1 giây: 3366
+2025-04-10 10:57:26: Số message đã xử lý trong 1 giây: 164
+2025-04-10 10:57:27: ✅ Batch committed successfully: 3366 records
+2025-04-10 10:57:27: Số message đã xử lý trong 1 giây: 214
+2025-04-10 10:57:28: ✅ Batch committed successfully: 164 records
+2025-04-10 10:57:28: ✅ Batch committed successfully: 214 records
+2025-04-10 10:57:29: Số message đã xử lý trong 1 giây: 4014
+2025-04-10 10:57:29: ✅ Batch committed successfully: 4014 records
+2025-04-10 10:57:30: Số message đã xử lý trong 1 giây: 2095
+2025-04-10 10:57:30: ✅ Batch committed successfully: 2095 records
+2025-04-10 10:57:31: Số message đã xử lý trong 1 giây: 2822
+2025-04-10 10:57:31: ✅ Batch committed successfully: 2822 records
+2025-04-10 10:57:31: Số message đã xử lý trong 1 giây: 1194
+2025-04-10 10:57:32: ✅ Batch committed successfully: 1194 records
+2025-04-10 10:57:33: Số message đã xử lý trong 1 giây: 2135
+2025-04-10 10:57:33: ✅ Batch committed successfully: 2135 records
+2025-04-10 10:57:33: Số message đã xử lý trong 1 giây: 928
+2025-04-10 10:57:34: ✅ Batch committed successfully: 928 records
+2025-04-10 10:57:35: Số message đã xử lý trong 1 giây: 2149
+2025-04-10 10:57:35: Số message đã xử lý trong 1 giây: 130
+2025-04-10 10:57:37: ✅ Batch committed successfully: 2149 records
+2025-04-10 10:57:37: Số message đã xử lý trong 1 giây: 46
+2025-04-10 10:57:37: ✅ Batch committed successfully: 130 records
+2025-04-10 10:57:37: ✅ Batch committed successfully: 46 records
+2025-04-10 10:57:38: Số message đã xử lý trong 1 giây: 3435
+2025-04-10 10:57:38: ✅ Batch committed successfully: 3435 records
+2025-04-10 10:57:38: Số message đã xử lý trong 1 giây: 1087
+2025-04-10 10:57:40: Số message đã xử lý trong 1 giây: 25
+2025-04-10 10:57:40: ✅ Batch committed successfully: 1087 records
+2025-04-10 10:57:40: ✅ Batch committed successfully: 25 records
+2025-04-10 10:57:41: Số message đã xử lý trong 1 giây: 3011
+2025-04-10 10:57:41: Số message đã xử lý trong 1 giây: 266
+2025-04-10 10:57:42: ✅ Batch committed successfully: 3011 records
+2025-04-10 10:57:42: ✅ Batch committed successfully: 266 records
+2025-04-10 10:57:43: Số message đã xử lý trong 1 giây: 4503
+2025-04-10 10:57:44: Số message đã xử lý trong 1 giây: 137
+2025-04-10 10:57:44: ✅ Batch committed successfully: 4503 records
+2025-04-10 10:57:44: ✅ Batch committed successfully: 137 records
+2025-04-10 10:57:45: Số message đã xử lý trong 1 giây: 4882
+2025-04-10 10:57:45: ✅ Batch committed successfully: 4882 records
+2025-04-10 10:57:46: Số message đã xử lý trong 1 giây: 2635
+2025-04-10 10:57:47: Số message đã xử lý trong 1 giây: 0
+2025-04-10 10:57:47: ✅ Batch committed successfully: 2635 records
+2025-04-10 10:57:48: Số message đã xử lý trong 1 giây: 2856
+2025-04-10 10:57:48: Số message đã xử lý trong 1 giây: 80
+2025-04-10 10:57:49: ✅ Batch committed successfully: 2856 records
+2025-04-10 10:57:49: Số message đã xử lý trong 1 giây: 196
+2025-04-10 10:57:49: ✅ Batch committed successfully: 80 records
+2025-04-10 10:57:49: ✅ Batch committed successfully: 196 records
+2025-04-10 10:57:51: Số message đã xử lý trong 1 giây: 4205
+2025-04-10 10:57:52: Số message đã xử lý trong 1 giây: 80
+2025-04-10 10:57:52: ✅ Batch committed successfully: 4205 records
+2025-04-10 10:57:52: ✅ Batch committed successfully: 80 records
+2025-04-10 10:57:53: Số message đã xử lý trong 1 giây: 1995
+2025-04-10 10:57:53: ✅ Batch committed successfully: 1995 records
+2025-04-10 10:57:54: Số message đã xử lý trong 1 giây: 5000
+2025-04-10 10:57:55: Số message đã xử lý trong 1 giây: 720
+2025-04-10 10:57:55: ✅ Batch committed successfully: 5000 records
+2025-04-10 10:57:55: ✅ Batch committed successfully: 720 records
+2025-04-10 10:57:56: Số message đã xử lý trong 1 giây: 3566
+2025-04-10 10:57:56: ✅ Batch committed successfully: 3566 records
+2025-04-10 10:57:56: Số message đã xử lý trong 1 giây: 1155
+2025-04-10 10:57:58: Số message đã xử lý trong 1 giây: 85
+2025-04-10 10:57:58: ✅ Batch committed successfully: 1155 records
+2025-04-10 10:57:58: ✅ Batch committed successfully: 85 records
+2025-04-10 10:57:59: Số message đã xử lý trong 1 giây: 3257
+2025-04-10 10:57:59: ✅ Batch committed successfully: 3257 records
+2025-04-10 10:57:59: Số message đã xử lý trong 1 giây: 1010
+2025-04-10 10:58:00: Số message đã xử lý trong 1 giây: 109
+2025-04-10 10:58:01: ✅ Batch committed successfully: 1010 records
+2025-04-10 10:58:01: ✅ Batch committed successfully: 109 records
+2025-04-10 10:58:02: Số message đã xử lý trong 1 giây: 4457
+2025-04-10 10:58:02: ✅ Batch committed successfully: 4457 records
+2025-04-10 10:58:02: Số message đã xử lý trong 1 giây: 993
+2025-04-10 10:58:03: ✅ Batch committed successfully: 993 records
+2025-04-10 10:58:04: Số message đã xử lý trong 1 giây: 1791
+2025-04-10 10:58:04: ✅ Batch committed successfully: 1791 records
+2025-04-10 10:58:04: Số message đã xử lý trong 1 giây: 1039
+2025-04-10 10:58:06: Số message đã xử lý trong 1 giây: 84
+2025-04-10 10:58:06: ✅ Batch committed successfully: 1039 records
+2025-04-10 10:58:06: Số message đã xử lý trong 1 giây: 27
+2025-04-10 10:58:06: ✅ Batch committed successfully: 84 records
+2025-04-10 10:58:06: ✅ Batch committed successfully: 27 records
+2025-04-10 10:58:08: Số message đã xử lý trong 1 giây: 5000
+2025-04-10 10:58:08: ✅ Batch committed successfully: 5000 records
+2025-04-10 10:58:09: Số message đã xử lý trong 1 giây: 1763
+2025-04-10 10:58:09: ✅ Batch committed successfully: 1763 records
+2025-04-10 10:58:10: Số message đã xử lý trong 1 giây: 1942
+2025-04-10 10:58:10: Số message đã xử lý trong 1 giây: 140
+2025-04-10 10:58:11: ✅ Batch committed successfully: 1942 records
+2025-04-10 10:58:11: ✅ Batch committed successfully: 140 records
+2025-04-10 10:58:12: Số message đã xử lý trong 1 giây: 3687
+2025-04-10 10:58:12: ✅ Batch committed successfully: 3687 records
+2025-04-10 10:58:12: Số message đã xử lý trong 1 giây: 1008
+2025-04-10 10:58:13: ✅ Batch committed successfully: 1008 records
+2025-04-10 10:58:14: Số message đã xử lý trong 1 giây: 2101
+2025-04-10 10:58:15: Số message đã xử lý trong 1 giây: 0
+2025-04-10 10:58:15: ✅ Batch committed successfully: 2101 records
+2025-04-10 10:58:15: Số message đã xử lý trong 1 giây: 1039
+2025-04-10 10:58:16: ✅ Batch committed successfully: 1039 records
+2025-04-10 10:58:17: Số message đã xử lý trong 1 giây: 2293
+2025-04-10 10:58:17: ✅ Batch committed successfully: 2293 records
+2025-04-10 10:58:17: Số message đã xử lý trong 1 giây: 1393
+2025-04-10 10:58:18: ✅ Batch committed successfully: 1393 records
+2025-04-10 10:58:18: Số message đã xử lý trong 1 giây: 840
+2025-04-10 10:58:18: ✅ Batch committed successfully: 840 records
+2025-04-10 10:58:19: Số message đã xử lý trong 1 giây: 835
+2025-04-10 10:58:20: ✅ Batch committed successfully: 835 records
+2025-04-10 10:58:20: Số message đã xử lý trong 1 giây: 1073
+2025-04-10 10:58:21: ✅ Batch committed successfully: 1073 records
+2025-04-10 10:58:22: Số message đã xử lý trong 1 giây: 1942
+2025-04-10 10:58:22: Số message đã xử lý trong 1 giây: 82
+2025-04-10 10:58:22: ✅ Batch committed successfully: 1942 records
+2025-04-10 10:58:22: ✅ Batch committed successfully: 82 records
+2025-04-10 10:58:24: Số message đã xử lý trong 1 giây: 3658

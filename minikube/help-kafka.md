@@ -85,7 +85,7 @@ helm install prometheus prometheus-community/kube-prometheus-stack
 kubectl --namespace default port-forward prometheus-prometheus-kube-prometheus-prometheus-0 9090:9090
 
 ### Forward grafana ra cong 3000
-kubectl --namespace default port-forward prometheus-grafana-6854b47bf4-8z9g6 3000:3000
+prometheus-grafana-6854b47bf4-8z9g6
 
 
 

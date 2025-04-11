@@ -25,9 +25,15 @@ spec:
         volumeMounts:
         - name: aerospike-storage
           mountPath: /opt/aerospike/data
+        - name: aerospike-config
+          mountPath: /etc/aerospike/aerospike.conf
+          subPath: aerospike.conf
       volumes:
       - name: aerospike-storage
         emptyDir: {}
+      - name: aerospike-config
+        configMap:
+          name: aerospike-config
 ---
 apiVersion: v1
 kind: Service
@@ -46,3 +52,63 @@ spec:
     targetPort: 3002
   selector:
     app: aerospike
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aerospike-config
+  namespace: aerospike
+data:
+  aerospike.conf: 
+    service {
+        user root
+        group root
+        paxos-single-replica-limit 1
+        pidfile /var/run/aerospike/asd.pid
+        service-threads 4
+        transaction-queues 4
+        transaction-threads-per-queue 4
+        proto-fd-max 15000
+    }
+
+    logging {
+        file /var/log/aerospike/aerospike.log {
+            context any info
+        }
+    }
+
+    network {
+        service {
+            address any
+            port 3000
+        }
+
+        heartbeat {
+            mode mesh
+            port 3002
+            interval 150
+            timeout 10
+        }
+
+        fabric {
+            port 3001
+        }
+
+        info {
+            port 3003
+        }
+    }
+
+    namespace producer {
+        replication-factor 1
+        memory-size 1G
+        default-ttl 30d
+        storage-engine memory
+    }
+
+    namespace consumer {
+        replication-factor 1
+        memory-size 1G
+        default-ttl 30d
+        storage-engine memory
+    }

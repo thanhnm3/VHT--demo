@@ -9,7 +9,7 @@ public class MainVertxApp {
         Vertx vertx = Vertx.vertx(new VertxOptions().setEventLoopPoolSize(Runtime.getRuntime().availableProcessors() * 2));
 
         // Triển khai AerospikeToKafkaVerticle (tác vụ đọc)
-        vertx.deployVerticle(new AerospikeToKafkaVerticle(vertx), res -> {
+        vertx.deployVerticle(new AerospikeToKafkaVerticle(), res -> {
             if (res.succeeded()) {
                 System.out.println("AerospikeToKafkaVerticle deployed successfully");
             } else {
@@ -18,7 +18,7 @@ public class MainVertxApp {
         });
 
         // Triển khai KafkaToAerospikeVerticle (tác vụ ghi)
-        vertx.deployVerticle(new KafkaToAerospikeVerticle(vertx), res -> {
+        vertx.deployVerticle(new KafkaToAerospikeVerticle(), res -> {
             if (res.succeeded()) {
                 System.out.println("KafkaToAerospikeVerticle deployed successfully");
             } else {
