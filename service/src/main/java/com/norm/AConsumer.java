@@ -16,6 +16,8 @@ import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class AConsumer {
 
@@ -36,21 +38,15 @@ public class AConsumer {
     private static final AtomicInteger messagesProcessedThisSecond = new AtomicInteger(0);
     private static ExecutorService executor;
 
-    public static void main(String[] args, int workerPoolSize) {
-        executor = Executors.newFixedThreadPool(workerPoolSize); // Sử dụng workerPoolSize từ Main
+    public static void main(String[] args, int workerPoolSize, int maxMessagesPerSecond) {
+        executor = Executors.newFixedThreadPool(workerPoolSize);
         KafkaConsumer<byte[], byte[]> kafkaConsumer = null;
         AerospikeClient aerospikeClient = null;
 
         try {
-            // Initialize Aerospike client
             aerospikeClient = new AerospikeClient(AEROSPIKE_HOST, AEROSPIKE_PORT);
             WritePolicy writePolicy = new WritePolicy();
 
-            // Tạo biến final cục bộ
-            final AerospikeClient finalAerospikeClient = aerospikeClient;
-            final WritePolicy finalWritePolicy = writePolicy;
-
-            // Initialize Kafka consumer
             Properties kafkaProps = new Properties();
             kafkaProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA_BROKER);
             kafkaProps.put(ConsumerConfig.GROUP_ID_CONFIG, GROUP_ID);
@@ -61,26 +57,30 @@ public class AConsumer {
             kafkaConsumer = new KafkaConsumer<>(kafkaProps);
             kafkaConsumer.subscribe(Collections.singletonList(KAFKA_TOPIC));
 
-            // Schedule a task to reset the message counter every second
-            Thread counterResetThread = new Thread(() -> {
-                while (true) {
-                    try {
-                        Thread.sleep(1000);
-                        System.out.println("Messages consumed : " + messagesProcessedThisSecond.get());
-                        messagesProcessedThisSecond.set(0);
-                    } catch (InterruptedException e) {
-                        System.err.println("Counter reset thread interrupted: " + e.getMessage());
-                    }
-                }
-            });
-            counterResetThread.setDaemon(true);
-            counterResetThread.start();
+            final AerospikeClient finalAerospikeClient = aerospikeClient;
+            final WritePolicy finalWritePolicy = writePolicy;
 
-            // Poll messages from Kafka and process them directly using Thread Pool
+            ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+            scheduler.scheduleAtFixedRate(() -> {
+                System.out.println("Messages processed in the last second: " + messagesProcessedThisSecond.get());
+                messagesProcessedThisSecond.set(0);
+            }, 0, 1, TimeUnit.SECONDS);
+
             while (true) {
                 ConsumerRecords<byte[], byte[]> records = kafkaConsumer.poll(Duration.ofMillis(100));
                 for (ConsumerRecord<byte[], byte[]> record : records) {
-                    executor.submit(() -> processRecord(finalAerospikeClient, finalWritePolicy, record));
+                    executor.submit(() -> {
+                        try {
+                            while (messagesProcessedThisSecond.get() >= maxMessagesPerSecond) {
+                                Thread.sleep(1);
+                            }
+                            processRecord(finalAerospikeClient, finalWritePolicy, record);
+                            messagesProcessedThisSecond.incrementAndGet();
+                        } catch (Exception e) {
+                            System.err.println("Error processing record: " + e.getMessage());
+                            e.printStackTrace();
+                        }
+                    });
                 }
             }
 
@@ -96,11 +96,12 @@ public class AConsumer {
                 aerospikeClient.close();
                 System.out.println("Aerospike Client closed.");
             }
-            executor.shutdown(); // Đóng Thread Pool khi kết thúc
+            executor.shutdown();
         }
     }
 
     private static void processRecord(AerospikeClient aerospikeClient, WritePolicy writePolicy, ConsumerRecord<byte[], byte[]> record) {
+        // Xử lý record và ghi vào Aerospike
         try {
             byte[] keyBytes = record.key();
             byte[] value = record.value();
@@ -117,9 +118,6 @@ public class AConsumer {
 
             // Write data to Aerospike
             aerospikeClient.put(writePolicy, aerospikeKey, PKBin, dataBin);
-
-            // Increment the counter for messages processed
-            messagesProcessedThisSecond.incrementAndGet();
         } catch (Exception e) {
             System.err.println("Failed to process record: " + e.getMessage());
             e.printStackTrace();

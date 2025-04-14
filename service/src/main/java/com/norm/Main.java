@@ -4,13 +4,14 @@ public class Main {
 
     public static void main(String[] args) {
         // Cấu hình worker pool size
-        final int workerPoolSizeProducer = 2; // Số lượng thread trong Thread Pool
-        final int workerPoolSizeConsumer = 4; // Số lượng thread trong Thread Pool cho Aerospike
+        final int workerPoolSizeProducer = 4; // Số lượng thread trong Thread Pool
+        final int workerPoolSizeConsumer = 8; // Số lượng thread trong Thread Pool cho Aerospike
+        final int maxMessagesPerSecond = 6000; // Giới hạn số lượng message mỗi giây
 
         // Khởi chạy KafkaToAerospike trong một luồng riêng
         Thread producer = new Thread(() -> {
             try {
-                AProducer.main(args, workerPoolSizeProducer);
+                AProducer.main(args, workerPoolSizeProducer, maxMessagesPerSecond);
             } catch (Exception e) {
                 System.err.println("Error in KafkaToAerospike: " + e.getMessage());
                 e.printStackTrace();
@@ -20,7 +21,7 @@ public class Main {
         // Khởi chạy AerospikeToKafka trong một luồng riêng
         Thread consumer = new Thread(() -> {
             try {
-                AConsumer.main(args, workerPoolSizeConsumer);
+                AConsumer.main(args, workerPoolSizeConsumer, maxMessagesPerSecond);
             } catch (Exception e) {
                 System.err.println("Error in AerospikeToKafka: " + e.getMessage());
                 e.printStackTrace();

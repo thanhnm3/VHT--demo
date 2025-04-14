@@ -30,13 +30,12 @@ public class AProducer {
     private static final String KAFKA_TOPIC = dotenv.get("KAFKA_TOPIC");
 
     // Rate limiting and retry configuration
-    private static final int MAX_MESSAGES_PER_SECOND = Integer.parseInt(dotenv.get("MAX_MESSAGES_PER_SECOND"));
     private static final int MAX_RETRIES = Integer.parseInt(dotenv.get("MAX_RETRIES"));
 
     private static final AtomicInteger messagesSentThisSecond = new AtomicInteger(0);
     private static ExecutorService executor;
 
-    public static void main(String[] args, int workerPoolSize) {
+    public static void main(String[] args, int workerPoolSize, int maxMessagesPerSecond) {
         executor = Executors.newFixedThreadPool(workerPoolSize); // Sử dụng workerPoolSize từ Main
         AerospikeClient aerospikeClient = null;
         KafkaProducer<String, byte[]> kafkaProducer = null;
@@ -55,12 +54,12 @@ public class AProducer {
             // Schedule a task to reset the message counter every second
             ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
             scheduler.scheduleAtFixedRate(() -> {
-                System.out.println("Messages Produced : " + messagesSentThisSecond.get());
+                System.out.println("Messages sent in the last second: " + messagesSentThisSecond.get());
                 messagesSentThisSecond.set(0);
             }, 0, 1, TimeUnit.SECONDS);
 
             // Start reading data from Aerospike and send directly to Kafka using Thread Pool
-            readDataFromAerospike(aerospikeClient, kafkaProducer);
+            readDataFromAerospike(aerospikeClient, kafkaProducer, maxMessagesPerSecond);
 
         } catch (Exception e) {
             System.err.println("Error: " + e.getMessage());
@@ -89,18 +88,23 @@ public class AProducer {
         }
     }
 
-    private static void readDataFromAerospike(AerospikeClient client, KafkaProducer<String, byte[]> producer) {
+    private static void readDataFromAerospike(AerospikeClient client, KafkaProducer<String, byte[]> producer, int maxMessagesPerSecond) {
         ScanPolicy scanPolicy = new ScanPolicy();
         scanPolicy.concurrentNodes = true;
 
         try {
             System.out.println("Starting to read data from Aerospike...");
             client.scanAll(scanPolicy, NAMESPACE, SET_NAME, (key, record) -> {
-                executor.submit(() -> { // Sử dụng Thread Pool để xử lý song song
+                executor.submit(() -> {
                     try {
                         if (!record.bins.containsKey("personData")) {
                             System.err.println("Warning: Missing 'personData' bin in record: " + key.userKey);
                             return;
+                        }
+
+                        // Kiểm tra giới hạn tốc độ
+                        while (messagesSentThisSecond.get() >= maxMessagesPerSecond) {
+                            Thread.sleep(10); // Chờ 10ms nếu đã đạt giới hạn
                         }
 
                         byte[] personData = (byte[]) record.getValue("personData");
