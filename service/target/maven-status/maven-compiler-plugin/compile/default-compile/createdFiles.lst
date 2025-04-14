@@ -1,5 +1,5 @@
-com\norm\Consumer.class
-com\norm\Producer.class
+com\norm\AProducer.class
+com\norm\AConsumer.class
 com\vertx\SimpleLogFormatter.class
 com\delete\DeleteAerospikeSet.class
 com\vertx\AerospikeToKafkaVerticle.class

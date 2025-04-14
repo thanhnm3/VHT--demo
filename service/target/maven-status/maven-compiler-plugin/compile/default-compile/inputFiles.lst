@@ -1,10 +1,10 @@
+D:\VHT3\VHT--demo\service\src\main\java\com\norm\AConsumer.java
 D:\VHT3\VHT--demo\service\src\main\java\com\vertx\EnvPrinter.java
 D:\VHT3\VHT--demo\service\src\main\java\com\vertx\KafkaToAerospikeVerticle.java
+D:\VHT3\VHT--demo\service\src\main\java\com\norm\AProducer.java
 D:\VHT3\VHT--demo\service\src\main\java\com\delete\DeleteAerospikeSet.java
 D:\VHT3\VHT--demo\service\src\main\java\com\vertx\AerospikeToKafkaVerticle.java
-D:\VHT3\VHT--demo\service\src\main\java\com\norm\Producer.java
 D:\VHT3\VHT--demo\service\src\main\java\com\vertx\SimpleLogFormatter.java
 D:\VHT3\VHT--demo\service\src\main\java\com\norm\Main.java
 D:\VHT3\VHT--demo\service\src\main\java\com\insert\AerospikeInsertProtoRandomBatchTest.java
-D:\VHT3\VHT--demo\service\src\main\java\com\norm\Consumer.java
 D:\VHT3\VHT--demo\service\src\main\java\com\vertx\MainVertxApp.java

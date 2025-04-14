@@ -9,6 +9,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import com.google.common.util.concurrent.RateLimiter;
 
 import java.util.Collections;
 import java.time.Duration;
@@ -43,6 +44,9 @@ public class AConsumer {
         KafkaConsumer<byte[], byte[]> kafkaConsumer = null;
         AerospikeClient aerospikeClient = null;
 
+        // Tạo RateLimiter với maxMessagesPerSecond
+        RateLimiter rateLimiter = RateLimiter.create(maxMessagesPerSecond);
+
         try {
             aerospikeClient = new AerospikeClient(AEROSPIKE_HOST, AEROSPIKE_PORT);
             WritePolicy writePolicy = new WritePolicy();
@@ -54,6 +58,12 @@ public class AConsumer {
             kafkaProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.ByteArrayDeserializer");
             kafkaProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
             kafkaProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
+
+            // Thêm các cấu hình tối ưu hóa
+            kafkaProps.put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, "32768"); // Gom đủ 32KB trước khi gửi batch
+            kafkaProps.put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, "50");  // Chờ tối đa 50ms để gom batch
+            kafkaProps.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, "1048576"); // Tăng giới hạn lên 1MB cho mỗi partition
+
             kafkaConsumer = new KafkaConsumer<>(kafkaProps);
             kafkaConsumer.subscribe(Collections.singletonList(KAFKA_TOPIC));
 
@@ -71,9 +81,9 @@ public class AConsumer {
                 for (ConsumerRecord<byte[], byte[]> record : records) {
                     executor.submit(() -> {
                         try {
-                            while (messagesProcessedThisSecond.get() >= maxMessagesPerSecond) {
-                                Thread.sleep(1);
-                            }
+                            // Sử dụng RateLimiter để kiểm soát tốc độ
+                            rateLimiter.acquire(); // Chờ cho đến khi có "phép" xử lý tiếp theo
+
                             processRecord(finalAerospikeClient, finalWritePolicy, record);
                             messagesProcessedThisSecond.incrementAndGet();
                         } catch (Exception e) {
@@ -102,25 +112,47 @@ public class AConsumer {
 
     private static void processRecord(AerospikeClient aerospikeClient, WritePolicy writePolicy, ConsumerRecord<byte[], byte[]> record) {
         // Xử lý record và ghi vào Aerospike
-        try {
-            byte[] keyBytes = record.key();
-            byte[] value = record.value();
+        final int MAX_RETRIES = 3; // Số lần retry tối đa
+        int retryCount = 0;
 
-            if (keyBytes == null || value == null) {
-                System.err.println("Received null key or value, skipping record.");
-                return;
+        while (retryCount <= MAX_RETRIES) {
+            try {
+                byte[] keyBytes = record.key();
+                byte[] value = record.value();
+
+                if (keyBytes == null || value == null) {
+                    System.err.println("Received null key or value, skipping record.");
+                    return;
+                }
+
+                String keyString = new String(keyBytes);
+                Key aerospikeKey = new Key(NAMESPACE, SET_NAME, keyString);
+                Bin dataBin = new Bin("data", value);
+                Bin PKBin = new Bin("PK", keyString);
+
+                // Write data to Aerospike
+                aerospikeClient.put(writePolicy, aerospikeKey, PKBin, dataBin);
+                return; // Ghi thành công, thoát khỏi vòng lặp
+
+            } catch (Exception e) {
+                retryCount++;
+                System.err.println("Failed to process record (attempt " + retryCount + "): " + e.getMessage());
+
+                if (retryCount > MAX_RETRIES) {
+                    System.err.println("Max retries reached. Skipping record.");
+                    e.printStackTrace();
+                    return; // Thoát nếu đã retry đủ số lần
+                }
+
+                try {
+                    // Chờ một khoảng thời gian trước khi retry
+                    Thread.sleep(100 * retryCount); // Tăng thời gian chờ theo số lần retry
+                } catch (InterruptedException ie) {
+                    System.err.println("Retry sleep interrupted: " + ie.getMessage());
+                    Thread.currentThread().interrupt();
+                    return;
+                }
             }
-
-            String keyString = new String(keyBytes);
-            Key aerospikeKey = new Key(NAMESPACE, SET_NAME, keyString);
-            Bin dataBin = new Bin("data", value);
-            Bin PKBin = new Bin("PK", keyString);
-
-            // Write data to Aerospike
-            aerospikeClient.put(writePolicy, aerospikeKey, PKBin, dataBin);
-        } catch (Exception e) {
-            System.err.println("Failed to process record: " + e.getMessage());
-            e.printStackTrace();
         }
     }
 }

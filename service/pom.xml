@@ -54,6 +54,13 @@
       <artifactId>dotenv-java</artifactId>
       <version>3.0.0</version>
     </dependency>
+
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+      <version>33.4.7-jre</version>
+    </dependency>
+    
   </dependencies>
 
     <build>

@@ -6,6 +6,7 @@ import com.aerospike.client.policy.ScanPolicy;
 import io.github.cdimascio.dotenv.Dotenv;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import com.google.common.util.concurrent.RateLimiter;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -49,6 +50,9 @@ public class AProducer {
             kafkaProps.put("bootstrap.servers", KAFKA_BROKER);
             kafkaProps.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
             kafkaProps.put("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
+            kafkaProps.put("linger.ms", "5"); // Thời gian chờ để gom batch
+            kafkaProps.put("batch.size", "32768"); // Kích thước batch tối đa (32KB)
+            kafkaProps.put("acks", "all"); // Đảm bảo tất cả các bản sao nhận được dữ liệu
             kafkaProducer = new KafkaProducer<>(kafkaProps);
 
             // Schedule a task to reset the message counter every second
@@ -92,6 +96,9 @@ public class AProducer {
         ScanPolicy scanPolicy = new ScanPolicy();
         scanPolicy.concurrentNodes = true;
 
+        // Tạo RateLimiter với maxMessagesPerSecond
+        RateLimiter rateLimiter = RateLimiter.create(maxMessagesPerSecond);
+
         try {
             System.out.println("Starting to read data from Aerospike...");
             client.scanAll(scanPolicy, NAMESPACE, SET_NAME, (key, record) -> {
@@ -102,18 +109,16 @@ public class AProducer {
                             return;
                         }
 
-                        // Kiểm tra giới hạn tốc độ
-                        while (messagesSentThisSecond.get() >= maxMessagesPerSecond) {
-                            Thread.sleep(10); // Chờ 10ms nếu đã đạt giới hạn
-                        }
+                        // Sử dụng RateLimiter để kiểm soát tốc độ
+                        rateLimiter.acquire(); // Chờ cho đến khi có "phép" xử lý tiếp theo
 
                         byte[] personData = (byte[]) record.getValue("personData");
                         ProducerRecord<String, byte[]> kafkaRecord = new ProducerRecord<>(KAFKA_TOPIC, key.userKey.toString(), personData);
 
-                        // Send directly to Kafka
+                        // Gửi dữ liệu tới Kafka
                         sendWithRetry(producer, kafkaRecord, 0);
 
-                        // Increment the counter for messages sent
+                        // Tăng bộ đếm số lượng message đã gửi
                         messagesSentThisSecond.incrementAndGet();
                     } catch (Exception e) {
                         System.err.println("Error processing record: " + e.getMessage());
