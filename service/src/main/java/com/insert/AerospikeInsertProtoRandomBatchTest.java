@@ -35,7 +35,7 @@ public class AerospikeInsertProtoRandomBatchTest {
         ScheduledExecutorService tpsLogger = Executors.newScheduledThreadPool(1);
         tpsLogger.scheduleAtFixedRate(() -> {
             int count = lastSecondCount.getAndSet(0);
-            System.out.println("📊 Tốc độ ghi: " + count + " records/sec");
+            System.out.println(" Toc do ghi: " + count + " records/sec");
         }, 1, 1, TimeUnit.SECONDS); // Cập nhật mỗi giây
 
         // 🛠 Luồng thực hiện ghi dữ liệu
@@ -78,7 +78,7 @@ public class AerospikeInsertProtoRandomBatchTest {
         // 🛠 Kết thúc đo TPS
         tpsLogger.shutdown();
 
-        System.out.println("\n🎯 Tổng số bản ghi đã insert: " + totalCount.get());
+        System.out.println("\n Tong so ban ghi: " + totalCount.get());
 
         // Đóng kết nối
         client.close();

@@ -6,7 +6,7 @@ import io.vertx.core.VertxOptions;
 public class MainVertxApp {
     public static void main(String[] args) {
         // Tạo Vertx instance với số lượng event loop hợp lý
-        Vertx vertx = Vertx.vertx(new VertxOptions().setEventLoopPoolSize(Runtime.getRuntime().availableProcessors() * 2));
+        Vertx vertx = Vertx.vertx(new VertxOptions().setEventLoopPoolSize(8)); // Số lượng event loop có thể điều chỉnh tùy theo tài nguyên hệ thống
 
         // Triển khai AerospikeToKafkaVerticle (tác vụ đọc)
         vertx.deployVerticle(new AerospikeToKafkaVerticle(), res -> {

@@ -3,6 +3,8 @@ package com.vertx;
 import com.aerospike.client.*;
 import com.aerospike.client.policy.ClientPolicy;
 import com.aerospike.client.policy.ScanPolicy;
+
+import io.github.cdimascio.dotenv.Dotenv;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Promise;
 import io.vertx.kafka.client.producer.KafkaProducer;
@@ -16,15 +18,30 @@ import java.util.logging.FileHandler;
 import java.util.logging.Logger;
 
 public class AerospikeToKafkaVerticle extends AbstractVerticle {
-    // Cấu hình Aerospike
-    private static final String AEROSPIKE_HOST = "127.0.0.1";
-    private static final int AEROSPIKE_PORT = 3000;
-    private static final String NAMESPACE = "producer";
-    private static final String SET_NAME = "users";
+
+    // Load cấu hình từ file .env
+    private static final Dotenv dotenv = Dotenv.configure()
+                                               .directory("service//.env") 
+                                               .load();
+
+    // Cấu hình Aerospike Producer
+    private static final String AEROSPIKE_PRODUCER_HOST = dotenv.get("AEROSPIKE_PRODUCER_HOST");
+    private static final int AEROSPIKE_PRODUCER_PORT = Integer.parseInt(dotenv.get("AEROSPIKE_PRODUCER_PORT"));
+    private static final String PRODUCER_NAMESPACE = dotenv.get("PRODUCER_NAMESPACE");
+    private static final String PRODUCER_SET_NAME = dotenv.get("PRODUCER_SET_NAME");
+
+    // Cấu hình Aerospike Consumer
+
 
     // Cấu hình Kafka
-    private static final String KAFKA_BROKER = "localhost:9092";
-    private static final String KAFKA_TOPIC = "person-topic";
+    private static final String KAFKA_BROKER = dotenv.get("KAFKA_BROKER");
+    private static final String KAFKA_TOPIC = dotenv.get("KAFKA_TOPIC");
+
+    // Giới hạn số message gửi mỗi giây
+    private static final int MAX_MESSAGES_PER_SECOND = Integer.parseInt(dotenv.get("MAX_MESSAGES_PER_SECOND"));
+
+    // Số lần retry tối đa
+    private static final int MAX_RETRIES = Integer.parseInt(dotenv.get("MAX_RETRIES"));
 
     private AerospikeClient client; // Kết nối Aerospike
     private KafkaProducer<String, byte[]> producer; // Kafka producer
@@ -32,14 +49,13 @@ public class AerospikeToKafkaVerticle extends AbstractVerticle {
     private static final Logger logger = Logger.getLogger(AerospikeToKafkaVerticle.class.getName()); // Logger
 
     private final Queue<KafkaProducerRecord<String, byte[]>> messageQueue = new ConcurrentLinkedQueue<>(); // Hàng đợi message
-    private static final int MAX_MESSAGES_PER_SECOND = 5000; // Giới hạn số message gửi mỗi giây
     private final AtomicInteger messagesSentThisSecond = new AtomicInteger(0); // Đếm số message gửi trong 1 giây
 
     @Override
     public void start(Promise<Void> startPromise) {
         try {
             // Cấu hình logger ghi log vào file
-            FileHandler fh = new FileHandler("log/aerospike_to_kafka.log", true);
+            FileHandler fh = new FileHandler("log/producer.log");
             fh.setFormatter(new SimpleLogFormatter()); // Sử dụng formatter tùy chỉnh
             if (logger.getHandlers().length == 0) {
                 logger.addHandler(fh);
@@ -49,7 +65,7 @@ public class AerospikeToKafkaVerticle extends AbstractVerticle {
         }
 
         // Kết nối Aerospike
-        client = new AerospikeClient(new ClientPolicy(), AEROSPIKE_HOST, AEROSPIKE_PORT);
+        client = new AerospikeClient(new ClientPolicy(), AEROSPIKE_PRODUCER_HOST, AEROSPIKE_PRODUCER_PORT);
 
         // Kết nối Kafka
         logger.info("🔄 KafkaToAerospikeVerticle sử dụng Vertx với Worker Pool Size: " + (Runtime.getRuntime().availableProcessors() * 2));
@@ -76,7 +92,7 @@ public class AerospikeToKafkaVerticle extends AbstractVerticle {
 
             try {
                 // Quét tất cả các bản ghi trong set
-                client.scanAll(scanPolicy, NAMESPACE, SET_NAME, (key, record) -> {
+                client.scanAll(scanPolicy, PRODUCER_NAMESPACE, PRODUCER_SET_NAME, (key, record) -> {
                     try {
                         // Kiểm tra bin 'personData' có tồn tại không
                         if (!record.bins.containsKey("personData")) {
@@ -117,7 +133,7 @@ public class AerospikeToKafkaVerticle extends AbstractVerticle {
         vertx.setPeriodic(1000, id -> {
             List<KafkaProducerRecord<String, byte[]>> batchToSend = new ArrayList<>();
 
-            // Lấy tối đa 5000 bản ghi từ hàng đợi
+            // Lấy tối đa MAX_MESSAGES_PER_SECOND bản ghi từ hàng đợi
             while (!messageQueue.isEmpty() && batchToSend.size() < MAX_MESSAGES_PER_SECOND) {
                 batchToSend.add(messageQueue.poll());
             }
@@ -148,15 +164,14 @@ public class AerospikeToKafkaVerticle extends AbstractVerticle {
 
     // Gửi lại message nếu thất bại
     private void retrySend(KafkaProducerRecord<String, byte[]> record) {
-        int maxRetries = 3; // Số lần retry tối đa
         AtomicInteger retryCount = new AtomicInteger(0); // Đếm số lần retry
 
         producer.send(record, result -> {
-            if (result.failed() && retryCount.incrementAndGet() <= maxRetries) {
+            if (result.failed() && retryCount.incrementAndGet() <= MAX_RETRIES) {
                 logger.warning("Retry lần " + retryCount.get() + " cho record: " + result.cause().getMessage());
                 retrySend(record); // Retry logic
             } else if (result.failed()) {
-                logger.severe("Retry thất bại sau " + maxRetries);
+                logger.severe("Retry thất bại sau " + MAX_RETRIES);
             } else {
                 recordCount.incrementAndGet(); // Tăng bộ đếm nếu gửi thành công
             }

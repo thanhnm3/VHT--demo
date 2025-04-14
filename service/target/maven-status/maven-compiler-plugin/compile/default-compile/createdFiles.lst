@@ -1,4 +1,10 @@
-com/vertx/Main.class
-com/vertx/AerospikeToKafkaVerticle.class
-com/vertx/MainVertxApp.class
-com/vertx/KafkaToAerospikeVerticle.class
+com\norm\Consumer.class
+com\norm\Producer.class
+com\vertx\SimpleLogFormatter.class
+com\delete\DeleteAerospikeSet.class
+com\vertx\AerospikeToKafkaVerticle.class
+com\vertx\KafkaToAerospikeVerticle.class
+com\vertx\MainVertxApp.class
+com\norm\Main.class
+com\vertx\EnvPrinter.class
+com\insert\AerospikeInsertProtoRandomBatchTest.class

@@ -30,8 +30,6 @@
       <version>8.0.1</version>
     </dependency>
 
-      <!-- Protobuf Java runtime -->
-
     <!-- Kafka Client -->
     <dependency>
       <groupId>org.apache.kafka</groupId>
@@ -39,22 +37,7 @@
       <version>3.6.0</version>
     </dependency>
 
-    <!-- Thư viện SLF4J API -->
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
-      <version>1.7.36</version>  <!-- Hoặc phiên bản mới nhất -->
-    </dependency>
-
-
-    <!-- Logback (implementation phổ biến nhất) -->
-    <dependency>
-      <groupId>ch.qos.logback</groupId>
-      <artifactId>logback-classic</artifactId>
-      <version>1.2.11</version>  <!-- Hoặc phiên bản mới nhất -->
-    </dependency>
-
-    <!-- Vert.x ( For fast kafka ) -->
+    <!-- Vert.x (For fast Kafka) -->
     <dependency>
       <groupId>io.vertx</groupId>
       <artifactId>vertx-core</artifactId>
@@ -65,9 +48,23 @@
       <artifactId>vertx-kafka-client</artifactId>
       <version>4.5.13</version>
     </dependency>
+
+    <dependency>
+      <groupId>io.github.cdimascio</groupId>
+      <artifactId>dotenv-java</artifactId>
+      <version>3.0.0</version>
+    </dependency>
   </dependencies>
 
     <build>
+    <resources>
+        <resource>
+            <directory>src/main/resources</directory>
+            <includes>
+                <include>.env</include>
+            </includes>
+        </resource>
+    </resources>
     <plugins>
       <!-- Protobuf Plugin -->
       <plugin>

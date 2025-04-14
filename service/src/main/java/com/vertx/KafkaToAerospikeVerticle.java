@@ -4,6 +4,7 @@ import com.aerospike.client.AerospikeClient;
 import com.aerospike.client.Bin;
 import com.aerospike.client.Key;
 import com.aerospike.client.policy.WritePolicy;
+import io.github.cdimascio.dotenv.Dotenv;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Promise;
 import io.vertx.kafka.client.consumer.KafkaConsumer;
@@ -18,18 +19,22 @@ import java.util.logging.Logger;
 
 public class KafkaToAerospikeVerticle extends AbstractVerticle {
 
+    // Load cấu hình từ file .env
+    private static final Dotenv dotenv = Dotenv.configure()
+                                               .directory("service//.env") // Đường dẫn tới file .env
+                                               .load();
+
     // Cấu hình kết nối Aerospike
-    private static final String AEROSPIKE_HOST = "127.0.0.1";
-    private static final int AEROSPIKE_PORT = 4000;
-    private static final String NAMESPACE = "consumer";
-    private static final String SET_NAME = "users";
+    private static final String AEROSPIKE_HOST = dotenv.get("AEROSPIKE_CONSUMER_HOST");
+    private static final int AEROSPIKE_PORT = Integer.parseInt(dotenv.get("AEROSPIKE_CONSUMER_PORT"));
+    private static final String NAMESPACE = dotenv.get("CONSUMER_NAMESPACE");
+    private static final String SET_NAME = dotenv.get("CONSUMER_SET_NAME");
 
     // Cấu hình Kafka
-    private static final String KAFKA_BROKER = "localhost:9092";
-    private static final String KAFKA_TOPIC = "person-topic";
-    private static final String GROUP_ID = "aerospike-consumer-group";
-    private static final int MAX_MESSAGES_PER_BATCH = 5000; // Giới hạn số lượng message mỗi batch
-
+    private static final String KAFKA_BROKER = dotenv.get("KAFKA_BROKER");
+    private static final String KAFKA_TOPIC = dotenv.get("KAFKA_TOPIC");
+    private static final String GROUP_ID = dotenv.get("CONSUMER_GROUP");
+    private static final int MAX_MESSAGES_PER_BATCH = Integer.parseInt(dotenv.get("MAX_MESSAGES_PER_SECOND"));
 
     private AerospikeClient aerospikeClient; // Kết nối Aerospike
     private KafkaConsumer<byte[], byte[]> consumer; // Kafka consumer
@@ -37,14 +42,13 @@ public class KafkaToAerospikeVerticle extends AbstractVerticle {
     private static final Logger logger = Logger.getLogger(KafkaToAerospikeVerticle.class.getName()); // Logger
     private final Queue<KafkaConsumerRecord<byte[], byte[]>> messageQueue = new ConcurrentLinkedQueue<>(); // Hàng đợi lưu trữ message từ Kafka
 
-
     private final AtomicInteger messagesProcessedThisSecond = new AtomicInteger(0); // Đếm số message xử lý trong 1 giây
 
     @Override
     public void start(Promise<Void> startPromise) {
         try {
             // Cấu hình logger ghi log vào file
-            FileHandler fh = new FileHandler("log/kafka_to_aerospike.log", true);
+            FileHandler fh = new FileHandler("log/consumer.log", true);
             fh.setFormatter(new SimpleLogFormatter());
             logger.addHandler(fh);
         } catch (IOException e) {
@@ -87,7 +91,7 @@ public class KafkaToAerospikeVerticle extends AbstractVerticle {
     private void processAndSendBatch(WritePolicy writePolicy) {
         List<KafkaConsumerRecord<byte[], byte[]>> batchToSend = new ArrayList<>();
 
-        // Lấy tối đa 5000 bản ghi từ hàng đợi
+        // Lấy tối đa MAX_MESSAGES_PER_BATCH bản ghi từ hàng đợi
         while (!messageQueue.isEmpty() && batchToSend.size() < MAX_MESSAGES_PER_BATCH) {
             KafkaConsumerRecord<byte[], byte[]> record = messageQueue.poll();
             if (record != null) {
