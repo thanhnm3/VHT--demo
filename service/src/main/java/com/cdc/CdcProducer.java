@@ -36,16 +36,15 @@ public class CdcProducer {
     private static long lastPolledTime = System.currentTimeMillis() - 10_000; // Bắt đầu từ 10s trước
     private static final AtomicInteger messagesSentThisSecond = new AtomicInteger(0); // Đếm số lượng message gửi mỗi giây
 
-    public static void main(String[] args) {
+    public static void main(String[] args, int threadPoolSize) {
         AerospikeClient client = null;
+        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(threadPoolSize); // Sử dụng threadPoolSize
         try {
             client = new AerospikeClient(AERO_HOST, AERO_PORT);
             Producer<String, byte[]> producer = createKafkaProducer();
 
-            // ScheduledExecutorService để in số lượng message mỗi giây
-            ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
             scheduler.scheduleAtFixedRate(() -> {
-                System.out.println("Messages sent to Kafka in the last second: " + messagesSentThisSecond.get());
+                System.out.println("Messages sent : " + messagesSentThisSecond.get());
                 messagesSentThisSecond.set(0); // Reset bộ đếm
             }, 0, 1, TimeUnit.SECONDS);
 
@@ -96,6 +95,7 @@ public class CdcProducer {
                 client.close(); // Đảm bảo đóng client
                 System.out.println("Aerospike client closed.");
             }
+            scheduler.shutdown(); // Đảm bảo đóng scheduler
         }
     }
 

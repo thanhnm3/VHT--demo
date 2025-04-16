@@ -77,13 +77,15 @@ public class AProducer {
             // Đợi tất cả các thread trong ThreadPool hoàn thành trước khi đóng KafkaProducer
             executor.shutdown();
             try {
-                if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
-                    System.err.println("Executor did not terminate in the specified time.");
+                // Tăng thời gian chờ để đảm bảo tất cả các tác vụ hoàn thành
+                if (!executor.awaitTermination(5, TimeUnit.MINUTES)) {
+                    System.err.println("Executor did not terminate in the specified time. Forcing shutdown...");
                     executor.shutdownNow(); // Buộc dừng nếu cần
                 }
             } catch (InterruptedException e) {
                 System.err.println("Executor termination interrupted: " + e.getMessage());
-                executor.shutdownNow();
+                executor.shutdownNow(); // Buộc dừng nếu bị gián đoạn
+                Thread.currentThread().interrupt(); // Khôi phục trạng thái gián đoạn
             }
 
             if (kafkaProducer != null) {

@@ -43,6 +43,7 @@ public class AConsumer {
 
     private static final AtomicInteger messagesProcessedThisSecond = new AtomicInteger(0);
     private static ExecutorService executor;
+    private static volatile boolean isProcessing = true;
 
     public static void main(String[] args, int workerPoolSize, int maxMessagesPerSecond) {
         executor = Executors.newFixedThreadPool(workerPoolSize);
@@ -50,7 +51,7 @@ public class AConsumer {
         AerospikeClient aerospikeClient = null;
 
         // Tạo RateLimiter với maxMessagesPerSecond
-        RateLimiter rateLimiter = RateLimiter.create(maxMessagesPerSecond);
+        RateLimiter rateLimiter = RateLimiter.create(maxMessagesPerSecond + 300); // Thêm một chút dung sai
 
         try {
             aerospikeClient = new AerospikeClient(AEROSPIKE_HOST, AEROSPIKE_PORT);
@@ -81,7 +82,7 @@ public class AConsumer {
                 messagesProcessedThisSecond.set(0);
             }, 0, 1, TimeUnit.SECONDS);
 
-            while (true) {
+            while (isProcessing) {
                 ConsumerRecords<byte[], byte[]> records = kafkaConsumer.poll(Duration.ofMillis(100));
                 for (ConsumerRecord<byte[], byte[]> record : records) {
                     executor.submit(() -> {
@@ -103,6 +104,8 @@ public class AConsumer {
             System.err.println("Error: " + e.getMessage());
             e.printStackTrace();
         } finally {
+            isProcessing = false; // Đặt cờ khi không còn dữ liệu cần xử lý
+            shutdownExecutor();
             if (kafkaConsumer != null) {
                 kafkaConsumer.close();
                 System.out.println("Kafka Consumer closed.");
@@ -111,7 +114,20 @@ public class AConsumer {
                 aerospikeClient.close();
                 System.out.println("Aerospike Client closed.");
             }
-            executor.shutdown();
+        }
+    }
+
+    private static void shutdownExecutor() {
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(5, TimeUnit.MINUTES)) {
+                System.err.println("Executor did not terminate in the specified time. Forcing shutdown...");
+                executor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            System.err.println("Executor termination interrupted: " + e.getMessage());
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
         }
     }
 

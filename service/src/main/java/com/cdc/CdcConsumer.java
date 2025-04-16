@@ -77,7 +77,7 @@ public class CdcConsumer {
 
             ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
             scheduler.scheduleAtFixedRate(() -> {
-                System.out.println("Messages processed in the last second: " + messagesProcessedThisSecond.get());
+                System.out.println("Messages consumed: " + messagesProcessedThisSecond.get());
                 messagesProcessedThisSecond.set(0);
             }, 0, 1, TimeUnit.SECONDS);
 
