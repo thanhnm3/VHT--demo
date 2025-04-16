@@ -8,6 +8,7 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import com.google.common.util.concurrent.RateLimiter;
 
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -104,16 +105,28 @@ public class AProducer {
             client.scanAll(scanPolicy, NAMESPACE, SET_NAME, (key, record) -> {
                 executor.submit(() -> {
                     try {
-                        if (!record.bins.containsKey("personData")) {
-                            System.err.println("Warning: Missing 'personData' bin in record: " + key.userKey);
+                        if (!record.bins.containsKey("personData") || !record.bins.containsKey("last_update")) {
+                            System.err.println("Warning: Missing required bins in record: " + key.userKey);
                             return;
                         }
 
                         // Sử dụng RateLimiter để kiểm soát tốc độ
-                        rateLimiter.acquire(); // Chờ cho đến khi có "phép" xử lý tiếp theo
+                        rateLimiter.acquire();
 
+                        // Lấy dữ liệu từ các bin
                         byte[] personData = (byte[]) record.getValue("personData");
-                        ProducerRecord<String, byte[]> kafkaRecord = new ProducerRecord<>(KAFKA_TOPIC, key.userKey.toString(), personData);
+                        long lastUpdate = record.getLong("last_update");
+
+                        // Kết hợp personData và lastUpdate thành một gói dữ liệu JSON
+                        String message = String.format("{\"personData\": \"%s\", \"lastUpdate\": %d}",
+                                Base64.getEncoder().encodeToString(personData), lastUpdate);
+
+                        // Tạo Kafka record và gửi dữ liệu
+                        ProducerRecord<String, byte[]> kafkaRecord = new ProducerRecord<>(
+                                KAFKA_TOPIC,
+                                key.userKey.toString(), // Key từ Aerospike
+                                message.getBytes(StandardCharsets.UTF_8) // Giá trị là JSON chứa cả personData và lastUpdate
+                        );
 
                         // Gửi dữ liệu tới Kafka
                         sendWithRetry(producer, kafkaRecord, 0);
@@ -146,3 +159,4 @@ public class AProducer {
         });
     }
 }
+

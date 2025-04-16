@@ -52,10 +52,11 @@ public class AerospikeInsertProtoRandomBatchTest {
                         String userId = UUID.randomUUID().toString();
                         Key key = new Key(namespace, setName, userId);
                         Bin personBin = new Bin("personData", personBytes);
+                        Bin lastUpdateBin = new Bin("last_update", System.currentTimeMillis()); 
 
                         // 🟢 Thêm vào batch
                         keys.add(key);
-                        binsList.add(new Bin[]{personBin});
+                        binsList.add(new Bin[]{personBin, lastUpdateBin});
                     }
 
                     // 🟢 Ghi batch vào Aerospike

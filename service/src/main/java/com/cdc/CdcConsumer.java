@@ -1,4 +1,4 @@
-package com.norm;
+package com.cdc;
 
 import com.aerospike.client.AerospikeClient;
 import com.aerospike.client.Bin;
@@ -15,7 +15,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 
 import java.util.Base64;
 import java.util.Collections;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Properties;
@@ -24,8 +23,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
- 
-public class AConsumer {
+import java.nio.charset.StandardCharsets;
+
+public class CdcConsumer {
 
     // Load configuration from .env
     private static final Dotenv dotenv = Dotenv.configure().directory("service//.env").load();
@@ -38,8 +38,8 @@ public class AConsumer {
 
     // Kafka configuration
     private static final String KAFKA_BROKER = dotenv.get("KAFKA_BROKER");
-    private static final String KAFKA_TOPIC = dotenv.get("KAFKA_TOPIC");
-    private static final String GROUP_ID = dotenv.get("CONSUMER_GROUP");
+    private static final String KAFKA_TOPIC = dotenv.get("KAFKA_TOPIC_CDC");
+    private static final String GROUP_ID = dotenv.get("CONSUMER_GROUP_CDC");
 
     private static final AtomicInteger messagesProcessedThisSecond = new AtomicInteger(0);
     private static ExecutorService executor;
@@ -163,7 +163,7 @@ public class AConsumer {
 
                 try {
                     // Chờ một khoảng thời gian trước khi retry
-                    Thread.sleep(100 ); 
+                    Thread.sleep(100 * retryCount); // Tăng thời gian chờ theo số lần retry
                 } catch (InterruptedException ie) {
                     System.err.println("Retry sleep interrupted: " + ie.getMessage());
                     Thread.currentThread().interrupt();
