@@ -141,14 +141,14 @@ public class AConsumer {
                 // Tách các trường từ JSON
                 String personDataBase64 = (String) data.get("personData");
                 byte[] personData = Base64.getDecoder().decode(personDataBase64);
-                long lastUpdate = ((Number) data.get("lastUpdate")).longValue();
+                long migratedGen = ((Number) data.get("migratedGen")).longValue();
 
                 // Tạo các bin
                 Bin personBin = new Bin("personData", personData);
-                Bin lastUpdateBin = new Bin("last_update", lastUpdate);
+                Bin migratedGenBin = new Bin("migrated_gen", migratedGen);
 
                 // Ghi dữ liệu vào Aerospike
-                aerospikeClient.put(writePolicy, aerospikeKey, personBin, lastUpdateBin);
+                aerospikeClient.put(writePolicy, aerospikeKey, personBin, migratedGenBin);
                 return; // Ghi thành công, thoát khỏi vòng lặp
 
             } catch (Exception e) {

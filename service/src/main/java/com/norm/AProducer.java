@@ -105,7 +105,7 @@ public class AProducer {
             client.scanAll(scanPolicy, NAMESPACE, SET_NAME, (key, record) -> {
                 executor.submit(() -> {
                     try {
-                        if (!record.bins.containsKey("personData") || !record.bins.containsKey("last_update")) {
+                        if (!record.bins.containsKey("personData") || !record.bins.containsKey("migrated_gen")) {
                             System.err.println("Warning: Missing required bins in record: " + key.userKey);
                             return;
                         }
@@ -115,17 +115,17 @@ public class AProducer {
 
                         // Lấy dữ liệu từ các bin
                         byte[] personData = (byte[]) record.getValue("personData");
-                        long lastUpdate = record.getLong("last_update");
+                        long migratedGen = record.getLong("migrated_gen");
 
-                        // Kết hợp personData và lastUpdate thành một gói dữ liệu JSON
-                        String message = String.format("{\"personData\": \"%s\", \"lastUpdate\": %d}",
-                                Base64.getEncoder().encodeToString(personData), lastUpdate);
+                        // Kết hợp personData và migratedGen thành một gói dữ liệu JSON
+                        String message = String.format("{\"personData\": \"%s\", \"migratedGen\": %d}",
+                                Base64.getEncoder().encodeToString(personData), migratedGen);
 
                         // Tạo Kafka record và gửi dữ liệu
                         ProducerRecord<String, byte[]> kafkaRecord = new ProducerRecord<>(
                                 KAFKA_TOPIC,
                                 key.userKey.toString(), // Key từ Aerospike
-                                message.getBytes(StandardCharsets.UTF_8) // Giá trị là JSON chứa cả personData và lastUpdate
+                                message.getBytes(StandardCharsets.UTF_8) // Giá trị là JSON chứa cả personData và migratedGen
                         );
 
                         // Gửi dữ liệu tới Kafka

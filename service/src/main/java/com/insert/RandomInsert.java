@@ -10,7 +10,7 @@ import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class AerospikeInsertProtoRandomBatchTest {
+public class RandomInsert {
     public static void main(String[] args) {
         //  Kết nối đến Aerospike
         AerospikeClient client = new AerospikeClient("localhost", 3000);
@@ -52,11 +52,13 @@ public class AerospikeInsertProtoRandomBatchTest {
                         String userId = UUID.randomUUID().toString();
                         Key key = new Key(namespace, setName, userId);
                         Bin personBin = new Bin("personData", personBytes);
-                        Bin lastUpdateBin = new Bin("last_update", System.currentTimeMillis()); 
+
+                        // 🟢 Thay thế last_update bằng migrated_gen với giá trị mặc định là null
+                        Bin migratedGenBin = new Bin("migrated_gen", 0);
 
                         // 🟢 Thêm vào batch
                         keys.add(key);
-                        binsList.add(new Bin[]{personBin, lastUpdateBin});
+                        binsList.add(new Bin[]{personBin, migratedGenBin});
                     }
 
                     // 🟢 Ghi batch vào Aerospike
