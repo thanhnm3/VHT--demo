@@ -130,7 +130,7 @@ public class CdcConsumer {
                 }
 
                 // Tạo key từ Kafka key
-                String userId = new String(keyBytes);
+                String userId = new String(keyBytes, StandardCharsets.UTF_8);
                 Key aerospikeKey = new Key(NAMESPACE, SET_NAME, userId);
 
                 // Giải mã JSON từ Kafka value
@@ -140,14 +140,34 @@ public class CdcConsumer {
 
                 // Tách các trường từ JSON
                 String personDataBase64 = (String) data.get("personData");
-                byte[] personData = Base64.getDecoder().decode(personDataBase64);
-                long lastUpdate = ((Number) data.get("lastUpdate")).longValue();
+                byte[] personData = null;
+                if (personDataBase64 != null) {
+                    try {
+                        personData = Base64.getDecoder().decode(personDataBase64);
+                    } catch (IllegalArgumentException e) {
+                        System.err.println("Invalid Base64 in personData, inserting as null.");
+                        personData = null;
+                    }
+                }
+                // Nếu personDataBase64 là null hoặc decode lỗi thì personData vẫn là null và vẫn insert
+
+                Object lastUpdateObj = data.get("lastUpdate");
+                if (lastUpdateObj == null) {
+                    System.err.println("lastUpdate is null, skipping record.");
+                    return;
+                }
+                long lastUpdate;
+                try {
+                    lastUpdate = ((Number) lastUpdateObj).longValue();
+                } catch (Exception e) {
+                    System.err.println("Invalid lastUpdate value, skipping record.");
+                    return;
+                }
 
                 // Tạo các bin
                 Bin personBin = new Bin("personData", personData);
                 Bin lastUpdateBin = new Bin("last_update", lastUpdate);
 
-                // Ghi dữ liệu vào Aerospike
                 aerospikeClient.put(writePolicy, aerospikeKey, personBin, lastUpdateBin);
                 return; // Ghi thành công, thoát khỏi vòng lặp
 

@@ -4,13 +4,13 @@ import com.aerospike.client.*;
 import com.aerospike.client.query.*;
 import io.github.cdimascio.dotenv.Dotenv;
 import org.apache.kafka.clients.producer.*;
-import com.aerospike.client.query.Filter;
 import com.aerospike.client.Record;
 
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -38,7 +38,11 @@ public class CdcProducer {
 
     public static void main(String[] args, int threadPoolSize) {
         AerospikeClient client = null;
-        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(threadPoolSize); // Sử dụng threadPoolSize
+        // Tạo thread pool chỉ cho producer (gửi dữ liệu)
+        ExecutorService executor = Executors.newFixedThreadPool(threadPoolSize);
+
+        // Scheduler chỉ dùng 1 thread để in log mỗi giây
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         try {
             client = new AerospikeClient(AERO_HOST, AERO_PORT);
             Producer<String, byte[]> producer = createKafkaProducer();
@@ -49,41 +53,40 @@ public class CdcProducer {
             }, 0, 1, TimeUnit.SECONDS);
 
             while (true) {
+                long windowStart = lastPolledTime + 1;
+                long windowEnd = System.currentTimeMillis();
+                System.out.printf("Scanning window [%d → %d]%n", windowStart, windowEnd);
                 try {
                     Statement stmt = new Statement();
                     stmt.setNamespace(NAMESPACE);
                     stmt.setSetName(SET_NAME);
-
-                    // Sử dụng Filter để lọc các bản ghi dựa trên giá trị của BIN_LAST_UPDATE
-                    stmt.setFilter(Filter.range(BIN_LAST_UPDATE, lastPolledTime + 1, System.currentTimeMillis()));
+                    // Không dùng filter, quét toàn bộ set
+                    // stmt.setFilter(Filter.range(BIN_LAST_UPDATE, windowStart, windowEnd));
 
                     RecordSet records = client.query(null, stmt);
-
                     try {
                         while (records.next()) {
                             Key key = records.getKey();
                             Record record = records.getRecord();
-
-                            byte[] data = record.getBytes(BIN_NAME);
-                            if (data != null) {
-                                // Tạo message ở dạng JSON và mã hóa UTF-8
-                                String message = String.format("{\"personData\": \"%s\", \"lastUpdate\": %d}",
-                                    Base64.getEncoder().encodeToString(data), record.getLong(BIN_LAST_UPDATE));
-                                sendWithRetry(producer, new ProducerRecord<>(KAFKA_TOPIC, key.userKey.toString(), message.getBytes(StandardCharsets.UTF_8)), 0);
-                                messagesSentThisSecond.incrementAndGet(); // Tăng bộ đếm
-                            }
-
                             long updateTime = record.getLong(BIN_LAST_UPDATE);
-                            if (updateTime > lastPolledTime) {
-                                lastPolledTime = updateTime;
+                            if (updateTime >= windowStart && updateTime <= windowEnd) {
+                                byte[] data = record.getBytes(BIN_NAME);
+                                String message = (data != null) ?
+                                    String.format("{\"personData\": \"%s\", \"lastUpdate\": %d}", Base64.getEncoder().encodeToString(data), updateTime) :
+                                    String.format("{\"personData\": null, \"lastUpdate\": %d}", updateTime);
+                                executor.submit(() -> sendWithRetry(producer, new ProducerRecord<>(KAFKA_TOPIC, key.userKey.toString(), message.getBytes(StandardCharsets.UTF_8)), 0));
+                                messagesSentThisSecond.incrementAndGet();
                             }
                         }
                     } finally {
-                        records.close(); // Đảm bảo đóng RecordSet
+                        records.close();
                     }
-
-                    Thread.sleep(1000); // Poll mỗi 1 giây
+                    // Nếu query thành công, cập nhật lastPolledTime
+                    lastPolledTime = windowEnd;
+                    System.out.printf("Window done. Next start = %d\n", lastPolledTime);
                 } catch (Exception e) {
+                    // Nếu lỗi, không cập nhật lastPolledTime, sẽ retry lại window này
+                    System.err.println("Error during scan, retrying same window:");
                     e.printStackTrace();
                 }
             }
@@ -95,6 +98,7 @@ public class CdcProducer {
                 client.close(); // Đảm bảo đóng client
                 System.out.println("Aerospike client closed.");
             }
+            executor.shutdown();
             scheduler.shutdown(); // Đảm bảo đóng scheduler
         }
     }

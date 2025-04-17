@@ -107,27 +107,24 @@ public class AProducer {
             client.scanAll(scanPolicy, NAMESPACE, SET_NAME, (key, record) -> {
                 executor.submit(() -> {
                     try {
-                        if (!record.bins.containsKey("personData") || !record.bins.containsKey("last_update")) {
-                            System.err.println("Warning: Missing required bins in record: " + key.userKey);
-                            return;
-                        }
 
-                        // Sử dụng RateLimiter để kiểm soát tốc độ
                         rateLimiter.acquire();
-
-                        // Lấy dữ liệu từ các bin
+                        // Không kiểm tra bins nữa, lấy giá trị luôn (có thể là null)
                         byte[] personData = (byte[]) record.getValue("personData");
-                        long lastUpdate = record.getLong("last_update");
+                        Long lastUpdate = record.getLong("last_update"); // dùng Long để nhận null
 
                         // Kết hợp personData và lastUpdate thành một gói dữ liệu JSON
-                        String message = String.format("{\"personData\": \"%s\", \"lastUpdate\": %d}",
-                                Base64.getEncoder().encodeToString(personData), lastUpdate);
+                        String message = String.format(
+                            "{\"personData\": \"%s\", \"lastUpdate\": %s}",
+                            personData != null ? Base64.getEncoder().encodeToString(personData) : null,
+                            lastUpdate != null ? lastUpdate.toString() : "null"
+                        );
 
                         // Tạo Kafka record và gửi dữ liệu
                         ProducerRecord<String, byte[]> kafkaRecord = new ProducerRecord<>(
-                                KAFKA_TOPIC,
-                                key.userKey.toString(), // Key từ Aerospike
-                                message.getBytes(StandardCharsets.UTF_8) // Giá trị là JSON chứa cả personData và lastUpdate
+                            KAFKA_TOPIC,
+                            key.userKey != null ? key.userKey.toString() : null,
+                            message.getBytes(StandardCharsets.UTF_8)
                         );
 
                         // Gửi dữ liệu tới Kafka

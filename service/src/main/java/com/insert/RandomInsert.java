@@ -10,7 +10,7 @@ import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class AerospikeInsertProtoRandomBatchTest {
+public class RandomInsert {
     public static void main(String[] args) {
         //  Kết nối đến Aerospike
         AerospikeClient client = new AerospikeClient("localhost", 3000);

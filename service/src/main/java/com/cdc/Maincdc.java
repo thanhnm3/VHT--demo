@@ -8,7 +8,7 @@ public class Maincdc {
         int consumerThreadPoolSize = 4; // Số lượng thread cho Consumer
         int randomOperationsThreadPoolSize = 2; // Số lượng thread cho RandomOperations
         int maxMessagesPerSecond = 5000; // Giới hạn số lượng message mỗi giây
-        int operationsPerSecond = 500; // Số lượng thao tác mỗi giây cho RandomOperations
+        int operationsPerSecond = 100; // Số lượng thao tác mỗi giây cho RandomOperations
 
         // Tạo luồng để chạy AerospikeRandomOperations
         Thread randomOperationsThread = new Thread(() -> {
