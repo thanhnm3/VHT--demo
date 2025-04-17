@@ -4,7 +4,6 @@ import com.aerospike.client.AerospikeClient;
 import com.aerospike.client.Bin;
 import com.aerospike.client.Key;
 import com.aerospike.client.policy.WritePolicy;
-import io.github.cdimascio.dotenv.Dotenv;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -27,24 +26,15 @@ import java.nio.charset.StandardCharsets;
 
 public class CdcConsumer {
 
-    // Load configuration from .env
-    private static final Dotenv dotenv = Dotenv.configure().directory("service//.env").load();
 
-    // Aerospike configuration
-    private static final String AEROSPIKE_HOST = dotenv.get("AEROSPIKE_CONSUMER_HOST");
-    private static final int AEROSPIKE_PORT = Integer.parseInt(dotenv.get("AEROSPIKE_CONSUMER_PORT"));
-    private static final String NAMESPACE = dotenv.get("CONSUMER_NAMESPACE");
-    private static final String SET_NAME = dotenv.get("CONSUMER_SET_NAME");
 
-    // Kafka configuration
-    private static final String KAFKA_BROKER = dotenv.get("KAFKA_BROKER");
-    private static final String KAFKA_TOPIC = dotenv.get("KAFKA_TOPIC_CDC");
-    private static final String GROUP_ID = dotenv.get("CONSUMER_GROUP_CDC");
+
 
     private static final AtomicInteger messagesProcessedThisSecond = new AtomicInteger(0);
     private static ExecutorService executor;
 
-    public static void main(String[] args, int workerPoolSize, int maxMessagesPerSecond) {
+    public static void main(String aeroHost, int aeroPort, String namespace, String setName, String kafkaBroker,
+                           String kafkaTopic, String groupId, int workerPoolSize, int maxMessagesPerSecond) {
         executor = Executors.newFixedThreadPool(workerPoolSize);
         KafkaConsumer<byte[], byte[]> kafkaConsumer = null;
         AerospikeClient aerospikeClient = null;
@@ -53,12 +43,12 @@ public class CdcConsumer {
         RateLimiter rateLimiter = RateLimiter.create(maxMessagesPerSecond);
 
         try {
-            aerospikeClient = new AerospikeClient(AEROSPIKE_HOST, AEROSPIKE_PORT);
+            aerospikeClient = new AerospikeClient(aeroHost, aeroPort);
             WritePolicy writePolicy = new WritePolicy();
 
             Properties kafkaProps = new Properties();
-            kafkaProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA_BROKER);
-            kafkaProps.put(ConsumerConfig.GROUP_ID_CONFIG, GROUP_ID);
+            kafkaProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBroker);
+            kafkaProps.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
             kafkaProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.ByteArrayDeserializer");
             kafkaProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.ByteArrayDeserializer");
             kafkaProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
@@ -70,7 +60,7 @@ public class CdcConsumer {
             kafkaProps.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, "1048576"); // Tăng giới hạn lên 1MB cho mỗi partition
 
             kafkaConsumer = new KafkaConsumer<>(kafkaProps);
-            kafkaConsumer.subscribe(Collections.singletonList(KAFKA_TOPIC));
+            kafkaConsumer.subscribe(Collections.singletonList(kafkaTopic));
 
             final AerospikeClient finalAerospikeClient = aerospikeClient;
             final WritePolicy finalWritePolicy = writePolicy;
@@ -89,7 +79,7 @@ public class CdcConsumer {
                             // Sử dụng RateLimiter để kiểm soát tốc độ
                             rateLimiter.acquire(); // Chờ cho đến khi có "phép" xử lý tiếp theo
 
-                            processRecord(finalAerospikeClient, finalWritePolicy, record);
+                            processRecord(finalAerospikeClient, finalWritePolicy, record, namespace, setName);
                             messagesProcessedThisSecond.incrementAndGet();
                         } catch (Exception e) {
                             System.err.println("Error processing record: " + e.getMessage());
@@ -115,7 +105,8 @@ public class CdcConsumer {
         }
     }
 
-    private static void processRecord(AerospikeClient aerospikeClient, WritePolicy writePolicy, ConsumerRecord<byte[], byte[]> record) {
+    private static void processRecord(AerospikeClient aerospikeClient, WritePolicy writePolicy, ConsumerRecord<byte[], byte[]> record,
+                                      String namespace, String setName) {
         final int MAX_RETRIES = 3; // Số lần retry tối đa
         int retryCount = 0;
 
@@ -131,7 +122,7 @@ public class CdcConsumer {
 
                 // Tạo key từ Kafka key
                 String userId = new String(keyBytes, StandardCharsets.UTF_8);
-                Key aerospikeKey = new Key(NAMESPACE, SET_NAME, userId);
+                Key aerospikeKey = new Key(namespace, setName, userId);
 
                 // Giải mã JSON từ Kafka value
                 String jsonString = new String(value, StandardCharsets.UTF_8);
