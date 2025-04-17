@@ -4,14 +4,14 @@ import com.aerospike.client.AerospikeClient;
 import com.aerospike.client.Bin;
 import com.aerospike.client.Key;
 import com.aerospike.client.policy.WritePolicy;
-import io.github.cdimascio.dotenv.Dotenv;
+import com.google.common.util.concurrent.RateLimiter;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.type.TypeReference;
+
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import com.google.common.util.concurrent.RateLimiter;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.core.type.TypeReference;
 
 import java.util.Base64;
 import java.util.Collections;
@@ -24,56 +24,45 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
- 
+
 public class AConsumer {
-
-    // Load configuration from .env
-    private static final Dotenv dotenv = Dotenv.configure().directory("service//.env").load();
-
-    // Aerospike configuration
-    private static final String AEROSPIKE_HOST = dotenv.get("AEROSPIKE_CONSUMER_HOST");
-    private static final int AEROSPIKE_PORT = Integer.parseInt(dotenv.get("AEROSPIKE_CONSUMER_PORT"));
-    private static final String NAMESPACE = dotenv.get("CONSUMER_NAMESPACE");
-    private static final String SET_NAME = dotenv.get("CONSUMER_SET_NAME");
-
-    // Kafka configuration
-    private static final String KAFKA_BROKER = dotenv.get("KAFKA_BROKER");
-    private static final String KAFKA_TOPIC = dotenv.get("KAFKA_TOPIC");
-    private static final String GROUP_ID = dotenv.get("CONSUMER_GROUP");
 
     private static final AtomicInteger messagesProcessedThisSecond = new AtomicInteger(0);
     private static ExecutorService executor;
     private static volatile boolean isProcessing = true;
 
-    public static void main(String[] args, int workerPoolSize, int maxMessagesPerSecond) {
+    public static void main(String[] args, int workerPoolSize, int maxMessagesPerSecond,
+                            String sourceHost, int sourcePort, String sourceNamespace,
+                            String destinationHost, int destinationPort, String destinationNamespace,
+                            String setName, String kafkaBroker, String kafkaTopic, String consumerGroup) {
         executor = Executors.newFixedThreadPool(workerPoolSize);
         KafkaConsumer<byte[], byte[]> kafkaConsumer = null;
-        AerospikeClient aerospikeClient = null;
+        AerospikeClient sourceClient = null;
+        AerospikeClient destinationClient = null;
 
         // Tạo RateLimiter với maxMessagesPerSecond
         RateLimiter rateLimiter = RateLimiter.create(maxMessagesPerSecond + 300); // Thêm một chút dung sai
 
         try {
-            aerospikeClient = new AerospikeClient(AEROSPIKE_HOST, AEROSPIKE_PORT);
+            // Initialize Aerospike clients
+            sourceClient = new AerospikeClient(sourceHost, sourcePort);
+            destinationClient = new AerospikeClient(destinationHost, destinationPort);
             WritePolicy writePolicy = new WritePolicy();
 
+            // Initialize Kafka consumer
             Properties kafkaProps = new Properties();
-            kafkaProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA_BROKER);
-            kafkaProps.put(ConsumerConfig.GROUP_ID_CONFIG, GROUP_ID);
+            kafkaProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBroker);
+            kafkaProps.put(ConsumerConfig.GROUP_ID_CONFIG, consumerGroup);
             kafkaProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.ByteArrayDeserializer");
             kafkaProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.ByteArrayDeserializer");
             kafkaProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
             kafkaProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
 
-            // Thêm các cấu hình tối ưu hóa
-            kafkaProps.put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, "32768"); // Gom đủ 32KB trước khi gửi batch
-            kafkaProps.put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, "50");  // Chờ tối đa 50ms để gom batch
-            kafkaProps.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, "1048576"); // Tăng giới hạn lên 1MB cho mỗi partition
-
             kafkaConsumer = new KafkaConsumer<>(kafkaProps);
-            kafkaConsumer.subscribe(Collections.singletonList(KAFKA_TOPIC));
+            kafkaConsumer.subscribe(Collections.singletonList(kafkaTopic));
 
-            final AerospikeClient finalAerospikeClient = aerospikeClient;
+            final AerospikeClient finalSourceClient = sourceClient;
+            final AerospikeClient finalDestinationClient = destinationClient;
             final WritePolicy finalWritePolicy = writePolicy;
 
             ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
@@ -90,7 +79,8 @@ public class AConsumer {
                             // Sử dụng RateLimiter để kiểm soát tốc độ
                             rateLimiter.acquire(); // Chờ cho đến khi có "phép" xử lý tiếp theo
 
-                            processRecord(finalAerospikeClient, finalWritePolicy, record);
+                            processRecord(finalSourceClient, finalDestinationClient, finalWritePolicy, record,
+                                          sourceNamespace, destinationNamespace, setName);
                             messagesProcessedThisSecond.incrementAndGet();
                         } catch (Exception e) {
                             System.err.println("Error processing record: " + e.getMessage());
@@ -110,9 +100,13 @@ public class AConsumer {
                 kafkaConsumer.close();
                 System.out.println("Kafka Consumer closed.");
             }
-            if (aerospikeClient != null) {
-                aerospikeClient.close();
-                System.out.println("Aerospike Client closed.");
+            if (sourceClient != null) {
+                sourceClient.close();
+                System.out.println("Source Aerospike Client closed.");
+            }
+            if (destinationClient != null) {
+                destinationClient.close();
+                System.out.println("Destination Aerospike Client closed.");
             }
         }
     }
@@ -131,7 +125,8 @@ public class AConsumer {
         }
     }
 
-    private static void processRecord(AerospikeClient aerospikeClient, WritePolicy writePolicy, ConsumerRecord<byte[], byte[]> record) {
+    private static void processRecord(AerospikeClient sourceClient, AerospikeClient destinationClient, WritePolicy writePolicy,
+                                      ConsumerRecord<byte[], byte[]> record, String sourceNamespace, String destinationNamespace, String setName) {
         final int MAX_RETRIES = 3; // Số lần retry tối đa
         int retryCount = 0;
 
@@ -147,7 +142,8 @@ public class AConsumer {
 
                 // Tạo key từ Kafka key
                 String userId = new String(keyBytes);
-                Key aerospikeKey = new Key(NAMESPACE, SET_NAME, userId);
+                Key sourceKey = new Key(sourceNamespace, setName, userId);
+                Key destinationKey = new Key(destinationNamespace, setName, userId);
 
                 // Giải mã JSON từ Kafka value
                 String jsonString = new String(value, StandardCharsets.UTF_8);
@@ -158,14 +154,35 @@ public class AConsumer {
                 String personDataBase64 = (String) data.get("personData");
                 byte[] personData = Base64.getDecoder().decode(personDataBase64);
                 long migratedGen = ((Number) data.get("migratedGen")).longValue();
+                int gen = ((Number) data.get("gen")).intValue(); // Lấy gen từ message
 
                 // Tạo các bin
                 Bin personBin = new Bin("personData", personData);
                 Bin migratedGenBin = new Bin("migrated_gen", migratedGen);
 
-                // Ghi dữ liệu vào Aerospike
-                aerospikeClient.put(writePolicy, aerospikeKey, personBin, migratedGenBin);
-                return; // Ghi thành công, thoát khỏi vòng lặp
+                // Thực hiện đồng thời hai thao tác
+                executor.submit(() -> {
+                    try {
+                        // Cập nhật migrated_gen trong cơ sở dữ liệu nguồn
+                        Bin updatedMigratedGenBin = new Bin("migrated_gen", gen);
+                        sourceClient.put(writePolicy, sourceKey, updatedMigratedGenBin);
+                    } catch (Exception e) {
+                        System.err.println("Error updating migrated_gen in source database: " + e.getMessage());
+                        e.printStackTrace();
+                    }
+                });
+
+                executor.submit(() -> {
+                    try {
+                        // Ghi dữ liệu vào cơ sở dữ liệu đích
+                        destinationClient.put(writePolicy, destinationKey, personBin, migratedGenBin);
+                    } catch (Exception e) {
+                        System.err.println("Error writing to destination database: " + e.getMessage());
+                        e.printStackTrace();
+                    }
+                });
+
+                return; // Thoát nếu thành công
 
             } catch (Exception e) {
                 retryCount++;
@@ -179,7 +196,7 @@ public class AConsumer {
 
                 try {
                     // Chờ một khoảng thời gian trước khi retry
-                    Thread.sleep(100 ); 
+                    Thread.sleep(100);
                 } catch (InterruptedException ie) {
                     System.err.println("Retry sleep interrupted: " + ie.getMessage());
                     Thread.currentThread().interrupt();

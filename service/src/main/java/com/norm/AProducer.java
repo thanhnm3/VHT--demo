@@ -3,7 +3,6 @@ package com.norm;
 import com.aerospike.client.*;
 import com.aerospike.client.policy.ClientPolicy;
 import com.aerospike.client.policy.ScanPolicy;
-import io.github.cdimascio.dotenv.Dotenv;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import com.google.common.util.concurrent.RateLimiter;
@@ -13,48 +12,35 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-
-
-
 public class AProducer {
 
-    // Load configuration from .env
-    private static final Dotenv dotenv = Dotenv.configure().directory("service//.env").load();
-
-    // Aerospike configuration
-    private static final String AEROSPIKE_HOST = dotenv.get("AEROSPIKE_PRODUCER_HOST");
-    private static final int AEROSPIKE_PORT = Integer.parseInt(dotenv.get("AEROSPIKE_PRODUCER_PORT"));
-    private static final String NAMESPACE = dotenv.get("PRODUCER_NAMESPACE");
-    private static final String SET_NAME = dotenv.get("PRODUCER_SET_NAME");
-
-    // Kafka configuration
-    private static final String KAFKA_BROKER = dotenv.get("KAFKA_BROKER");
-    private static final String KAFKA_TOPIC = dotenv.get("KAFKA_TOPIC");
-
-    // Rate limiting and retry configuration
-    private static final int MAX_RETRIES = Integer.parseInt(dotenv.get("MAX_RETRIES"));
 
     private static final AtomicInteger messagesSentThisSecond = new AtomicInteger(0);
     private static ExecutorService executor;
 
-    public static void main(String[] args, int workerPoolSize, int maxMessagesPerSecond) {
-        executor = Executors.newFixedThreadPool(workerPoolSize); // Sử dụng workerPoolSize từ Main
+    public static void main(String[] args, int workerPoolSize, int maxMessagesPerSecond,
+                            String aerospikeHost, int aerospikePort, String namespace, String setName,
+                            String kafkaBroker, String kafkaTopic, int maxRetries) {
+        // Sử dụng các tham số được truyền từ Main.java
         AerospikeClient aerospikeClient = null;
         KafkaProducer<String, byte[]> kafkaProducer = null;
 
         try {
             // Initialize Aerospike client
-            aerospikeClient = new AerospikeClient(new ClientPolicy(), AEROSPIKE_HOST, AEROSPIKE_PORT);
+            aerospikeClient = new AerospikeClient(new ClientPolicy(), aerospikeHost, aerospikePort);
 
             // Initialize Kafka producer
             Properties kafkaProps = new Properties();
-            kafkaProps.put("bootstrap.servers", KAFKA_BROKER);
+            kafkaProps.put("bootstrap.servers", kafkaBroker);
             kafkaProps.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
             kafkaProps.put("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
             kafkaProps.put("linger.ms", "5"); // Thời gian chờ để gom batch
             kafkaProps.put("batch.size", "32768"); // Kích thước batch tối đa (32KB)
             kafkaProps.put("acks", "all"); // Đảm bảo tất cả các bản sao nhận được dữ liệu
             kafkaProducer = new KafkaProducer<>(kafkaProps);
+
+            // Initialize thread pool
+            executor = Executors.newFixedThreadPool(workerPoolSize);
 
             // Schedule a task to reset the message counter every second
             ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
@@ -64,7 +50,7 @@ public class AProducer {
             }, 0, 1, TimeUnit.SECONDS);
 
             // Start reading data from Aerospike and send directly to Kafka using Thread Pool
-            readDataFromAerospike(aerospikeClient, kafkaProducer, maxMessagesPerSecond);
+            readDataFromAerospike(aerospikeClient, kafkaProducer, maxMessagesPerSecond, namespace, setName, kafkaTopic, maxRetries);
 
         } catch (Exception e) {
             System.err.println("Error: " + e.getMessage());
@@ -95,7 +81,9 @@ public class AProducer {
         }
     }
 
-    private static void readDataFromAerospike(AerospikeClient client, KafkaProducer<String, byte[]> producer, int maxMessagesPerSecond) {
+    private static void readDataFromAerospike(AerospikeClient client, KafkaProducer<String, byte[]> producer,
+                                              int maxMessagesPerSecond, String namespace, String setName,
+                                              String kafkaTopic, int maxRetries) {
         ScanPolicy scanPolicy = new ScanPolicy();
         scanPolicy.concurrentNodes = true;
 
@@ -104,7 +92,7 @@ public class AProducer {
 
         try {
             System.out.println("Starting to read data from Aerospike...");
-            client.scanAll(scanPolicy, NAMESPACE, SET_NAME, (key, record) -> {
+            client.scanAll(scanPolicy, namespace, setName, (key, record) -> {
                 executor.submit(() -> {
                     try {
                         if (!record.bins.containsKey("personData") || !record.bins.containsKey("migrated_gen")) {
@@ -118,20 +106,21 @@ public class AProducer {
                         // Lấy dữ liệu từ các bin
                         byte[] personData = (byte[]) record.getValue("personData");
                         long migratedGen = record.getLong("migrated_gen");
+                        int gen = record.generation; // Lấy gen từ metadata của bản ghi
 
-                        // Kết hợp personData và migratedGen thành một gói dữ liệu JSON
-                        String message = String.format("{\"personData\": \"%s\", \"migratedGen\": %d}",
-                                Base64.getEncoder().encodeToString(personData), migratedGen);
+                        // Kết hợp personData, migratedGen và gen thành một gói dữ liệu JSON
+                        String message = String.format("{\"personData\": \"%s\", \"migratedGen\": %d, \"gen\": %d}",
+                                Base64.getEncoder().encodeToString(personData), migratedGen, gen);
 
                         // Tạo Kafka record và gửi dữ liệu
                         ProducerRecord<String, byte[]> kafkaRecord = new ProducerRecord<>(
-                                KAFKA_TOPIC,
+                                kafkaTopic,
                                 key.userKey.toString(), // Key từ Aerospike
-                                message.getBytes(StandardCharsets.UTF_8) // Giá trị là JSON chứa cả personData và migratedGen
+                                message.getBytes(StandardCharsets.UTF_8) // Giá trị là JSON chứa cả personData, migratedGen và gen
                         );
 
                         // Gửi dữ liệu tới Kafka
-                        sendWithRetry(producer, kafkaRecord, 0);
+                        sendWithRetry(producer, kafkaRecord, 0, maxRetries);
 
                         // Tăng bộ đếm số lượng message đã gửi
                         messagesSentThisSecond.incrementAndGet();
@@ -148,14 +137,15 @@ public class AProducer {
         }
     }
 
-    private static void sendWithRetry(KafkaProducer<String, byte[]> producer, ProducerRecord<String, byte[]> record, int retryCount) {
+    private static void sendWithRetry(KafkaProducer<String, byte[]> producer, ProducerRecord<String, byte[]> record,
+                                      int retryCount, int maxRetries) {
         producer.send(record, (metadata, exception) -> {
             if (exception != null) {
-                if (retryCount < MAX_RETRIES) {
+                if (retryCount < maxRetries) {
                     System.err.println("Retrying message. Attempt: " + (retryCount + 1));
-                    sendWithRetry(producer, record, retryCount + 1);
+                    sendWithRetry(producer, record, retryCount + 1, maxRetries);
                 } else {
-                    System.err.println("Failed to send message after " + MAX_RETRIES + " retries: " + exception.getMessage());
+                    System.err.println("Failed to send message after " + maxRetries + " retries: " + exception.getMessage());
                 }
             }
         });
