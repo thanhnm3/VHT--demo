@@ -5,8 +5,8 @@ public class Main {
     public static void main(String[] args) {
         // Cấu hình worker pool size
         final int workerPoolSizeProducer = 2; // Số lượng thread trong Thread Pool
-        final int workerPoolSizeConsumer = 8; // Số lượng thread trong Thread Pool cho Aerospike
-        final int maxMessagesPerSecond = 6000; // Giới hạn số lượng message mỗi giây
+        final int workerPoolSizeConsumer = 6; // Số lượng thread trong Thread Pool cho Aerospike
+        final int maxMessagesPerSecond = 8000; // Giới hạn số lượng message mỗi giây
 
         // Khởi chạy KafkaToAerospike trong một luồng riêng
         Thread producer = new Thread(() -> {

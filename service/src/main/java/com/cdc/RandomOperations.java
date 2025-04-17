@@ -12,9 +12,13 @@ import com.google.common.util.concurrent.RateLimiter;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class RandomOperations {
-    public static void main(String[] args) {
+    public static void main(String[] args, int operationsPerSecond, int threadPoolSize) {
         // Kết nối đến Aerospike
         AerospikeClient client = new AerospikeClient("localhost", 3000);
         WritePolicy writePolicy = new WritePolicy();
@@ -25,36 +29,67 @@ public class RandomOperations {
         String setName = "users";
         Random random = new Random();
 
-        int operationsPerSecond = 1; // Số lượng thao tác mỗi giây (có thể điều chỉnh)
-        RateLimiter rateLimiter = RateLimiter.create(operationsPerSecond); // Tạo RateLimiter để kiểm soát tốc độ
+        // Sử dụng RateLimiter để kiểm soát tốc độ
+        RateLimiter rateLimiter = RateLimiter.create(operationsPerSecond);
 
         AtomicInteger totalInsertCount = new AtomicInteger(0);
         AtomicInteger totalUpdateCount = new AtomicInteger(0);
         AtomicInteger totalDeleteCount = new AtomicInteger(0);
 
+        AtomicInteger insertCountThisSecond = new AtomicInteger(0);
+        AtomicInteger updateCountThisSecond = new AtomicInteger(0);
+        AtomicInteger deleteCountThisSecond = new AtomicInteger(0);
+
         long startTime = System.currentTimeMillis();
-        long duration = 100_000; // Chạy trong 100 giây
+        long duration = 20_000; // Chạy trong x giây
+
+        // Tạo thread pool chỉ cho producer (gửi dữ liệu)
+        ExecutorService executor = Executors.newFixedThreadPool(threadPoolSize);
+
+        // Scheduler chỉ dùng 1 thread để in log mỗi giây
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        scheduler.scheduleAtFixedRate(() -> {
+            System.out.println("Insert: " + insertCountThisSecond.get() +
+                               ", Update: " + updateCountThisSecond.get() +
+                               ", Delete: " + deleteCountThisSecond.get());
+            insertCountThisSecond.set(0);
+            updateCountThisSecond.set(0);
+            deleteCountThisSecond.set(0);
+        }, 0, 1, TimeUnit.SECONDS);
 
         while (System.currentTimeMillis() - startTime < duration) {
             rateLimiter.acquire(); // Đảm bảo chỉ thực hiện số thao tác tối đa mỗi giây
 
-            int operationType = random.nextInt(3); // 0: Insert, 1: Update, 2: Delete
-            switch (operationType) {
-                case 0: // Insert
-                    performInsert(client, writePolicy, namespace, setName, random);
-                    totalInsertCount.incrementAndGet();
-                    break;
-                case 1: // Update
-                    performUpdate(client, writePolicy, readPolicy, namespace, setName, random);
-                    totalUpdateCount.incrementAndGet();
-                    break;
-                case 2: // Delete
-                    performDelete(client, namespace, setName, random);
-                    totalDeleteCount.incrementAndGet();
-                    break;
-            }
+            executor.submit(() -> {
+                int operationType = random.nextInt(3); // 0: Insert, 1: Update, 2: Delete
+                switch (operationType) {
+                    case 0: // Insert
+                        performInsert(client, writePolicy, namespace, setName, random);
+                        totalInsertCount.incrementAndGet();
+                        insertCountThisSecond.incrementAndGet();
+                        break;
+                    case 1: // Update
+                        performUpdate(client, writePolicy, readPolicy, namespace, setName, random);
+                        totalUpdateCount.incrementAndGet();
+                        updateCountThisSecond.incrementAndGet();
+                        break;
+                    case 2: // Delete
+                        performDelete(client, namespace, setName, random);
+                        totalDeleteCount.incrementAndGet();
+                        deleteCountThisSecond.incrementAndGet();
+                        break;
+                }
+            });
         }
 
+        executor.shutdown();
+        try {
+            executor.awaitTermination(1, TimeUnit.MINUTES);
+        } catch (InterruptedException e) {
+            System.err.println("Executor interrupted: " + e.getMessage());
+        }
+
+        scheduler.shutdown();
         System.out.println("\nTổng số thao tác:");
         System.out.println("Insert: " + totalInsertCount.get());
         System.out.println("Update: " + totalUpdateCount.get());
@@ -98,16 +133,21 @@ public class RandomOperations {
     }
 
     private static void performDelete(AerospikeClient client, String namespace, String setName, Random random) {
-        String userId = UUID.randomUUID().toString(); // Giả định xóa một key ngẫu nhiên
-        Key key = new Key(namespace, setName, userId);
+        // Lấy một key ngẫu nhiên từ cơ sở dữ liệu
+        Key key = getRandomKeyFromDatabase(client, namespace, setName, random);
+
+        if (key == null) {
+            System.err.println("No records found for deletion.");
+            return; // Không có bản ghi nào để sửa
+        }
 
         try {
-            boolean deleted = client.delete(null, key);
-            if (deleted) {
-                System.out.println("Deleted record with key: " + userId);
-            }
+            Bin deleteBin = Bin.asNull("personData");
+            Bin lastUpdateBin = new Bin("last_update", System.currentTimeMillis()); // Cập nhật last_update khi xóa
+            client.put(null, key, deleteBin, lastUpdateBin);
+            System.out.println("Deleted field with key: " + key.userKey);
         } catch (AerospikeException e) {
-            System.err.println("Failed to delete record with key: " + userId);
+            System.err.println("Failed to delete with key: " + key.userKey + " (exception: " + e.getMessage() + ")");
         }
     }
 
