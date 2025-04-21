@@ -17,16 +17,17 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+
+
+// Can cai thien lai code rat nhieu, nhung ma co ban thi van chay tot
 public class RandomOperations {
-    public static void main(String[] args, int operationsPerSecond, int threadPoolSize) {
+    public static void main(String aeroHost, int aeroPort, String namespace, String setName, int operationsPerSecond, int threadPoolSize) {
         // Kết nối đến Aerospike
-        AerospikeClient client = new AerospikeClient("localhost", 3000);
+        AerospikeClient client = new AerospikeClient(aeroHost, aeroPort);
         WritePolicy writePolicy = new WritePolicy();
         Policy readPolicy = new Policy(); // Sử dụng readPolicy
         writePolicy.sendKey = true;
 
-        String namespace = "producer";
-        String setName = "users";
         Random random = new Random();
 
         // Sử dụng RateLimiter để kiểm soát tốc độ
@@ -43,11 +44,11 @@ public class RandomOperations {
         long startTime = System.currentTimeMillis();
         long duration = 20_000; // Chạy trong x giây
 
-        // Tạo thread pool để xử lý các thao tác
+        // Tạo thread pool chỉ cho producer (gửi dữ liệu)
         ExecutorService executor = Executors.newFixedThreadPool(threadPoolSize);
 
-        // Tạo ScheduledExecutorService để in số lượng thao tác mỗi giây
-        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+        // Scheduler chỉ dùng 1 thread để in log mỗi giây
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         scheduler.scheduleAtFixedRate(() -> {
             System.out.println("Insert: " + insertCountThisSecond.get() +
                                ", Update: " + updateCountThisSecond.get() +
@@ -107,7 +108,7 @@ public class RandomOperations {
         Bin lastUpdateBin = new Bin("last_update", System.currentTimeMillis());
 
         client.put(writePolicy, key, personBin, lastUpdateBin);
-        System.out.println("Inserted record with key: " + userId);
+        // System.out.println("Inserted record with key: " + userId);
     }
 
     private static void performUpdate(AerospikeClient client, WritePolicy writePolicy, Policy readPolicy, String namespace, String setName, Random random) {
@@ -125,7 +126,7 @@ public class RandomOperations {
                 Bin updatedLastUpdateBin = new Bin("last_update", System.currentTimeMillis());
 
                 client.put(writePolicy, randomKey, updatedPersonBin, updatedLastUpdateBin);
-                System.out.println("Updated record with key: " + randomKey.userKey);
+                // System.out.println("Updated record with key: " + randomKey.userKey);
             }
         } catch (AerospikeException e) {
             System.err.println("Failed to update record with key: " + randomKey.userKey);
@@ -138,18 +139,16 @@ public class RandomOperations {
 
         if (key == null) {
             System.err.println("No records found for deletion.");
-            return; // Không có bản ghi nào để xóa
+            return; // Không có bản ghi nào để sửa
         }
 
         try {
-            boolean deleted = client.delete(null, key);
-            if (deleted) {
-                System.out.println("Deleted record with key: " + key.userKey);
-            } else {
-                System.err.println("Failed to delete record with key: " + key.userKey + " (key not found)");
-            }
+            Bin deleteBin = Bin.asNull("personData");
+            Bin lastUpdateBin = new Bin("last_update", System.currentTimeMillis()); // Cập nhật last_update khi xóa
+            client.put(null, key, deleteBin, lastUpdateBin);
+            // System.out.println("Deleted field with key: " + key.userKey);
         } catch (AerospikeException e) {
-            System.err.println("Failed to delete record with key: " + key.userKey + " (exception: " + e.getMessage() + ")");
+            System.err.println("Failed to delete with key: " + key.userKey + " (exception: " + e.getMessage() + ")");
         }
     }
 

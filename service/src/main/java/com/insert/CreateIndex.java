@@ -4,7 +4,6 @@ import com.aerospike.client.AerospikeClient;
 import com.aerospike.client.AerospikeException;
 import com.aerospike.client.policy.Policy;
 import com.aerospike.client.task.IndexTask;
-import com.aerospike.client.query.IndexType;
 
 public class CreateIndex {
     public static void main(String[] args) {
@@ -14,11 +13,11 @@ public class CreateIndex {
             String set = "users";
             String indexName = "idx_last_update";
 
+            // Xóa index
             Policy policy = new Policy();
-            IndexTask task = client.createIndex(policy, namespace, set, indexName, "last_update", IndexType.NUMERIC);
-
-            task.waitTillComplete(); // Đợi tạo xong
-            System.out.println("Secondary Index created.");
+            IndexTask task = client.dropIndex(policy, namespace, set, indexName);
+            task.waitTillComplete(); // Đợi xóa xong
+            System.out.println("Secondary Index dropped.");
         } catch (AerospikeException e) {
             e.printStackTrace();
         } finally {

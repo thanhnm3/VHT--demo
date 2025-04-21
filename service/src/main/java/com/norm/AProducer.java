@@ -100,10 +100,8 @@ public class AProducer {
                             return;
                         }
 
-                        // Sử dụng RateLimiter để kiểm soát tốc độ
                         rateLimiter.acquire();
-
-                        // Lấy dữ liệu từ các bin
+                        // Không kiểm tra bins nữa, lấy giá trị luôn (có thể là null)
                         byte[] personData = (byte[]) record.getValue("personData");
                         long migratedGen = record.getLong("migrated_gen");
                         int gen = record.generation; // Lấy gen từ metadata của bản ghi
