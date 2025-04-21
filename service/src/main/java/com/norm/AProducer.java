@@ -103,18 +103,17 @@ public class AProducer {
                         rateLimiter.acquire();
                         // Không kiểm tra bins nữa, lấy giá trị luôn (có thể là null)
                         byte[] personData = (byte[]) record.getValue("personData");
-                        long migratedGen = record.getLong("migrated_gen");
-                        int gen = record.generation; // Lấy gen từ metadata của bản ghi
+                        long lastUpdate = System.currentTimeMillis(); // Lấy timestamp hiện tại
 
-                        // Kết hợp personData, migratedGen và gen thành một gói dữ liệu JSON
-                        String message = String.format("{\"personData\": \"%s\", \"migratedGen\": %d, \"gen\": %d}",
-                                Base64.getEncoder().encodeToString(personData), migratedGen, gen);
+                        // Kết hợp personData và lastUpdate thành một gói dữ liệu JSON
+                        String message = String.format("{\"personData\": \"%s\", \"lastUpdate\": %d}",
+                                Base64.getEncoder().encodeToString(personData), lastUpdate);
 
                         // Tạo Kafka record và gửi dữ liệu
                         ProducerRecord<String, byte[]> kafkaRecord = new ProducerRecord<>(
                                 kafkaTopic,
                                 key.userKey.toString(), // Key từ Aerospike
-                                message.getBytes(StandardCharsets.UTF_8) // Giá trị là JSON chứa cả personData, migratedGen và gen
+                                message.getBytes(StandardCharsets.UTF_8) // Giá trị là JSON chứa personData và lastUpdate
                         );
 
                         // Gửi dữ liệu tới Kafka

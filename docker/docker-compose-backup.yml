@@ -36,6 +36,9 @@ services:
     command:
       - '--kafka.server=kafka1:29092'
     container_name: kafka-exporter
+    depends_on:
+      kafka1:
+        condition: service_healthy
     networks:
       - kafka-platform
 
@@ -75,6 +78,12 @@ services:
       CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: zookeeper1:2181
       CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
       CONFLUENT_METRICS_ENABLE: 'false'
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     networks:
       - kafka-platform
 

@@ -19,17 +19,17 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.ArrayList;
+import java.util.List;
 
 public class AConsumer {
 
     private static final AtomicInteger messagesProcessedThisSecond = new AtomicInteger(0);
     private static ExecutorService executor;
     private static volatile boolean isProcessing = true;
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     public static void main(String[] args, int workerPoolSize, int maxMessagesPerSecond,
                             String sourceHost, int sourcePort, String sourceNamespace,
@@ -40,8 +40,8 @@ public class AConsumer {
         AerospikeClient sourceClient = null;
         AerospikeClient destinationClient = null;
 
-        // Tạo RateLimiter với maxMessagesPerSecond
-        RateLimiter rateLimiter = RateLimiter.create(maxMessagesPerSecond + 300); // Thêm một chút dung sai
+        // Tạo RateLimiter với maxMessagesPerSecond (không thêm dung sai)
+        RateLimiter rateLimiter = RateLimiter.create(maxMessagesPerSecond);
 
         try {
             // Initialize Aerospike clients
@@ -49,7 +49,7 @@ public class AConsumer {
             destinationClient = new AerospikeClient(destinationHost, destinationPort);
             WritePolicy writePolicy = new WritePolicy();
 
-            // Initialize Kafka consumer
+            // Initialize Kafka consumer với cấu hình batch
             Properties kafkaProps = new Properties();
             kafkaProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBroker);
             kafkaProps.put(ConsumerConfig.GROUP_ID_CONFIG, consumerGroup);
@@ -57,11 +57,14 @@ public class AConsumer {
             kafkaProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.ByteArrayDeserializer");
             kafkaProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
             kafkaProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
+            kafkaProps.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "100"); // Giới hạn số lượng records trong mỗi poll
+            kafkaProps.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG, "52428800"); // 50MB
+            kafkaProps.put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, "1"); // Không đợi batch đầy
+            kafkaProps.put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, "500"); // Thời gian đợi tối đa cho mỗi fetch
 
             kafkaConsumer = new KafkaConsumer<>(kafkaProps);
             kafkaConsumer.subscribe(Collections.singletonList(kafkaTopic));
 
-            final AerospikeClient finalSourceClient = sourceClient;
             final AerospikeClient finalDestinationClient = destinationClient;
             final WritePolicy finalWritePolicy = writePolicy;
 
@@ -72,29 +75,39 @@ public class AConsumer {
             }, 0, 1, TimeUnit.SECONDS);
 
             while (isProcessing) {
-                ConsumerRecords<byte[], byte[]> records = kafkaConsumer.poll(Duration.ofMillis(100));
-                for (ConsumerRecord<byte[], byte[]> record : records) {
-                    executor.submit(() -> {
-                        try {
-                            // Sử dụng RateLimiter để kiểm soát tốc độ
-                            rateLimiter.acquire(); // Chờ cho đến khi có "phép" xử lý tiếp theo
+                ConsumerRecords<byte[], byte[]> records = kafkaConsumer.poll(Duration.ofMillis(500));
+                if (records.isEmpty()) continue;
 
-                            processRecord(finalSourceClient, finalDestinationClient, finalWritePolicy, record,
-                                          sourceNamespace, destinationNamespace, setName);
+                // Xử lý batch messages
+                List<CompletableFuture<Void>> futures = new ArrayList<>();
+                
+                for (ConsumerRecord<byte[], byte[]> record : records) {
+                    // Rate limit trước khi submit task
+                    rateLimiter.acquire();
+                    
+                    CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                        try {
+                            processRecord(finalDestinationClient, finalWritePolicy, record,
+                                        destinationNamespace, setName);
                             messagesProcessedThisSecond.incrementAndGet();
                         } catch (Exception e) {
                             System.err.println("Error processing record: " + e.getMessage());
                             e.printStackTrace();
                         }
-                    });
+                    }, executor);
+                    
+                    futures.add(future);
                 }
+
+                // Đợi tất cả các futures hoàn thành
+                CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
             }
 
         } catch (Exception e) {
             System.err.println("Error: " + e.getMessage());
             e.printStackTrace();
         } finally {
-            isProcessing = false; // Đặt cờ khi không còn dữ liệu cần xử lý
+            isProcessing = false;
             shutdownExecutor();
             if (kafkaConsumer != null) {
                 kafkaConsumer.close();
@@ -125,9 +138,9 @@ public class AConsumer {
         }
     }
 
-    private static void processRecord(AerospikeClient sourceClient, AerospikeClient destinationClient, WritePolicy writePolicy,
-                                      ConsumerRecord<byte[], byte[]> record, String sourceNamespace, String destinationNamespace, String setName) {
-        final int MAX_RETRIES = 3; // Số lần retry tối đa
+    private static void processRecord(AerospikeClient destinationClient, WritePolicy writePolicy,
+                                    ConsumerRecord<byte[], byte[]> record, String destinationNamespace, String setName) {
+        final int MAX_RETRIES = 3;
         int retryCount = 0;
 
         while (retryCount <= MAX_RETRIES) {
@@ -142,47 +155,25 @@ public class AConsumer {
 
                 // Tạo key từ Kafka key
                 String userId = new String(keyBytes);
-                Key sourceKey = new Key(sourceNamespace, setName, userId);
                 Key destinationKey = new Key(destinationNamespace, setName, userId);
 
                 // Giải mã JSON từ Kafka value
                 String jsonString = new String(value, StandardCharsets.UTF_8);
-                ObjectMapper objectMapper = new ObjectMapper();
                 Map<String, Object> data = objectMapper.readValue(jsonString, new TypeReference<Map<String, Object>>() {});
 
-                // Tách các trường từ JSON
+                // Lấy personData và lastUpdate từ JSON
                 String personDataBase64 = (String) data.get("personData");
                 byte[] personData = Base64.getDecoder().decode(personDataBase64);
-                long migratedGen = ((Number) data.get("migratedGen")).longValue();
-                int gen = ((Number) data.get("gen")).intValue(); // Lấy gen từ message
+                long lastUpdate = ((Number) data.get("lastUpdate")).longValue();
 
                 // Tạo các bin
                 Bin personBin = new Bin("personData", personData);
-                Bin migratedGenBin = new Bin("migrated_gen", migratedGen);
+                Bin lastUpdateBin = new Bin("lastUpdate", lastUpdate);
+                Bin keyBin = new Bin("PK", userId);
 
-                // Thực hiện đồng thời hai thao tác
-                executor.submit(() -> {
-                    try {
-                        // Cập nhật migrated_gen trong cơ sở dữ liệu nguồn
-                        Bin updatedMigratedGenBin = new Bin("migrated_gen", gen);
-                        sourceClient.put(writePolicy, sourceKey, updatedMigratedGenBin);
-                    } catch (Exception e) {
-                        System.err.println("Error updating migrated_gen in source database: " + e.getMessage());
-                        e.printStackTrace();
-                    }
-                });
-
-                executor.submit(() -> {
-                    try {
-                        // Ghi dữ liệu vào cơ sở dữ liệu đích
-                        destinationClient.put(writePolicy, destinationKey, personBin, migratedGenBin);
-                    } catch (Exception e) {
-                        System.err.println("Error writing to destination database: " + e.getMessage());
-                        e.printStackTrace();
-                    }
-                });
-
-                return; // Thoát nếu thành công
+                // Ghi dữ liệu vào cơ sở dữ liệu đích
+                destinationClient.put(writePolicy, destinationKey, keyBin, personBin, lastUpdateBin);
+                return;
 
             } catch (Exception e) {
                 retryCount++;
@@ -191,12 +182,12 @@ public class AConsumer {
                 if (retryCount > MAX_RETRIES) {
                     System.err.println("Max retries reached. Skipping record.");
                     e.printStackTrace();
-                    return; // Thoát nếu đã retry đủ số lần
+                    return;
                 }
 
                 try {
-                    // Chờ một khoảng thời gian trước khi retry
-                    Thread.sleep(100);
+                    // Giảm thời gian sleep giữa các lần retry
+                    Thread.sleep(50);
                 } catch (InterruptedException ie) {
                     System.err.println("Retry sleep interrupted: " + ie.getMessage());
                     Thread.currentThread().interrupt();

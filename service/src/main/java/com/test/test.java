@@ -67,7 +67,7 @@ public class test {
 
                 if (rec1 == null || rec2 == null) {
                     missing++;
-                    System.out.println("Key " + randomKey + ": Thiếu bản ghi ở " + (rec1 == null ? "DB1" : "DB2"));
+                    System.out.println("Key " + randomKey + ": Thieu ban ghi o " + (rec1 == null ? "DB1" : "DB2"));
                 } else {
                     boolean isEqual;
                     if (personData1 == null && personData2 == null) {
@@ -81,14 +81,14 @@ public class test {
                         same++;
                     } else {
                         diff++;
-                        System.out.println("Key " + randomKey + ": SAI (personData khác nhau)");
+                        System.out.println("Key " + randomKey + ": SAI (personData khac nhau)");
                     }
                 }
             }
-            System.out.println("Tổng số key kiểm tra: " + sampleSize);
-            System.out.println("Giống nhau: " + same);
-            System.out.println("Khác nhau: " + diff);
-            System.out.println("Thiếu bản ghi: " + missing);
+            System.out.println("Tong so key kiem tra: " + sampleSize);
+            System.out.println("Giong nhau: " + same);
+            System.out.println("Khac nhau: " + diff);
+            System.out.println("Thieu ban ghi: " + missing);
         } finally {
             db1.close();
             db2.close();
