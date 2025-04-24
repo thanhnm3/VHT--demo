@@ -161,18 +161,18 @@ public class AConsumer {
                 String jsonString = new String(value, StandardCharsets.UTF_8);
                 Map<String, Object> data = objectMapper.readValue(jsonString, new TypeReference<Map<String, Object>>() {});
 
-                // Lấy personData và lastUpdate từ JSON
+                // Lấy personData và last_update từ JSON
                 String personDataBase64 = (String) data.get("personData");
                 byte[] personData = Base64.getDecoder().decode(personDataBase64);
-                long lastUpdate = ((Number) data.get("lastUpdate")).longValue();
+                long last_update = ((Number) data.get("last_update")).longValue();
 
                 // Tạo các bin
                 Bin personBin = new Bin("personData", personData);
-                Bin lastUpdateBin = new Bin("lastUpdate", lastUpdate);
+                Bin last_updateBin = new Bin("last_update", last_update);
                 Bin keyBin = new Bin("PK", userId);
 
                 // Ghi dữ liệu vào cơ sở dữ liệu đích
-                destinationClient.put(writePolicy, destinationKey, keyBin, personBin, lastUpdateBin);
+                destinationClient.put(writePolicy, destinationKey, keyBin, personBin, last_updateBin);
                 return;
 
             } catch (Exception e) {

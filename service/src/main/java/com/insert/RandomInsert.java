@@ -52,13 +52,11 @@ public class RandomInsert {
                         String userId = UUID.randomUUID().toString();
                         Key key = new Key(namespace, setName, userId);
                         Bin personBin = new Bin("personData", personBytes);
-
-                        // 🟢 Thay thế last_update bằng migrated_gen với giá trị mặc định là null
-                        Bin migratedGenBin = new Bin("migrated_gen", 0);
+                        Bin lastUpdateBin = new Bin("last_update", System.currentTimeMillis()); 
 
                         // 🟢 Thêm vào batch
                         keys.add(key);
-                        binsList.add(new Bin[]{personBin, migratedGenBin});
+                        binsList.add(new Bin[]{personBin, lastUpdateBin});
                     }
 
                     // 🟢 Ghi batch vào Aerospike
@@ -95,4 +93,3 @@ public class RandomInsert {
         return bytes;
     }
 }
-

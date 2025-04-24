@@ -95,7 +95,7 @@ public class AProducer {
             client.scanAll(scanPolicy, namespace, setName, (key, record) -> {
                 executor.submit(() -> {
                     try {
-                        if (!record.bins.containsKey("personData") || !record.bins.containsKey("migrated_gen")) {
+                        if (!record.bins.containsKey("personData") || !record.bins.containsKey("last_update")) {
                             System.err.println("Warning: Missing required bins in record: " + key.userKey);
                             return;
                         }
@@ -103,17 +103,17 @@ public class AProducer {
                         rateLimiter.acquire();
                         // Không kiểm tra bins nữa, lấy giá trị luôn (có thể là null)
                         byte[] personData = (byte[]) record.getValue("personData");
-                        long lastUpdate = System.currentTimeMillis(); // Lấy timestamp hiện tại
+                        long last_update = System.currentTimeMillis(); // Lấy timestamp hiện tại
 
-                        // Kết hợp personData và lastUpdate thành một gói dữ liệu JSON
-                        String message = String.format("{\"personData\": \"%s\", \"lastUpdate\": %d}",
-                                Base64.getEncoder().encodeToString(personData), lastUpdate);
+                        // Kết hợp personData và last_update thành một gói dữ liệu JSON
+                        String message = String.format("{\"personData\": \"%s\", \"last_update\": %d}",
+                                Base64.getEncoder().encodeToString(personData), last_update);
 
                         // Tạo Kafka record và gửi dữ liệu
                         ProducerRecord<String, byte[]> kafkaRecord = new ProducerRecord<>(
                                 kafkaTopic,
                                 key.userKey.toString(), // Key từ Aerospike
-                                message.getBytes(StandardCharsets.UTF_8) // Giá trị là JSON chứa personData và lastUpdate
+                                message.getBytes(StandardCharsets.UTF_8) // Giá trị là JSON chứa personData và last_update
                         );
 
                         // Gửi dữ liệu tới Kafka
