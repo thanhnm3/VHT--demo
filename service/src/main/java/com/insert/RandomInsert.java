@@ -52,7 +52,7 @@ public class RandomInsert {
                         String userId = UUID.randomUUID().toString();
                         Key key = new Key(namespace, setName, userId);
                         Bin personBin = new Bin("personData", personBytes);
-                        Bin lastUpdateBin = new Bin("last_update", System.currentTimeMillis()); 
+                        Bin lastUpdateBin = new Bin("lastUpdate", System.currentTimeMillis()); 
 
                         // 🟢 Thêm vào batch
                         keys.add(key);
