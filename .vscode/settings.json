@@ -1,4 +1,22 @@
 {
     "java.configuration.updateBuildConfiguration": "interactive",
-    "java.project.sourcePaths": []
+    "java.project.sourcePaths": [],
+    "workbench.colorTheme": "Default Dark+",
+    "workbench.preferredDarkColorTheme": "Default Dark+",
+    "workbench.preferredLightColorTheme": "Default Light+",
+    "editor.fontSize": 14,
+    "editor.fontFamily": "Consolas, 'Courier New', monospace",
+    "editor.fontLigatures": true,
+    "files.autoSave": "afterDelay",
+    "files.autoSaveDelay": 1000,
+    "editor.tokenColorCustomizations": {
+        "textMateRules": [
+            {
+                "scope": ["comment", "punctuation.definition.comment"],
+                "settings": {
+                    "fontStyle": "italic"
+                }
+            }
+        ]
+    }
 }

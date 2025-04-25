@@ -1,8 +1,0 @@
-hostPort: kafka101:9991
-lowercaseOutputName: true
-lowercaseOutputLabelNames: true
-
-# Chỉ giữ lại các metric cần thiết
-
-rules:
-  - pattern: ".*"
