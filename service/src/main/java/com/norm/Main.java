@@ -3,8 +3,12 @@ package com.norm;
 import io.github.cdimascio.dotenv.Dotenv;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CountDownLatch;
 
 public class Main {
+    private static final CountDownLatch consumerReady = new CountDownLatch(1);
+
     public static void main(String[] args) {
         // Load configuration from .env
         Dotenv dotenv = Dotenv.configure()
@@ -35,7 +39,32 @@ public class Main {
         // Tạo thread pool cho Producer và Consumer
         ExecutorService executor = Executors.newFixedThreadPool(2);
 
-        // Chạy Producer trong một thread riêng
+        // Chạy Consumer trước
+        executor.submit(() -> {
+            try {
+                System.out.println("Khởi động Consumer...");
+                AConsumer.main(args, consumerThreadPoolSize, maxMessagesPerSecond,
+                        sourceHost, sourcePort, sourceNamespace,
+                        destinationHost, destinationPort, destinationNamespace,
+                        consumerSetName, kafkaBroker, kafkaTopic, consumerGroup);
+                consumerReady.countDown(); // Báo hiệu consumer đã sẵn sàng
+            } catch (Exception e) {
+                System.err.println("Lỗi trong Consumer: " + e.getMessage());
+                e.printStackTrace();
+            }
+        });
+
+        // Đợi consumer khởi động và ổn định
+        try {
+            Thread.sleep( 1000);
+            System.out.println("Consumer đã sẵn sàng, bắt đầu Producer...");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            System.err.println("Bị gián đoạn khi đợi Consumer khởi động");
+            return;
+        }
+
+        // Chạy Producer sau khi consumer đã sẵn sàng
         executor.submit(() -> {
             try {
                 AProducer.main(args, producerThreadPoolSize, maxMessagesPerSecond,
@@ -47,23 +76,18 @@ public class Main {
             }
         });
 
-        // Chạy Consumer trong một thread riêng
-        executor.submit(() -> {
-            try {
-                AConsumer.main(args, consumerThreadPoolSize, maxMessagesPerSecond,
-                        sourceHost, sourcePort, sourceNamespace,
-                        destinationHost, destinationPort, destinationNamespace,
-                        consumerSetName, kafkaBroker, kafkaTopic, consumerGroup);
-            } catch (Exception e) {
-                System.err.println("Lỗi trong Consumer: " + e.getMessage());
-                e.printStackTrace();
-            }
-        });
-
         // Thêm shutdown hook để xử lý khi chương trình bị tắt
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             System.out.println("Đang tắt chương trình...");
             executor.shutdown();
+            try {
+                if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
+                    executor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                executor.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
         }));
     }
 }
