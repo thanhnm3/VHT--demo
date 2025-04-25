@@ -105,7 +105,7 @@ public class RandomOperations {
         Key key = new Key(namespace, setName, userId);
         byte[] personBytes = generateRandomBytes(random, 100, 1_000);
         Bin personBin = new Bin("personData", personBytes);
-        Bin lastUpdateBin = new Bin("last_update", System.currentTimeMillis());
+        Bin lastUpdateBin = new Bin("lastUpdate", System.currentTimeMillis());
 
         client.put(writePolicy, key, personBin, lastUpdateBin);
         // System.out.println("Inserted record with key: " + userId);
@@ -123,7 +123,7 @@ public class RandomOperations {
             if (record != null) {
                 byte[] updatedBytes = generateRandomBytes(random, 100, 1_000);
                 Bin updatedPersonBin = new Bin("personData", updatedBytes);
-                Bin updatedLastUpdateBin = new Bin("last_update", System.currentTimeMillis());
+                Bin updatedLastUpdateBin = new Bin("lastUpdate", System.currentTimeMillis());
 
                 client.put(writePolicy, randomKey, updatedPersonBin, updatedLastUpdateBin);
                 // System.out.println("Updated record with key: " + randomKey.userKey);
@@ -144,7 +144,7 @@ public class RandomOperations {
 
         try {
             Bin deleteBin = Bin.asNull("personData");
-            Bin lastUpdateBin = new Bin("last_update", System.currentTimeMillis()); // Cập nhật last_update khi xóa
+            Bin lastUpdateBin = new Bin("lastUpdate", System.currentTimeMillis()); // Cập nhật lastUpdate khi xóa
             client.put(null, key, deleteBin, lastUpdateBin);
             // System.out.println("Deleted field with key: " + key.userKey);
         } catch (AerospikeException e) {

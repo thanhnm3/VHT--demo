@@ -157,7 +157,7 @@ public class CdcConsumer {
 
                 // Tạo các bin
                 Bin personBin = new Bin("personData", personData);
-                Bin lastUpdateBin = new Bin("last_update", lastUpdate);
+                Bin lastUpdateBin = new Bin("lastUpdate", lastUpdate);
 
                 aerospikeClient.put(writePolicy, aerospikeKey, personBin, lastUpdateBin);
                 return; // Ghi thành công, thoát khỏi vòng lặp
