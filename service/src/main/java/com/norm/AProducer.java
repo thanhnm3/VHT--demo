@@ -82,7 +82,7 @@ public class AProducer {
         scanPolicy.recordsPerSecond = maxMessagesPerSecond;
 
         RateLimiter rateLimiter = RateLimiter.create(maxMessagesPerSecond);
-        List<ProducerRecord<String, byte[]>> batch = new ArrayList<>(500);
+        List<ProducerRecord<String, byte[]>> batch = new ArrayList<>(100);
         Object batchLock = new Object();
 
         try {
