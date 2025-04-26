@@ -152,7 +152,7 @@ public class RandomOperations {
         try {
             Bin deleteBin = Bin.asNull("personData");
             Bin lastUpdateBin = new Bin("lastUpdate", System.currentTimeMillis()); // Cập nhật lastUpdate khi xóa
-            client.put(null, randomKey, deleteBin, lastUpdateBin);
+            client.put(null, key, deleteBin, lastUpdateBin);
             // System.out.println("Deleted field with key: " + key.userKey);
         } catch (AerospikeException e) {
             System.err.println(
