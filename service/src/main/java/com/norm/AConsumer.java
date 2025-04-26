@@ -21,17 +21,9 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.ArrayList;
-import java.util.List;
 
 public class AConsumer {
-    private static final AtomicInteger messagesProcessedThisSecond = new AtomicInteger(0);
-    private static final AtomicLong totalMessagesProcessed = new AtomicLong(0);
-    private static final AtomicInteger errorCount = new AtomicInteger(0);
     private static ExecutorService executor;
-    private static final int BATCH_SIZE = 1000;
-    private static final Duration POLL_TIMEOUT = Duration.ofMillis(100);
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     public static void main(String[] args, int workerPoolSize, int maxMessagesPerSecond,
@@ -45,7 +37,7 @@ public class AConsumer {
             // Initialize Aerospike client
             destinationClient = new AerospikeClient(destinationHost, destinationPort);
             WritePolicy writePolicy = new WritePolicy();
-            writePolicy.totalTimeout = 500; // 500ms timeout
+            writePolicy.totalTimeout = 200; // 500ms timeout
 
             // Initialize Kafka consumer
             Properties kafkaProps = new Properties();
@@ -55,41 +47,30 @@ public class AConsumer {
             kafkaProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.ByteArrayDeserializer");
             kafkaProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
             kafkaProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
-            kafkaProps.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, String.valueOf(BATCH_SIZE));
-            kafkaProps.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG, "52428800"); // 50MB
-            kafkaProps.put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, "1048576"); // 1MB
-            kafkaProps.put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, "500");
-            kafkaProps.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, "1000");
+            kafkaProps.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, "100");
+            kafkaProps.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "5000");
 
             kafkaConsumer = new KafkaConsumer<>(kafkaProps);
             kafkaConsumer.subscribe(Collections.singletonList(kafkaTopic));
 
-            // Initialize thread pool
-            ThreadPoolExecutor customExecutor = new ThreadPoolExecutor(
-                workerPoolSize,
-                workerPoolSize,
-                60L, TimeUnit.SECONDS,
-                new LinkedBlockingQueue<>(10000),
-                new ThreadPoolExecutor.CallerRunsPolicy()
-            );
-            executor = customExecutor;
+            // Initialize worker pool
+            ExecutorService workers = Executors.newFixedThreadPool(workerPoolSize,
+                new ThreadFactory() {
+                    private final AtomicInteger threadCount = new AtomicInteger(1);
+                    @Override
+                    public Thread newThread(Runnable r) {
+                        Thread thread = new Thread(r);
+                        thread.setName("consumer-worker-" + threadCount.getAndIncrement());
+                        return thread;
+                    }
+                });
 
             // Create RateLimiter
-            RateLimiter rateLimiter = RateLimiter.create(maxMessagesPerSecond + 1000);
-
-            // Schedule metrics reporting
-            ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-            scheduler.scheduleAtFixedRate(() -> {
-                int currentRate = messagesProcessedThisSecond.getAndSet(0);
-                long total = totalMessagesProcessed.get();
-                int errors = errorCount.get();
-                System.out.printf("Messages ---> Processed: %d/s, Total: %d, Errors: %d, Active threads: %d%n",
-                    currentRate, total, errors, customExecutor.getActiveCount());
-            }, 0, 1, TimeUnit.SECONDS);
+            RateLimiter rateLimiter = RateLimiter.create(maxMessagesPerSecond*2);
 
             // Start processing
             processMessages(kafkaConsumer, destinationClient, writePolicy, 
-                          destinationNamespace, setName, rateLimiter);
+                          destinationNamespace, setName, rateLimiter, workers);
 
         } catch (Exception e) {
             System.err.println("Critical error: " + e.getMessage());
@@ -104,36 +85,22 @@ public class AConsumer {
                                      WritePolicy writePolicy,
                                      String destinationNamespace,
                                      String setName,
-                                     RateLimiter rateLimiter) {
+                                     RateLimiter rateLimiter,
+                                     ExecutorService workers) {
         try {
-            while (true) {
-                ConsumerRecords<byte[], byte[]> records = consumer.poll(POLL_TIMEOUT);
-                if (records.isEmpty()) continue;
-
-                CountDownLatch latch = new CountDownLatch(records.count());
-                List<Future<?>> futures = new ArrayList<>(records.count());
-
+            while (!Thread.currentThread().isInterrupted()) {
+                ConsumerRecords<byte[], byte[]> records = consumer.poll(Duration.ofMillis(0));
+                
                 for (ConsumerRecord<byte[], byte[]> record : records) {
-                    rateLimiter.acquire();
-
-                    Future<?> future = executor.submit(() -> {
+                    workers.submit(() -> {
                         try {
                             processRecord(record, destinationClient, writePolicy, 
                                         destinationNamespace, setName);
-                            messagesProcessedThisSecond.incrementAndGet();
-                            totalMessagesProcessed.incrementAndGet();
                         } catch (Exception e) {
                             System.err.println("Error processing record: " + e.getMessage());
-                            errorCount.incrementAndGet();
-                        } finally {
-                            latch.countDown();
                         }
                     });
-                    futures.add(future);
                 }
-
-                // Wait for all records to be processed
-                latch.await(5, TimeUnit.SECONDS);
             }
         } catch (Exception e) {
             System.err.println("Error in message processing: " + e.getMessage());
@@ -173,7 +140,7 @@ public class AConsumer {
         if (executor != null) {
             executor.shutdown();
             try {
-                if (!executor.awaitTermination(5, TimeUnit.MINUTES)) {
+                if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
                     executor.shutdownNow();
                 }
             } catch (InterruptedException e) {

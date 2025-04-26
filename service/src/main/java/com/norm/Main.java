@@ -28,12 +28,12 @@ public class Main {
         String kafkaTopic = dotenv.get("KAFKA_TOPIC");
         String consumerGroup = dotenv.get("CONSUMER_GROUP");
         int producerThreadPoolSize = 2; // Số thread cho Producer
-        int consumerThreadPoolSize = 6; // Số thread cho Consumer
+        int consumerThreadPoolSize = 8; // Số thread cho Consumer
         int maxMessagesPerSecond = Integer.parseInt(dotenv.get("MAX_MESSAGES_PER_SECOND"));
         int maxRetries = Integer.parseInt(dotenv.get("MAX_RETRIES"));
 
         // Xóa và tạo lại topic trước khi bắt đầu
-        System.out.println("Đang xóa và tạo lại topic...");
+        System.out.println("Đang xoa va tao lai topic...");
         DeleteTopic.deleteTopic(kafkaBroker, kafkaTopic);
 
         // Tạo thread pool cho Producer và Consumer
@@ -42,14 +42,14 @@ public class Main {
         // Chạy Consumer trước
         executor.submit(() -> {
             try {
-                System.out.println("Khởi động Consumer...");
+                System.out.println("Khoi dong Consumer...");
                 AConsumer.main(args, consumerThreadPoolSize, maxMessagesPerSecond,
                         sourceHost, sourcePort, sourceNamespace,
                         destinationHost, destinationPort, destinationNamespace,
                         consumerSetName, kafkaBroker, kafkaTopic, consumerGroup);
-                consumerReady.countDown(); // Báo hiệu consumer đã sẵn sàng
+                consumerReady.countDown(); // Bao hieu consumer da san sang
             } catch (Exception e) {
-                System.err.println("Lỗi trong Consumer: " + e.getMessage());
+                System.err.println("Loi trong Consumer: " + e.getMessage());
                 e.printStackTrace();
             }
         });
@@ -57,10 +57,10 @@ public class Main {
         // Đợi consumer khởi động và ổn định
         try {
             Thread.sleep( 1000);
-            System.out.println("Consumer đã sẵn sàng, bắt đầu Producer...");
+            System.out.println("Consumer da san sang, bat dau Producer...");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            System.err.println("Bị gián đoạn khi đợi Consumer khởi động");
+            System.err.println("Bi gian doan khi doi Consumer khoi dong");
             return;
         }
 
@@ -71,14 +71,14 @@ public class Main {
                         sourceHost, sourcePort, sourceNamespace, producerSetName,
                         kafkaBroker, kafkaTopic, maxRetries);
             } catch (Exception e) {
-                System.err.println("Lỗi trong Producer: " + e.getMessage());
+                System.err.println("Loi trong Producer: " + e.getMessage());
                 e.printStackTrace();
             }
         });
 
-        // Thêm shutdown hook để xử lý khi chương trình bị tắt
+        // Them shutdown hook de xu ly khi chuong trinh bi tat
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            System.out.println("Đang tắt chương trình...");
+            System.out.println("Dang tat chuong trinh...");
             executor.shutdown();
             try {
                 if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
