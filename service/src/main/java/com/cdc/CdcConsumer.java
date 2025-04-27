@@ -121,7 +121,7 @@ public class CdcConsumer {
                 }
 
                 // Tạo key từ Kafka key
-                String userId = new String(keyBytes, StandardCharsets.UTF_8);
+                byte[] userId = record.key();
                 Key aerospikeKey = new Key(namespace, setName, userId);
 
                 // Giải mã JSON từ Kafka value

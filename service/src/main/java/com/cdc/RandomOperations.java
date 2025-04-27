@@ -104,14 +104,22 @@ public class RandomOperations {
 
     private static void performInsert(AerospikeClient client, WritePolicy writePolicy, String namespace, String setName,
             Random random) {
-        String userId = UUID.randomUUID().toString();
-        Key key = new Key(namespace, setName, userId);
+        // Tạo UUID và chuyển sang dạng byte
+        UUID uuid = UUID.randomUUID();
+        byte[] uuidBytes = new byte[16];
+        long msb = uuid.getMostSignificantBits();
+        long lsb = uuid.getLeastSignificantBits();
+        for (int b = 0; b < 8; b++) {
+            uuidBytes[b] = (byte) (msb >>> (8 * (7 - b)));
+            uuidBytes[8 + b] = (byte) (lsb >>> (8 * (7 - b)));
+        }
+
+        Key key = new Key(namespace, setName, uuidBytes);
         byte[] personBytes = generateRandomBytes(random, 100, 1_000);
         Bin personBin = new Bin("personData", personBytes);
         Bin lastUpdateBin = new Bin("lastUpdate", System.currentTimeMillis());
 
         client.put(writePolicy, key, personBin, lastUpdateBin);
-        // System.out.println("Inserted record with key: " + userId);
     }
 
     private static void performUpdate(AerospikeClient client, WritePolicy writePolicy, Policy readPolicy,

@@ -28,7 +28,7 @@ public class CdcProducer {
 
         try {
             client = new AerospikeClient(aeroHost, aeroPort);
-            Producer<String, byte[]> producer = createKafkaProducer(kafkaBroker);
+            Producer<byte[], byte[]> producer = createKafkaProducer(kafkaBroker);
 
             scheduler.scheduleAtFixedRate(() -> {
                 System.out.println("Messages sent : " + messagesSentThisSecond.get());
@@ -57,7 +57,7 @@ public class CdcProducer {
                                                 Base64.getEncoder().encodeToString(data), updateTime)
                                         : String.format("{\"personData\": null, \"lastUpdate\": %d}", updateTime);
                                 executor.submit(() -> sendWithRetry(producer, new ProducerRecord<>(kafkaTopic,
-                                        key.userKey.toString(), message.getBytes(StandardCharsets.UTF_8)), maxRetries));
+                                        (byte[]) key.userKey.getObject(), message.getBytes(StandardCharsets.UTF_8)), maxRetries));
                                 messagesSentThisSecond.incrementAndGet();
                             }
                         }
@@ -86,10 +86,10 @@ public class CdcProducer {
         }
     }
 
-    private static Producer<String, byte[]> createKafkaProducer(String kafkaBroker) {
+    private static Producer<byte[], byte[]> createKafkaProducer(String kafkaBroker) {
         Properties props = new Properties();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBroker);
-        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringSerializer");
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.ByteArraySerializer");
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
                 "org.apache.kafka.common.serialization.ByteArraySerializer");
         props.put("linger.ms", "5");
@@ -98,7 +98,7 @@ public class CdcProducer {
         return new KafkaProducer<>(props);
     }
 
-    private static void sendWithRetry(Producer<String, byte[]> producer, ProducerRecord<String, byte[]> record,
+    private static void sendWithRetry(Producer<byte[], byte[]> producer, ProducerRecord<byte[], byte[]> record,
             int maxRetries) {
         producer.send(record, (metadata, exception) -> {
             if (exception != null) {

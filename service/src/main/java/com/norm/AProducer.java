@@ -22,7 +22,7 @@ public class AProducer {
                           String aerospikeHost, int aerospikePort, String namespace, String setName,
                           String kafkaBroker, String kafkaTopic, int maxRetries) {
         AerospikeClient aerospikeClient = null;
-        KafkaProducer<String, byte[]> kafkaProducer = null;
+        KafkaProducer<byte[], byte[]> kafkaProducer = null;
 
         try {
             // Initialize Aerospike client
@@ -34,7 +34,7 @@ public class AProducer {
             // Initialize Kafka producer
             Properties kafkaProps = new Properties();
             kafkaProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBroker);
-            kafkaProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringSerializer");
+            kafkaProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.ByteArraySerializer");
             kafkaProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.ByteArraySerializer");
             kafkaProps.put(ProducerConfig.BATCH_SIZE_CONFIG, "131072");
             kafkaProps.put(ProducerConfig.LINGER_MS_CONFIG, "5");
@@ -77,7 +77,7 @@ public class AProducer {
 
     
     // ======================= Read data from Aerospike =======================
-    private static void readDataFromAerospike(AerospikeClient client, KafkaProducer<String, byte[]> producer,
+    private static void readDataFromAerospike(AerospikeClient client, KafkaProducer<byte[], byte[]> producer,
                                             int maxMessagesPerSecond, String namespace, String setName,
                                             String kafkaTopic, int maxRetries) {
         ScanPolicy scanPolicy = new ScanPolicy();
@@ -86,7 +86,7 @@ public class AProducer {
         scanPolicy.recordsPerSecond = maxMessagesPerSecond;
 
         RateLimiter rateLimiter = RateLimiter.create(maxMessagesPerSecond);
-        List<ProducerRecord<String, byte[]>> batch = new ArrayList<>(100);
+        List<ProducerRecord<byte[], byte[]>> batch = new ArrayList<>(100);
         Object batchLock = new Object();
 
         try {
@@ -101,7 +101,7 @@ public class AProducer {
                             return;
                         }
 
-                        ProducerRecord<String, byte[]> kafkaRecord = createKafkaRecord(key, record, kafkaTopic);
+                        ProducerRecord<byte[], byte[]> kafkaRecord = createKafkaRecord(key, record, kafkaTopic);
                         
                         synchronized (batchLock) {
                             batch.add(kafkaRecord);
@@ -137,16 +137,16 @@ public class AProducer {
                record.bins.containsKey("lastUpdate");
     }
 
-    private static ProducerRecord<String, byte[]> createKafkaRecord(Key key, com.aerospike.client.Record record, String kafkaTopic) {
+    private static ProducerRecord<byte[], byte[]> createKafkaRecord(Key key, com.aerospike.client.Record record, String kafkaTopic) {
         byte[] personData = (byte[]) record.getValue("personData");
         long lastUpdate = System.currentTimeMillis();
 
         String message = String.format("{\"personData\": \"%s\", \"lastUpdate\": %d}",
                 Base64.getEncoder().encodeToString(personData), lastUpdate);
 
-        return new ProducerRecord<>(
+        return new ProducerRecord<byte[], byte[]>(
                 kafkaTopic,
-                key.userKey.toString(),
+                (byte[]) key.userKey.getObject(),
                 message.getBytes(StandardCharsets.UTF_8)
         );
     }
@@ -155,12 +155,12 @@ public class AProducer {
 
 
     // ======================= Send batch =======================
-    private static void sendBatch(KafkaProducer<String, byte[]> producer, 
-                                List<ProducerRecord<String, byte[]>> batch,
+    private static void sendBatch(KafkaProducer<byte[], byte[]> producer, 
+                                List<ProducerRecord<byte[], byte[]>> batch,
                                 int maxRetries) {
         CountDownLatch latch = new CountDownLatch(batch.size());
 
-        for (ProducerRecord<String, byte[]> record : batch) {
+        for (ProducerRecord<byte[], byte[]> record : batch) {
             producer.send(record, (metadata, exception) -> {
                 try {
                     if (exception != null) {
@@ -188,8 +188,8 @@ public class AProducer {
 
 
     // ======================= Handle send error =======================
-    private static void handleSendError(KafkaProducer<String, byte[]> producer,
-                                      ProducerRecord<String, byte[]> record,
+    private static void handleSendError(KafkaProducer<byte[], byte[]> producer,
+                                      ProducerRecord<byte[], byte[]> record,
                                       Exception exception,
                                       int maxRetries) {
         int retryCount = 0;
@@ -220,7 +220,7 @@ public class AProducer {
 
     // ======================= Shutdown gracefully =======================
     private static void shutdownGracefully(AerospikeClient aerospikeClient, 
-                                         KafkaProducer<String, byte[]> kafkaProducer) {
+                                         KafkaProducer<byte[], byte[]> kafkaProducer) {
         if (executor != null) {
             executor.shutdown();
             try {

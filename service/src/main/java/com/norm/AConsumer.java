@@ -114,7 +114,7 @@ public class AConsumer {
                                     String destinationNamespace,
                                     String setName) {
         try {
-            String userId = new String(record.key());
+            byte[] userId = record.key();
             Key destinationKey = new Key(destinationNamespace, setName, userId);
 
             String jsonString = new String(record.value(), StandardCharsets.UTF_8);

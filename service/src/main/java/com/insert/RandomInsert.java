@@ -48,12 +48,20 @@ public class RandomInsert {
                         // 🟢 Tạo dữ liệu ngẫu nhiên với kích thước từ 100B đến 1KB
                         byte[] personBytes = generateRandomBytes(random, 100, 1_000);
                         
-                        // 🟢 Sinh UUID
-                        String userId = UUID.randomUUID().toString();
-                        Key key = new Key(namespace, setName, userId);
+                        // 🟢 Sinh UUID và chuyển sang dạng byte
+                        UUID uuid = UUID.randomUUID();
+                        byte[] uuidBytes = new byte[16];
+                        long msb = uuid.getMostSignificantBits();
+                        long lsb = uuid.getLeastSignificantBits();
+                        for (int b = 0; b < 8; b++) {
+                            uuidBytes[b] = (byte) (msb >>> (8 * (7 - b)));
+                            uuidBytes[8 + b] = (byte) (lsb >>> (8 * (7 - b)));
+                        }
+                        
+                        Key key = new Key(namespace, setName, uuidBytes);
                         Bin personBin = new Bin("personData", personBytes);
 
-                        // 🟢 Thay thế migrated_gen bằng lastUpdate với giá trị timestamp hiện tại
+                        // 🟢 Giữ lastUpdate ở dạng timestamp
                         Bin lastUpdateBin = new Bin("lastUpdate", System.currentTimeMillis());
 
                         // 🟢 Thêm vào batch
