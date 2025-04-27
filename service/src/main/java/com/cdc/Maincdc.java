@@ -13,7 +13,7 @@ public class Maincdc {
         String producerNamespace = dotenv.get("PRODUCER_NAMESPACE");
         String producerSetName = dotenv.get("PRODUCER_SET_NAME");
         String binName = "personData";
-        String binLastUpdate = "last_update";
+        String binLastUpdate = "lastUpdate";
 
         // Aerospike Consumer configuration
         String consumerHost = dotenv.get("AEROSPIKE_CONSUMER_HOST");

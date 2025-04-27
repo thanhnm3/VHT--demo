@@ -16,12 +16,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-
-
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 // Can cai thien lai code rat nhieu, nhung ma co ban thi van chay tot
 public class RandomOperations {
-    public static void main(String aeroHost, int aeroPort, String namespace, String setName, int operationsPerSecond, int threadPoolSize) {
+    public static void main(String aeroHost, int aeroPort, String namespace, String setName, int operationsPerSecond,
+            int threadPoolSize) {
         // Kết nối đến Aerospike
         AerospikeClient client = new AerospikeClient(aeroHost, aeroPort);
         WritePolicy writePolicy = new WritePolicy();
@@ -44,6 +44,8 @@ public class RandomOperations {
         long startTime = System.currentTimeMillis();
         long duration = 20_000; // Chạy trong x giây
 
+        ConcurrentLinkedQueue<Key> randomKeys = getRandomKeysFromDatabase(client, namespace, setName, 10000);
+
         // Tạo thread pool chỉ cho producer (gửi dữ liệu)
         ExecutorService executor = Executors.newFixedThreadPool(threadPoolSize);
 
@@ -51,8 +53,8 @@ public class RandomOperations {
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         scheduler.scheduleAtFixedRate(() -> {
             System.out.println("Insert: " + insertCountThisSecond.get() +
-                               ", Update: " + updateCountThisSecond.get() +
-                               ", Delete: " + deleteCountThisSecond.get());
+                    ", Update: " + updateCountThisSecond.get() +
+                    ", Delete: " + deleteCountThisSecond.get());
             insertCountThisSecond.set(0);
             updateCountThisSecond.set(0);
             deleteCountThisSecond.set(0);
@@ -70,12 +72,12 @@ public class RandomOperations {
                         insertCountThisSecond.incrementAndGet();
                         break;
                     case 1: // Update
-                        performUpdate(client, writePolicy, readPolicy, namespace, setName, random);
+                        performUpdate(client, writePolicy, readPolicy, namespace, setName, randomKeys, random);
                         totalUpdateCount.incrementAndGet();
                         updateCountThisSecond.incrementAndGet();
                         break;
                     case 2: // Delete
-                        performDelete(client, namespace, setName, random);
+                        performDelete(client, namespace, setName, randomKeys);
                         totalDeleteCount.incrementAndGet();
                         deleteCountThisSecond.incrementAndGet();
                         break;
@@ -100,7 +102,8 @@ public class RandomOperations {
         client.close();
     }
 
-    private static void performInsert(AerospikeClient client, WritePolicy writePolicy, String namespace, String setName, Random random) {
+    private static void performInsert(AerospikeClient client, WritePolicy writePolicy, String namespace, String setName,
+            Random random) {
         String userId = UUID.randomUUID().toString();
         Key key = new Key(namespace, setName, userId);
         byte[] personBytes = generateRandomBytes(random, 100, 1_000);
@@ -111,8 +114,9 @@ public class RandomOperations {
         // System.out.println("Inserted record with key: " + userId);
     }
 
-    private static void performUpdate(AerospikeClient client, WritePolicy writePolicy, Policy readPolicy, String namespace, String setName, Random random) {
-        Key randomKey = getRandomKeyFromDatabase(client, namespace, setName, random);
+    private static void performUpdate(AerospikeClient client, WritePolicy writePolicy, Policy readPolicy,
+            String namespace, String setName, ConcurrentLinkedQueue<Key> randomKeys, Random random) {
+        Key randomKey = randomKeys.poll(); // Lấy key từ hàng đợi
         if (randomKey == null) {
             System.err.println("No records found for update.");
             return;
@@ -129,30 +133,35 @@ public class RandomOperations {
                 // System.out.println("Updated record with key: " + randomKey.userKey);
             }
         } catch (AerospikeException e) {
-            System.err.println("Failed to update record with key: " + randomKey.userKey);
+            System.err.println(
+                    "Failed to update record with key: " + randomKey.userKey + " (exception: " + e.getMessage() + ")");
+        } finally {
+            // Trả lại key vào hàng đợi để tái sử dụng
+            randomKeys.offer(randomKey);
         }
     }
 
-    private static void performDelete(AerospikeClient client, String namespace, String setName, Random random) {
-        // Lấy một key ngẫu nhiên từ cơ sở dữ liệu
-        Key key = getRandomKeyFromDatabase(client, namespace, setName, random);
-
-        if (key == null) {
+    private static void performDelete(AerospikeClient client, String namespace, String setName,
+            ConcurrentLinkedQueue<Key> randomKeys) {
+        Key randomKey = randomKeys.poll(); // Lấy key từ hàng đợi
+        if (randomKey == null) {
             System.err.println("No records found for deletion.");
-            return; // Không có bản ghi nào để sửa
+            return; // Không có bản ghi nào để xóa
         }
 
         try {
             Bin deleteBin = Bin.asNull("personData");
             Bin lastUpdateBin = new Bin("lastUpdate", System.currentTimeMillis()); // Cập nhật lastUpdate khi xóa
-            client.put(null, key, deleteBin, lastUpdateBin);
+            client.put(null, randomKey, deleteBin, lastUpdateBin);
             // System.out.println("Deleted field with key: " + key.userKey);
         } catch (AerospikeException e) {
-            System.err.println("Failed to delete with key: " + key.userKey + " (exception: " + e.getMessage() + ")");
+            System.err.println(
+                    "Failed to delete record with key: " + randomKey.userKey + " (exception: " + e.getMessage() + ")");
         }
     }
 
-    // Phương thức để tạo byte array với kích thước ngẫu nhiên từ minSize đến maxSize bytes
+    // Phương thức để tạo byte array với kích thước ngẫu nhiên từ minSize đến
+    // maxSize bytes
     private static byte[] generateRandomBytes(Random random, int minSize, int maxSize) {
         int size = random.nextInt(maxSize - minSize + 1) + minSize;
         byte[] bytes = new byte[size];
@@ -160,25 +169,25 @@ public class RandomOperations {
         return bytes;
     }
 
-    private static Key getRandomKeyFromDatabase(AerospikeClient client, String namespace, String setName, Random random) {
-        QueryPolicy queryPolicy = new QueryPolicy(); // Sử dụng QueryPolicy thay vì ScanPolicy
-        queryPolicy.includeBinData = false; // Chỉ lấy key, không cần dữ liệu bin
+    private static ConcurrentLinkedQueue<Key> getRandomKeysFromDatabase(AerospikeClient client, String namespace,
+            String setName, int limit) {
+        ConcurrentLinkedQueue<Key> keys = new ConcurrentLinkedQueue<>();
+        QueryPolicy queryPolicy = new QueryPolicy();
+        queryPolicy.setMaxRecords(limit);
 
         Statement statement = new Statement();
         statement.setNamespace(namespace);
         statement.setSetName(setName);
 
         try (RecordSet recordSet = client.query(queryPolicy, statement)) {
-            if (recordSet.next()) {
-                // Trả về key của bản ghi đầu tiên tìm thấy
-                return recordSet.getKey();
-            } else {
-                System.err.println("No records found in the database.");
-                return null; // Không có bản ghi nào
+            while (recordSet.next() && keys.size() < limit) {
+                keys.add(recordSet.getKey());
             }
         } catch (AerospikeException e) {
-            System.err.println("Failed to query database: " + e.getMessage());
-            return null;
+            System.err.println("Error while fetching keys: " + e.getMessage());
         }
+
+        return keys;
     }
+
 }

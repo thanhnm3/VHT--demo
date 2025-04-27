@@ -12,16 +12,11 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
+
 
 public class AProducer {
-    private static final AtomicInteger messagesSentThisSecond = new AtomicInteger(0);
-    private static final AtomicLong totalMessagesSent = new AtomicLong(0);
-    private static final AtomicInteger errorCount = new AtomicInteger(0);
     private static ExecutorService executor;
-    private static final int BATCH_SIZE = 500;
-    private static final Duration FLUSH_TIMEOUT = Duration.ofSeconds(5);
+
 
     public static void main(String[] args, int workerPoolSize, int maxMessagesPerSecond,
                           String aerospikeHost, int aerospikePort, String namespace, String setName,
@@ -30,30 +25,30 @@ public class AProducer {
         KafkaProducer<String, byte[]> kafkaProducer = null;
 
         try {
-            // Initialize Aerospike client with improved configuration
+            // Initialize Aerospike client
             ClientPolicy clientPolicy = new ClientPolicy();
-            clientPolicy.timeout = 5000; // 5 second timeout
-            clientPolicy.maxConnsPerNode = 300; // Increase connection pool
+            clientPolicy.timeout = 5000;
+            clientPolicy.maxConnsPerNode = 300;
             aerospikeClient = new AerospikeClient(clientPolicy, aerospikeHost, aerospikePort);
 
-            // Initialize Kafka producer with optimized settings
+            // Initialize Kafka producer
             Properties kafkaProps = new Properties();
             kafkaProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBroker);
             kafkaProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringSerializer");
             kafkaProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.ByteArraySerializer");
-            kafkaProps.put(ProducerConfig.BATCH_SIZE_CONFIG, "131072"); // 128KB batch size
-            kafkaProps.put(ProducerConfig.LINGER_MS_CONFIG, "5"); // Wait up to 5ms to batch
+            kafkaProps.put(ProducerConfig.BATCH_SIZE_CONFIG, "131072");
+            kafkaProps.put(ProducerConfig.LINGER_MS_CONFIG, "5");
             kafkaProps.put(ProducerConfig.ACKS_CONFIG, "all");
             kafkaProps.put(ProducerConfig.RETRIES_CONFIG, String.valueOf(maxRetries));
             kafkaProps.put(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, "5");
             kafkaProps.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
-            kafkaProps.put(ProducerConfig.BUFFER_MEMORY_CONFIG, "134217728"); // 128MB buffer
+            kafkaProps.put(ProducerConfig.BUFFER_MEMORY_CONFIG, "134217728");
             kafkaProps.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "lz4");
-            kafkaProps.put(ProducerConfig.MAX_REQUEST_SIZE_CONFIG, "10485760"); // 10MB
+            kafkaProps.put(ProducerConfig.MAX_REQUEST_SIZE_CONFIG, "10485760");
 
             kafkaProducer = new KafkaProducer<>(kafkaProps);
 
-            // Initialize thread pool with custom configuration
+            // Initialize thread pool
             ThreadPoolExecutor customExecutor = new ThreadPoolExecutor(
                 workerPoolSize,
                 workerPoolSize,
@@ -63,15 +58,8 @@ public class AProducer {
             );
             executor = customExecutor;
 
-            // Schedule metrics reporting
-            ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-            scheduler.scheduleAtFixedRate(() -> {
-                int currentRate = messagesSentThisSecond.getAndSet(0);
-                long total = totalMessagesSent.get();
-                int errors = errorCount.get();
-                System.out.printf("Messages <---      : %d, Total: %d, Errors: %d, Active threads: %d%n",
-                    currentRate, total, errors, customExecutor.getActiveCount());
-            }, 0, 1, TimeUnit.SECONDS);
+            // Create RateLimiter
+            // RateLimiter rateLimiter = RateLimiter.create(maxMessagesPerSecond);
 
             // Start processing
             readDataFromAerospike(aerospikeClient, kafkaProducer, maxMessagesPerSecond, 
@@ -85,6 +73,10 @@ public class AProducer {
         }
     }
 
+
+
+    
+    // ======================= Read data from Aerospike =======================
     private static void readDataFromAerospike(AerospikeClient client, KafkaProducer<String, byte[]> producer,
                                             int maxMessagesPerSecond, String namespace, String setName,
                                             String kafkaTopic, int maxRetries) {
@@ -93,11 +85,9 @@ public class AProducer {
         scanPolicy.maxConcurrentNodes = 4;
         scanPolicy.recordsPerSecond = maxMessagesPerSecond;
 
-        RateLimiter rateLimiter = RateLimiter.create(maxMessagesPerSecond );
-
-        List<ProducerRecord<String, byte[]>> batch = new ArrayList<>(BATCH_SIZE);
+        RateLimiter rateLimiter = RateLimiter.create(maxMessagesPerSecond);
+        List<ProducerRecord<String, byte[]>> batch = new ArrayList<>(100);
         Object batchLock = new Object();
-        CountDownLatch scanLatch = new CountDownLatch(1);
 
         try {
             System.out.println("Starting to read data from Aerospike...");
@@ -115,21 +105,18 @@ public class AProducer {
                         
                         synchronized (batchLock) {
                             batch.add(kafkaRecord);
-                            if (batch.size() >= BATCH_SIZE) {
+                            if (batch.size() >= 500) {
                                 sendBatch(producer, new ArrayList<>(batch), maxRetries);
                                 batch.clear();
                             }
                         }
 
                     } catch (Exception e) {
-                        errorCount.incrementAndGet();
                         System.err.println("Error processing record: " + e.getMessage());
-                        e.printStackTrace();
                     }
                 });
             });
 
-            // Send any remaining records in the final batch
             synchronized (batchLock) {
                 if (!batch.isEmpty()) {
                     sendBatch(producer, new ArrayList<>(batch), maxRetries);
@@ -141,15 +128,6 @@ public class AProducer {
         } catch (Exception e) {
             System.err.println("Error scanning data from Aerospike: " + e.getMessage());
             e.printStackTrace();
-        } finally {
-            scanLatch.countDown();
-        }
-
-        try {
-            scanLatch.await(5, TimeUnit.MINUTES);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            System.err.println("Interrupted while waiting for scan to complete");
         }
     }
 
@@ -173,20 +151,20 @@ public class AProducer {
         );
     }
 
+
+
+
+    // ======================= Send batch =======================
     private static void sendBatch(KafkaProducer<String, byte[]> producer, 
                                 List<ProducerRecord<String, byte[]>> batch,
                                 int maxRetries) {
         CountDownLatch latch = new CountDownLatch(batch.size());
-        AtomicInteger batchErrors = new AtomicInteger(0);
 
         for (ProducerRecord<String, byte[]> record : batch) {
             producer.send(record, (metadata, exception) -> {
                 try {
                     if (exception != null) {
-                        handleSendError(producer, record, exception, maxRetries, batchErrors);
-                    } else {
-                        messagesSentThisSecond.incrementAndGet();
-                        totalMessagesSent.incrementAndGet();
+                        handleSendError(producer, record, exception, maxRetries);
                     }
                 } finally {
                     latch.countDown();
@@ -195,8 +173,8 @@ public class AProducer {
         }
 
         try {
-            if (!latch.await(FLUSH_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)) {
-                System.err.println("Timeout waiting for batch to complete from producer");
+            if (!latch.await(5, TimeUnit.SECONDS)) {
+                System.err.println("Timeout waiting for batch to complete");
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -204,11 +182,16 @@ public class AProducer {
         }
     }
 
+
+
+
+
+
+    // ======================= Handle send error =======================
     private static void handleSendError(KafkaProducer<String, byte[]> producer,
                                       ProducerRecord<String, byte[]> record,
                                       Exception exception,
-                                      int maxRetries,
-                                      AtomicInteger batchErrors) {
+                                      int maxRetries) {
         int retryCount = 0;
         while (retryCount < maxRetries) {
             try {
@@ -219,8 +202,6 @@ public class AProducer {
                 if (retryCount >= maxRetries) {
                     System.err.println("Failed to send message after " + maxRetries + 
                                      " retries: " + exception.getMessage());
-                    errorCount.incrementAndGet();
-                    batchErrors.incrementAndGet();
                     break;
                 }
                 try {
@@ -233,6 +214,11 @@ public class AProducer {
         }
     }
 
+
+
+
+
+    // ======================= Shutdown gracefully =======================
     private static void shutdownGracefully(AerospikeClient aerospikeClient, 
                                          KafkaProducer<String, byte[]> kafkaProducer) {
         if (executor != null) {
