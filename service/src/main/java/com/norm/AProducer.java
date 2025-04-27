@@ -73,6 +73,10 @@ public class AProducer {
         }
     }
 
+
+
+    
+    // ======================= Read data from Aerospike =======================
     private static void readDataFromAerospike(AerospikeClient client, KafkaProducer<String, byte[]> producer,
                                             int maxMessagesPerSecond, String namespace, String setName,
                                             String kafkaTopic, int maxRetries) {
@@ -147,6 +151,10 @@ public class AProducer {
         );
     }
 
+
+
+
+    // ======================= Send batch =======================
     private static void sendBatch(KafkaProducer<String, byte[]> producer, 
                                 List<ProducerRecord<String, byte[]>> batch,
                                 int maxRetries) {
@@ -174,6 +182,12 @@ public class AProducer {
         }
     }
 
+
+
+
+
+
+    // ======================= Handle send error =======================
     private static void handleSendError(KafkaProducer<String, byte[]> producer,
                                       ProducerRecord<String, byte[]> record,
                                       Exception exception,
@@ -200,6 +214,11 @@ public class AProducer {
         }
     }
 
+
+
+
+
+    // ======================= Shutdown gracefully =======================
     private static void shutdownGracefully(AerospikeClient aerospikeClient, 
                                          KafkaProducer<String, byte[]> kafkaProducer) {
         if (executor != null) {
