@@ -21,10 +21,21 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class AConsumer {
     private static ExecutorService executor;
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final Semaphore processingSemaphore = new Semaphore(300); // Tăng số lượng xử lý đồng thời
+    private static final AtomicLong totalProcessingTime = new AtomicLong(0);
+    private static final AtomicInteger processedCount = new AtomicInteger(0);
+    private static final int MONITORING_WINDOW = 1000;
+    private static volatile double currentRate = 8000.0; // Tăng tốc độ ban đầu lên 8000
+    private static final double MAX_RATE = 15000.0; // Tăng tốc độ tối đa
+    private static final double MIN_RATE = 2000.0; // Tăng tốc độ tối thiểu
+    private static final AtomicLong lastProcessedOffset = new AtomicLong(-1);
+    private static final AtomicLong currentOffset = new AtomicLong(-1);
+    private static final int LAG_THRESHOLD = 1000; // Ngưỡng lag để điều chỉnh tốc độ
 
     public static void main(String[] args, int workerPoolSize, int maxMessagesPerSecond,
                           String sourceHost, int sourcePort, String sourceNamespace,
@@ -53,8 +64,8 @@ public class AConsumer {
             kafkaConsumer = new KafkaConsumer<>(kafkaProps);
             kafkaConsumer.subscribe(Collections.singletonList(kafkaTopic));
 
-            // Initialize worker pool
-            ExecutorService workers = Executors.newFixedThreadPool(workerPoolSize,
+            // Initialize worker pool with more threads
+            ExecutorService workers = Executors.newFixedThreadPool(workerPoolSize ,
                 new ThreadFactory() {
                     private final AtomicInteger threadCount = new AtomicInteger(1);
                     @Override
@@ -65,8 +76,21 @@ public class AConsumer {
                     }
                 });
 
-            // Create RateLimiter
-            RateLimiter rateLimiter = RateLimiter.create(maxMessagesPerSecond*2);
+            // Create RateLimiter with higher initial rate
+            RateLimiter rateLimiter = RateLimiter.create(currentRate);
+
+            // Start lag monitoring thread
+            new Thread(() -> {
+                while (!Thread.currentThread().isInterrupted()) {
+                    try {
+                        monitorAndAdjustLag();
+                        Thread.sleep(1000); // Kiểm tra mỗi giây
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+            }).start();
 
             // Start processing
             processMessages(kafkaConsumer, destinationClient, writePolicy, 
@@ -80,6 +104,17 @@ public class AConsumer {
         }
     }
 
+    private static void monitorAndAdjustLag() {
+        long lag = currentOffset.get() - lastProcessedOffset.get();
+        if (lag > LAG_THRESHOLD) {
+            // Nếu lag vượt ngưỡng, tăng tốc độ xử lý
+            currentRate = Math.min(MAX_RATE, currentRate * 1.2);
+        } else if (lag < LAG_THRESHOLD / 2) {
+            // Nếu lag thấp, giảm tốc độ về mức tối ưu
+            currentRate = Math.max(MIN_RATE, currentRate * 0.9);
+        }
+    }
+
     private static void processMessages(KafkaConsumer<byte[], byte[]> consumer,
                                      AerospikeClient destinationClient,
                                      WritePolicy writePolicy,
@@ -89,15 +124,34 @@ public class AConsumer {
                                      ExecutorService workers) {
         try {
             while (!Thread.currentThread().isInterrupted()) {
-                ConsumerRecords<byte[], byte[]> records = consumer.poll(Duration.ofMillis(0));
+                ConsumerRecords<byte[], byte[]> records = consumer.poll(Duration.ofMillis(10));
                 
                 for (ConsumerRecord<byte[], byte[]> record : records) {
+                    currentOffset.set(record.offset());
+                    
+                    if (!processingSemaphore.tryAcquire()) {
+                        Thread.sleep(10); // Giảm thời gian chờ
+                        continue;
+                    }
+
                     workers.submit(() -> {
                         try {
+                            long startTime = System.nanoTime();
                             processRecord(record, destinationClient, writePolicy, 
                                         destinationNamespace, setName);
+                            long processingTime = System.nanoTime() - startTime;
+                            
+                            lastProcessedOffset.set(record.offset());
+                            totalProcessingTime.addAndGet(processingTime);
+                            processedCount.incrementAndGet();
+                            
+                            if (processedCount.get() % MONITORING_WINDOW == 0) {
+                                adjustProcessingRate();
+                            }
                         } catch (Exception e) {
                             System.err.println("Error processing record: " + e.getMessage());
+                        } finally {
+                            processingSemaphore.release();
                         }
                     });
                 }
@@ -106,6 +160,27 @@ public class AConsumer {
             System.err.println("Error in message processing: " + e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    private static void adjustProcessingRate() {
+        int count = processedCount.get();
+        if (count == 0) return;
+
+        long totalTime = totalProcessingTime.get();
+        double avgProcessingTime = (double) totalTime / count / 1_000_000_000.0;
+        
+        // Điều chỉnh tốc độ tích cực hơn
+        if (avgProcessingTime > 0.1) { // Nếu xử lý chậm
+            currentRate = Math.max(MIN_RATE, currentRate * 0.95); // Giảm 5%
+        } else if (avgProcessingTime < 0.05) { // Nếu xử lý nhanh
+            currentRate = Math.min(MAX_RATE, currentRate * 1.1); // Tăng 10%
+        } else if (avgProcessingTime < 0.02) { // Nếu xử lý rất nhanh
+            currentRate = Math.min(MAX_RATE, currentRate * 1.2); // Tăng 20%
+        }
+
+        // Reset metrics
+        totalProcessingTime.set(0);
+        processedCount.set(0);
     }
 
     private static void processRecord(ConsumerRecord<byte[], byte[]> record,

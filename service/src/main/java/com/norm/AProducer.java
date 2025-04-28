@@ -7,20 +7,37 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import com.google.common.util.concurrent.RateLimiter;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.ListConsumerGroupOffsetsResult;
+import org.apache.kafka.clients.admin.ListOffsetsResult;
+import org.apache.kafka.clients.admin.OffsetSpec;
+import org.apache.kafka.common.TopicPartition;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 
 public class AProducer {
     private static ExecutorService executor;
-
+    private static volatile double currentRate = 5000.0;
+    private static final double MAX_RATE = 10000.0;
+    private static final double MIN_RATE = 1000.0;
+    private static final int LAG_THRESHOLD = 1000; // Ngưỡng lag để điều chỉnh tốc độ
+    private static final AtomicLong producedCount = new AtomicLong(0);
+    private static AdminClient adminClient;
+    private static String consumerGroup;
+    private static String kafkaTopic;
 
     public static void main(String[] args, int workerPoolSize, int maxMessagesPerSecond,
                           String aerospikeHost, int aerospikePort, String namespace, String setName,
-                          String kafkaBroker, String kafkaTopic, int maxRetries) {
+                          String kafkaBroker, String kafkaTopic, int maxRetries, String consumerGroup) {
+        AProducer.consumerGroup = consumerGroup;
+        AProducer.kafkaTopic = kafkaTopic;
         AerospikeClient aerospikeClient = null;
         KafkaProducer<byte[], byte[]> kafkaProducer = null;
 
@@ -48,6 +65,24 @@ public class AProducer {
 
             kafkaProducer = new KafkaProducer<>(kafkaProps);
 
+            // Initialize Kafka Admin Client
+            Properties adminProps = new Properties();
+            adminProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBroker);
+            adminClient = AdminClient.create(adminProps);
+
+            // Start lag monitoring thread
+            new Thread(() -> {
+                while (!Thread.currentThread().isInterrupted()) {
+                    try {
+                        monitorAndAdjustLag();
+                        Thread.sleep(1000); // Kiểm tra mỗi giây
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+            }).start();
+
             // Initialize thread pool
             ThreadPoolExecutor customExecutor = new ThreadPoolExecutor(
                 workerPoolSize,
@@ -57,9 +92,6 @@ public class AProducer {
                 new ThreadPoolExecutor.CallerRunsPolicy()
             );
             executor = customExecutor;
-
-            // Create RateLimiter
-            // RateLimiter rateLimiter = RateLimiter.create(maxMessagesPerSecond);
 
             // Start processing
             readDataFromAerospike(aerospikeClient, kafkaProducer, maxMessagesPerSecond, 
@@ -73,9 +105,41 @@ public class AProducer {
         }
     }
 
+    private static void monitorAndAdjustLag() {
+        try {
+            // Lấy thông tin consumer group
+            ListConsumerGroupOffsetsResult result = adminClient.listConsumerGroupOffsets(consumerGroup);
+            Map<TopicPartition, org.apache.kafka.clients.consumer.OffsetAndMetadata> offsets = result.partitionsToOffsetAndMetadata().get();
+            
+            // Lấy thông tin topic partition
+            List<TopicPartition> partitions = offsets.keySet().stream()
+                .filter(tp -> tp.topic().equals(kafkaTopic))
+                .collect(Collectors.toList());
+                
+            // Lấy end offset của topic
+            Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> endOffsets = adminClient.listOffsets(
+                partitions.stream().collect(Collectors.toMap(tp -> tp, tp -> OffsetSpec.latest()))
+            ).all().get();
+            
+            // Tính lag
+            long totalLag = 0;
+            for (TopicPartition partition : partitions) {
+                long endOffset = endOffsets.get(partition).offset();
+                long currentOffset = offsets.get(partition).offset();
+                totalLag += (endOffset - currentOffset);
+            }
+            
+            // Điều chỉnh tốc độ dựa trên lag
+            if (totalLag > LAG_THRESHOLD) {
+                currentRate = Math.max(MIN_RATE, currentRate * 0.9);
+            } else if (totalLag < LAG_THRESHOLD / 2) {
+                currentRate = Math.min(MAX_RATE, currentRate * 1.1);
+            }
+        } catch (Exception e) {
+            System.err.println("Error monitoring lag: " + e.getMessage());
+        }
+    }
 
-
-    
     // ======================= Read data from Aerospike =======================
     private static void readDataFromAerospike(AerospikeClient client, KafkaProducer<byte[], byte[]> producer,
                                             int maxMessagesPerSecond, String namespace, String setName,
@@ -83,9 +147,9 @@ public class AProducer {
         ScanPolicy scanPolicy = new ScanPolicy();
         scanPolicy.concurrentNodes = true;
         scanPolicy.maxConcurrentNodes = 4;
-        scanPolicy.recordsPerSecond = maxMessagesPerSecond;
+        scanPolicy.recordsPerSecond = (int) currentRate;
 
-        RateLimiter rateLimiter = RateLimiter.create(maxMessagesPerSecond);
+        RateLimiter rateLimiter = RateLimiter.create(currentRate);
         List<ProducerRecord<byte[], byte[]>> batch = new ArrayList<>(100);
         Object batchLock = new Object();
 
@@ -105,8 +169,9 @@ public class AProducer {
                         
                         synchronized (batchLock) {
                             batch.add(kafkaRecord);
-                            if (batch.size() >= 500) {
+                            if (batch.size() >= 100) {
                                 sendBatch(producer, new ArrayList<>(batch), maxRetries);
+                                producedCount.addAndGet(batch.size());
                                 batch.clear();
                             }
                         }
@@ -120,6 +185,7 @@ public class AProducer {
             synchronized (batchLock) {
                 if (!batch.isEmpty()) {
                     sendBatch(producer, new ArrayList<>(batch), maxRetries);
+                    producedCount.addAndGet(batch.size());
                     batch.clear();
                 }
             }

@@ -33,7 +33,7 @@ public class Main {
         int maxRetries = Integer.parseInt(dotenv.get("MAX_RETRIES"));
 
         // Xóa và tạo lại topic trước khi bắt đầu
-        System.out.println("Đang xoa va tao lai topic...");
+        System.out.println("Dang xoa va tao lai topic...");
         DeleteTopic.deleteTopic(kafkaBroker, kafkaTopic);
 
         // Tạo thread pool cho Producer và Consumer
@@ -69,7 +69,7 @@ public class Main {
             try {
                 AProducer.main(args, producerThreadPoolSize, maxMessagesPerSecond,
                         sourceHost, sourcePort, sourceNamespace, producerSetName,
-                        kafkaBroker, kafkaTopic, maxRetries);
+                        kafkaBroker, kafkaTopic, maxRetries,consumerGroup);
             } catch (Exception e) {
                 System.err.println("Loi trong Producer: " + e.getMessage());
                 e.printStackTrace();
