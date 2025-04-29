@@ -25,13 +25,23 @@ import java.util.stream.Collectors;
 public class AProducer {
     private static ExecutorService executor;
     private static volatile double currentRate = 5000.0;
-    private static final double MAX_RATE = 10000.0;
+    private static final double MAX_RATE = 100000.0;
     private static final double MIN_RATE = 1000.0;
     private static final int LAG_THRESHOLD = 1000; // Ngưỡng lag để điều chỉnh tốc độ
     private static final AtomicLong producedCount = new AtomicLong(0);
     private static AdminClient adminClient;
     private static String consumerGroup;
     private static String kafkaTopic;
+    private static final int MONITORING_INTERVAL_SECONDS = 10; // Thêm hằng số cho interval
+    private static final AtomicLong lastRateAdjustmentTime = new AtomicLong(System.currentTimeMillis());
+    private static final AtomicLong failedMessages = new AtomicLong(0);
+    private static final AtomicLong skippedMessages = new AtomicLong(0);
+    private static final AtomicLong timeoutMessages = new AtomicLong(0);
+    private static final Queue<ProducerRecord<byte[], byte[]>> pendingMessages = new ConcurrentLinkedQueue<>();
+    private static final int RATE_ADJUSTMENT_STEPS = 5; // Số bước điều chỉnh rate
+    private static final double MAX_RATE_CHANGE_PERCENT = 0.2; // Tối đa 20% thay đổi mỗi lần
+    private static volatile double targetRate = 5000.0; // Rate mục tiêu
+    private static final ScheduledExecutorService rateAdjustmentExecutor = Executors.newSingleThreadScheduledExecutor();
 
     public static void main(String[] args, int workerPoolSize, int maxMessagesPerSecond,
                           String aerospikeHost, int aerospikePort, String namespace, String setName,
@@ -74,8 +84,17 @@ public class AProducer {
             new Thread(() -> {
                 while (!Thread.currentThread().isInterrupted()) {
                     try {
-                        monitorAndAdjustLag();
-                        Thread.sleep(1000); // Kiểm tra mỗi giây
+                        long currentTime = System.currentTimeMillis();
+                        if (currentTime - lastRateAdjustmentTime.get() >= MONITORING_INTERVAL_SECONDS * 1000) {
+                            double oldRate = currentRate;
+                            monitorAndAdjustLag();
+                            if (oldRate != currentRate) {
+                                System.out.printf("Rate adjusted from %.2f to %.2f messages/second%n", 
+                                                oldRate, currentRate);
+                                lastRateAdjustmentTime.set(currentTime);
+                            }
+                        }
+                        Thread.sleep(1000); // Vẫn check mỗi giây nhưng chỉ điều chỉnh mỗi 10 giây
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         break;
@@ -105,6 +124,35 @@ public class AProducer {
         }
     }
 
+    private static void adjustRateSmoothly(double newTargetRate) {
+        if (newTargetRate == targetRate) return;
+
+        // Tính toán số bước và lượng thay đổi cho mỗi bước
+        final double rateChange = newTargetRate - currentRate;
+        final double stepSize = rateChange / RATE_ADJUSTMENT_STEPS;
+        
+        // Giới hạn thay đổi tối đa mỗi bước
+        final double maxStepChange = currentRate * MAX_RATE_CHANGE_PERCENT;
+        final double finalStepSize = Math.abs(stepSize) > maxStepChange ? 
+            Math.signum(stepSize) * maxStepChange : stepSize;
+
+        // Lên lịch điều chỉnh rate từng bước
+        for (int i = 0; i < RATE_ADJUSTMENT_STEPS; i++) {
+            final int step = i;
+            rateAdjustmentExecutor.schedule(() -> {
+                double newRate = currentRate + finalStepSize;
+                if (finalStepSize > 0) {
+                    currentRate = Math.min(newRate, targetRate);
+                } else {
+                    currentRate = Math.max(newRate, targetRate);
+                }
+                System.out.printf("Rate adjusted to %.2f messages/second%n", currentRate);
+            }, step * 1000, TimeUnit.MILLISECONDS); // Mỗi bước cách nhau 1 giây
+        }
+
+        targetRate = newTargetRate;
+    }
+
     private static void monitorAndAdjustLag() {
         try {
             // Lấy thông tin consumer group
@@ -131,9 +179,11 @@ public class AProducer {
             
             // Điều chỉnh tốc độ dựa trên lag
             if (totalLag > LAG_THRESHOLD) {
-                currentRate = Math.max(MIN_RATE, currentRate * 0.9);
+                double newRate = Math.max(MIN_RATE, currentRate * 0.9);
+                adjustRateSmoothly(newRate);
             } else if (totalLag < LAG_THRESHOLD / 2) {
-                currentRate = Math.min(MAX_RATE, currentRate * 1.1);
+                double newRate = Math.min(MAX_RATE, currentRate * 1.1);
+                adjustRateSmoothly(newRate);
             }
         } catch (Exception e) {
             System.err.println("Error monitoring lag: " + e.getMessage());
@@ -161,26 +211,43 @@ public class AProducer {
                 executor.submit(() -> {
                     try {
                         if (!isValidRecord(record)) {
-                            System.err.println("Warning: Invalid record structure for key: " + key.userKey);
+                            String keyStr = key.userKey != null ? key.userKey.toString() : "null";
+                            logSkippedMessage(keyStr, "Invalid record structure");
+                            skippedMessages.incrementAndGet();
                             return;
                         }
 
                         ProducerRecord<byte[], byte[]> kafkaRecord = createKafkaRecord(key, record, kafkaTopic);
                         
                         synchronized (batchLock) {
-                            batch.add(kafkaRecord);
-                            if (batch.size() >= 100) {
-                                sendBatch(producer, new ArrayList<>(batch), maxRetries);
-                                producedCount.addAndGet(batch.size());
-                                batch.clear();
+                            if (currentRate < targetRate * 0.8) { // Nếu rate đang giảm mạnh
+                                pendingMessages.offer(kafkaRecord); // Lưu vào queue
+                            } else {
+                                batch.add(kafkaRecord);
+                                if (batch.size() >= 100) {
+                                    sendBatch(producer, new ArrayList<>(batch), maxRetries);
+                                    producedCount.addAndGet(batch.size());
+                                    batch.clear();
+                                }
                             }
                         }
 
+                        // Xử lý message đang chờ khi có cơ hội
+                        if (!pendingMessages.isEmpty() && currentRate >= targetRate * 0.9) {
+                            processPendingMessages(producer, maxRetries);
+                        }
+
                     } catch (Exception e) {
-                        System.err.println("Error processing record: " + e.getMessage());
+                        logFailedMessage(createKafkaRecord(key, record, kafkaTopic), "Processing error", e);
+                        failedMessages.incrementAndGet();
                     }
                 });
             });
+
+            // Xử lý các message còn lại trong queue
+            while (!pendingMessages.isEmpty()) {
+                processPendingMessages(producer, maxRetries);
+            }
 
             synchronized (batchLock) {
                 if (!batch.isEmpty()) {
@@ -191,6 +258,7 @@ public class AProducer {
             }
 
             System.out.println("Finished scanning data from Aerospike.");
+            printMessageStats();
         } catch (Exception e) {
             System.err.println("Error scanning data from Aerospike: " + e.getMessage());
             e.printStackTrace();
@@ -217,8 +285,30 @@ public class AProducer {
         );
     }
 
+    private static void logFailedMessage(ProducerRecord<byte[], byte[]> record, String reason, Exception e) {
+        String key = new String(record.key(), StandardCharsets.UTF_8);
+        System.err.printf("[FAILED_MESSAGE] Key: %s, Reason: %s, Error: %s%n", 
+                        key, reason, e != null ? e.getMessage() : "Unknown");
+    }
 
+    private static void logSkippedMessage(String key, String reason) {
+        System.err.printf("[SKIPPED_MESSAGE] Key: %s, Reason: %s%n", key, reason);
+    }
 
+    private static void logTimeoutMessage(ProducerRecord<byte[], byte[]> record) {
+        String key = new String(record.key(), StandardCharsets.UTF_8);
+        System.err.printf("[TIMEOUT_MESSAGE] Key: %s, Reason: Batch send timeout%n", key);
+    }
+
+    private static void printMessageStats() {
+        System.out.printf("\nMessage Statistics:%n" +
+                         "Failed Messages: %d%n" +
+                         "Skipped Messages: %d%n" +
+                         "Timeout Messages: %d%n",
+                         failedMessages.get(),
+                         skippedMessages.get(),
+                         timeoutMessages.get());
+    }
 
     // ======================= Send batch =======================
     private static void sendBatch(KafkaProducer<byte[], byte[]> producer, 
@@ -240,6 +330,10 @@ public class AProducer {
 
         try {
             if (!latch.await(5, TimeUnit.SECONDS)) {
+                for (ProducerRecord<byte[], byte[]> record : batch) {
+                    logTimeoutMessage(record);
+                    timeoutMessages.incrementAndGet();
+                }
                 System.err.println("Timeout waiting for batch to complete");
             }
         } catch (InterruptedException e) {
@@ -247,11 +341,6 @@ public class AProducer {
             System.err.println("Interrupted while waiting for batch completion");
         }
     }
-
-
-
-
-
 
     // ======================= Handle send error =======================
     private static void handleSendError(KafkaProducer<byte[], byte[]> producer,
@@ -266,12 +355,12 @@ public class AProducer {
             } catch (Exception retryEx) {
                 retryCount++;
                 if (retryCount >= maxRetries) {
-                    System.err.println("Failed to send message after " + maxRetries + 
-                                     " retries: " + exception.getMessage());
+                    logFailedMessage(record, "Max retries exceeded", exception);
+                    failedMessages.incrementAndGet();
                     break;
                 }
                 try {
-                    Thread.sleep(100 * retryCount); // Exponential backoff
+                    Thread.sleep(100 * retryCount);
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
                     break;
@@ -280,9 +369,18 @@ public class AProducer {
         }
     }
 
-
-
-
+    private static void processPendingMessages(KafkaProducer<byte[], byte[]> producer, int maxRetries) {
+        List<ProducerRecord<byte[], byte[]>> batch = new ArrayList<>(100);
+        while (!pendingMessages.isEmpty() && batch.size() < 100) {
+            ProducerRecord<byte[], byte[]> record = pendingMessages.poll();
+            if (record != null) {
+                batch.add(record);
+            }
+        }
+        if (!batch.isEmpty()) {
+            sendBatch(producer, batch, maxRetries);
+        }
+    }
 
     // ======================= Shutdown gracefully =======================
     private static void shutdownGracefully(AerospikeClient aerospikeClient, 
@@ -316,6 +414,18 @@ public class AProducer {
                 System.out.println("Aerospike Client closed successfully.");
             } catch (Exception e) {
                 System.err.println("Error closing Aerospike client: " + e.getMessage());
+            }
+        }
+
+        if (rateAdjustmentExecutor != null) {
+            rateAdjustmentExecutor.shutdown();
+            try {
+                if (!rateAdjustmentExecutor.awaitTermination(1, TimeUnit.MINUTES)) {
+                    rateAdjustmentExecutor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                rateAdjustmentExecutor.shutdownNow();
+                Thread.currentThread().interrupt();
             }
         }
     }

@@ -22,6 +22,10 @@ import java.util.Properties;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.Queue;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.concurrent.ScheduledExecutorService;
 
 public class AConsumer {
     private static ExecutorService executor;
@@ -31,11 +35,18 @@ public class AConsumer {
     private static final AtomicInteger processedCount = new AtomicInteger(0);
     private static final int MONITORING_WINDOW = 1000;
     private static volatile double currentRate = 8000.0; // Tăng tốc độ ban đầu lên 8000
-    private static final double MAX_RATE = 15000.0; // Tăng tốc độ tối đa
+    private static final double MAX_RATE = 10000.0; // Tăng tốc độ tối đa
     private static final double MIN_RATE = 2000.0; // Tăng tốc độ tối thiểu
     private static final AtomicLong lastProcessedOffset = new AtomicLong(-1);
     private static final AtomicLong currentOffset = new AtomicLong(-1);
     private static final int LAG_THRESHOLD = 1000; // Ngưỡng lag để điều chỉnh tốc độ
+    private static final int MONITORING_INTERVAL_SECONDS = 10; // Thêm hằng số cho interval
+    private static final AtomicLong lastRateAdjustmentTime = new AtomicLong(System.currentTimeMillis());
+    private static final Queue<ConsumerRecord<byte[], byte[]>> pendingMessages = new ConcurrentLinkedQueue<>();
+    private static final int RATE_ADJUSTMENT_STEPS = 5; // Số bước điều chỉnh rate
+    private static final double MAX_RATE_CHANGE_PERCENT = 0.2; // Tối đa 20% thay đổi mỗi lần
+    private static volatile double targetRate = 8000.0; // Rate mục tiêu
+    private static final ScheduledExecutorService rateAdjustmentExecutor = Executors.newSingleThreadScheduledExecutor();
 
     public static void main(String[] args, int workerPoolSize, int maxMessagesPerSecond,
                           String sourceHost, int sourcePort, String sourceNamespace,
@@ -83,8 +94,17 @@ public class AConsumer {
             new Thread(() -> {
                 while (!Thread.currentThread().isInterrupted()) {
                     try {
-                        monitorAndAdjustLag();
-                        Thread.sleep(1000); // Kiểm tra mỗi giây
+                        long currentTime = System.currentTimeMillis();
+                        if (currentTime - lastRateAdjustmentTime.get() >= MONITORING_INTERVAL_SECONDS * 1000) {
+                            double oldRate = currentRate;
+                            monitorAndAdjustLag();
+                            if (oldRate != currentRate) {
+                                System.out.printf("Consumer rate adjusted from %.2f to %.2f messages/second%n", 
+                                                oldRate, currentRate);
+                                lastRateAdjustmentTime.set(currentTime);
+                            }
+                        }
+                        Thread.sleep(1000); // Vẫn check mỗi giây nhưng chỉ điều chỉnh mỗi 10 giây
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         break;
@@ -104,15 +124,100 @@ public class AConsumer {
         }
     }
 
+    private static void adjustRateSmoothly(double newTargetRate) {
+        if (newTargetRate == targetRate) return;
+
+        // Tính toán số bước và lượng thay đổi cho mỗi bước
+        final double rateChange = newTargetRate - currentRate;
+        final double stepSize = rateChange / RATE_ADJUSTMENT_STEPS;
+        
+        // Giới hạn thay đổi tối đa mỗi bước
+        final double maxStepChange = currentRate * MAX_RATE_CHANGE_PERCENT;
+        final double finalStepSize = Math.abs(stepSize) > maxStepChange ? 
+            Math.signum(stepSize) * maxStepChange : stepSize;
+
+        // Lên lịch điều chỉnh rate từng bước
+        for (int i = 0; i < RATE_ADJUSTMENT_STEPS; i++) {
+            final int step = i;
+            rateAdjustmentExecutor.schedule(() -> {
+                double newRate = currentRate + finalStepSize;
+                if (finalStepSize > 0) {
+                    currentRate = Math.min(newRate, targetRate);
+                } else {
+                    currentRate = Math.max(newRate, targetRate);
+                }
+            }, step * 1000, TimeUnit.MILLISECONDS);
+        }
+
+        targetRate = newTargetRate;
+    }
+
     private static void monitorAndAdjustLag() {
         long lag = currentOffset.get() - lastProcessedOffset.get();
         if (lag > LAG_THRESHOLD) {
-            // Nếu lag vượt ngưỡng, tăng tốc độ xử lý
-            currentRate = Math.min(MAX_RATE, currentRate * 1.2);
+            double newRate = Math.min(MAX_RATE, currentRate * 1.2);
+            adjustRateSmoothly(newRate);
         } else if (lag < LAG_THRESHOLD / 2) {
-            // Nếu lag thấp, giảm tốc độ về mức tối ưu
-            currentRate = Math.max(MIN_RATE, currentRate * 0.9);
+            double newRate = Math.max(MIN_RATE, currentRate * 0.9);
+            adjustRateSmoothly(newRate);
         }
+    }
+
+    private static void processPendingMessages(AerospikeClient destinationClient,
+                                            WritePolicy writePolicy,
+                                            String destinationNamespace,
+                                            String setName,
+                                            ExecutorService workers) {
+        List<ConsumerRecord<byte[], byte[]>> batch = new ArrayList<>(100);
+        while (!pendingMessages.isEmpty() && batch.size() < 100) {
+            ConsumerRecord<byte[], byte[]> record = pendingMessages.poll();
+            if (record != null) {
+                batch.add(record);
+            }
+        }
+        if (!batch.isEmpty()) {
+            for (ConsumerRecord<byte[], byte[]> record : batch) {
+                if (processingSemaphore.tryAcquire()) {
+                    try {
+                        processRecordWithRetry(record, destinationClient, writePolicy, 
+                                            destinationNamespace, setName, workers);
+                    } finally {
+                        processingSemaphore.release();
+                    }
+                } else {
+                    // Nếu không lấy được semaphore, đưa lại vào queue
+                    pendingMessages.offer(record);
+                }
+            }
+        }
+    }
+
+    private static void processRecordWithRetry(ConsumerRecord<byte[], byte[]> record,
+                                            AerospikeClient destinationClient,
+                                            WritePolicy writePolicy,
+                                            String destinationNamespace,
+                                            String setName,
+                                            ExecutorService workers) {
+        workers.submit(() -> {
+            try {
+                long startTime = System.nanoTime();
+                processRecord(record, destinationClient, writePolicy, 
+                            destinationNamespace, setName);
+                long processingTime = System.nanoTime() - startTime;
+                
+                lastProcessedOffset.set(record.offset());
+                totalProcessingTime.addAndGet(processingTime);
+                processedCount.incrementAndGet();
+                
+                if (processedCount.get() % MONITORING_WINDOW == 0) {
+                    adjustProcessingRate();
+                }
+            } catch (Exception e) {
+                System.err.println("Error processing record: " + e.getMessage());
+                // Nếu xử lý thất bại, đưa lại vào queue
+                pendingMessages.offer(record);
+            }
+        });
     }
 
     private static void processMessages(KafkaConsumer<byte[], byte[]> consumer,
@@ -130,30 +235,29 @@ public class AConsumer {
                     currentOffset.set(record.offset());
                     
                     if (!processingSemaphore.tryAcquire()) {
-                        Thread.sleep(10); // Giảm thời gian chờ
+                        // Nếu không lấy được semaphore, lưu vào queue
+                        pendingMessages.offer(record);
                         continue;
                     }
 
-                    workers.submit(() -> {
-                        try {
-                            long startTime = System.nanoTime();
-                            processRecord(record, destinationClient, writePolicy, 
-                                        destinationNamespace, setName);
-                            long processingTime = System.nanoTime() - startTime;
-                            
-                            lastProcessedOffset.set(record.offset());
-                            totalProcessingTime.addAndGet(processingTime);
-                            processedCount.incrementAndGet();
-                            
-                            if (processedCount.get() % MONITORING_WINDOW == 0) {
-                                adjustProcessingRate();
-                            }
-                        } catch (Exception e) {
-                            System.err.println("Error processing record: " + e.getMessage());
-                        } finally {
-                            processingSemaphore.release();
+                    try {
+                        if (currentRate < targetRate * 0.8) {
+                            // Nếu rate đang giảm mạnh, lưu vào queue
+                            pendingMessages.offer(record);
+                        } else {
+                            processRecordWithRetry(record, destinationClient, writePolicy,
+                                                destinationNamespace, setName, workers);
                         }
-                    });
+                    } finally {
+                        // Luôn giải phóng semaphore sau khi xử lý xong
+                        processingSemaphore.release();
+                    }
+
+                    // Xử lý message đang chờ khi có cơ hội
+                    if (!pendingMessages.isEmpty() && currentRate >= targetRate * 0.9) {
+                        processPendingMessages(destinationClient, writePolicy,
+                                            destinationNamespace, setName, workers);
+                    }
                 }
             }
         } catch (Exception e) {
@@ -188,26 +292,106 @@ public class AConsumer {
                                     WritePolicy writePolicy,
                                     String destinationNamespace,
                                     String setName) {
-        try {
-            byte[] userId = record.key();
-            Key destinationKey = new Key(destinationNamespace, setName, userId);
+        int maxRetries = 3;
+        int currentRetry = 0;
+        boolean success = false;
+        String recordKey = new String(record.key(), StandardCharsets.UTF_8);
 
-            String jsonString = new String(record.value(), StandardCharsets.UTF_8);
-            Map<String, Object> data = objectMapper.readValue(jsonString, 
-                new TypeReference<Map<String, Object>>() {});
+        while (!success && currentRetry < maxRetries) {
+            try {
+                // Validate connection
+                if (!validateConnection(destinationClient)) {
+                    System.err.printf("Aerospike connection error for record %s: Connection is not valid%n", recordKey);
+                    throw new RuntimeException("Aerospike connection is not valid");
+                }
 
-            String personDataBase64 = (String) data.get("personData");
-            byte[] personData = Base64.getDecoder().decode(personDataBase64);
-            long lastUpdate = ((Number) data.get("lastUpdate")).longValue();
+                // Validate input data
+                if (record.key() == null || record.value() == null) {
+                    System.err.printf("Invalid record %s: key or value is null%n", recordKey);
+                    throw new IllegalArgumentException("Invalid record: key or value is null");
+                }
 
-            Bin personBin = new Bin("personData", personData);
-            Bin lastUpdateBin = new Bin("lastUpdate", lastUpdate);
-            Bin keyBin = new Bin("PK", userId);
+                byte[] userId = record.key();
+                Key destinationKey = new Key(destinationNamespace, setName, userId);
 
-            destinationClient.put(writePolicy, destinationKey, keyBin, personBin, lastUpdateBin);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to process record: " + e.getMessage(), e);
+                // Parse and validate JSON data
+                String jsonString = new String(record.value(), StandardCharsets.UTF_8);
+                Map<String, Object> data = objectMapper.readValue(jsonString, 
+                    new TypeReference<Map<String, Object>>() {});
+
+                if (!data.containsKey("personData") || !data.containsKey("lastUpdate")) {
+                    System.err.printf("Invalid data format for record %s: missing required fields%n", recordKey);
+                    throw new IllegalArgumentException("Invalid data format: missing required fields");
+                }
+
+                String personDataBase64 = (String) data.get("personData");
+                byte[] personData = Base64.getDecoder().decode(personDataBase64);
+                long lastUpdate = ((Number) data.get("lastUpdate")).longValue();
+
+                // Create bins with validation
+                Bin personBin = new Bin("personData", personData);
+                Bin lastUpdateBin = new Bin("lastUpdate", lastUpdate);
+                Bin keyBin = new Bin("PK", userId);
+
+                // Execute write with transaction
+                try {
+                    destinationClient.put(writePolicy, destinationKey, keyBin, personBin, lastUpdateBin);
+                    success = true;
+                } catch (Exception e) {
+                    if (isRetryableError(e)) {
+                        System.err.printf("Retryable error for record %s: %s%n", recordKey, e.getMessage());
+                        throw e;
+                    } else {
+                        System.err.printf("Non-retryable error for record %s: %s%n", recordKey, e.getMessage());
+                        throw new RuntimeException("Non-retryable error during write: " + e.getMessage(), e);
+                    }
+                }
+            } catch (Exception e) {
+                currentRetry++;
+                if (currentRetry < maxRetries) {
+                    System.err.printf("Retry attempt %d for record %s: %s%n", 
+                        currentRetry, recordKey, e.getMessage());
+                    handleRetry(currentRetry, e);
+                } else {
+                    System.err.printf("Failed to process record %s after %d attempts: %s%n", 
+                        recordKey, maxRetries, e.getMessage());
+                    throw new RuntimeException("Failed to process record after " + maxRetries + " attempts: " + e.getMessage(), e);
+                }
+            }
         }
+    }
+
+    private static boolean validateConnection(AerospikeClient client) {
+        try {
+            return client != null && client.isConnected();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static boolean isRetryableError(Exception e) {
+        // Add specific error types that should be retried
+        return e instanceof com.aerospike.client.AerospikeException.Timeout ||
+               e instanceof com.aerospike.client.AerospikeException.Connection;
+    }
+
+    private static void handleRetry(int currentRetry, Exception e) {
+        long backoffTime = calculateBackoffTime(currentRetry);
+        System.err.printf("Waiting %d ms before retry attempt %d%n", backoffTime, currentRetry);
+        try {
+            Thread.sleep(backoffTime);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Interrupted during retry", ie);
+        }
+    }
+
+    private static long calculateBackoffTime(int retryCount) {
+        // Exponential backoff with jitter
+        long baseDelay = 1000; // 1 second
+        long maxDelay = 10000; // 10 seconds
+        long delay = Math.min(baseDelay * (1L << retryCount), maxDelay);
+        return delay + (long)(Math.random() * 1000); // Add jitter
     }
 
     private static void shutdownGracefully(KafkaConsumer<byte[], byte[]> kafkaConsumer,
@@ -239,6 +423,18 @@ public class AConsumer {
                 System.out.println("Aerospike Client closed successfully.");
             } catch (Exception e) {
                 System.err.println("Error closing Aerospike client: " + e.getMessage());
+            }
+        }
+
+        if (rateAdjustmentExecutor != null) {
+            rateAdjustmentExecutor.shutdown();
+            try {
+                if (!rateAdjustmentExecutor.awaitTermination(1, TimeUnit.MINUTES)) {
+                    rateAdjustmentExecutor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                rateAdjustmentExecutor.shutdownNow();
+                Thread.currentThread().interrupt();
             }
         }
     }
