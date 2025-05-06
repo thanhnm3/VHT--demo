@@ -6,11 +6,14 @@ import com.aerospike.client.policy.WritePolicy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class RandomInsert {
+    private static final String[] PHONE_PREFIXES = {
+        "096", "033"
+    };
+
     public static void main(String[] args) {
         //  Kết nối đến Aerospike
         AerospikeClient client = new AerospikeClient("localhost", 3000);
@@ -48,17 +51,17 @@ public class RandomInsert {
                         // 🟢 Tạo dữ liệu ngẫu nhiên với kích thước từ 100B đến 1KB
                         byte[] personBytes = generateRandomBytes(random, 100, 1_000);
                         
-                        // 🟢 Sinh UUID và chuyển sang dạng byte
-                        UUID uuid = UUID.randomUUID();
-                        byte[] uuidBytes = new byte[16];
-                        long msb = uuid.getMostSignificantBits();
-                        long lsb = uuid.getLeastSignificantBits();
-                        for (int b = 0; b < 8; b++) {
-                            uuidBytes[b] = (byte) (msb >>> (8 * (7 - b)));
-                            uuidBytes[8 + b] = (byte) (lsb >>> (8 * (7 - b)));
+                        // 🟢 Tạo số điện thoại với prefix ngẫu nhiên và các số còn lại ngẫu nhiên
+                        String prefix = PHONE_PREFIXES[random.nextInt(PHONE_PREFIXES.length)];
+                        StringBuilder phoneNumber = new StringBuilder(prefix);
+                        for (int k = 0; k < 7; k++) {
+                            phoneNumber.append(random.nextInt(10));
                         }
                         
-                        Key key = new Key(namespace, setName, uuidBytes);
+                        // Chuyển số điện thoại thành byte array
+                        byte[] phoneBytes = phoneNumber.toString().getBytes();
+                        
+                        Key key = new Key(namespace, setName, phoneBytes);
                         Bin personBin = new Bin("personData", personBytes);
 
                         // 🟢 Giữ lastUpdate ở dạng timestamp

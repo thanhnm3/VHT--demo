@@ -9,7 +9,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.norm.service.RateControlService;
 import com.norm.service.KafkaService;
-import com.norm.service.MessageService;
 
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -21,98 +20,173 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.List;
-import java.util.ArrayList;
+import java.time.Duration;
+import java.util.HashMap;
 
 public class AConsumer {
-    private static ExecutorService executor;
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final Semaphore processingSemaphore = new Semaphore(300);
-    private static volatile double currentRate = 8000.0;
     private static final double MAX_RATE = 10000.0;
     private static final double MIN_RATE = 2000.0;
     private static final int LAG_THRESHOLD = 1000;
     private static final int MONITORING_INTERVAL_SECONDS = 10;
-    private static RateControlService rateControlService;
-    private static KafkaService kafkaService;
-    private static MessageService messageService;
+    private static final String[] PREFIXES = {"096", "033"};
 
-    public static void main(String[] args, int workerPoolSize, int maxMessagesPerSecond,
-                          String sourceHost, int sourcePort, String sourceNamespace,
-                          String destinationHost, int destinationPort, String destinationNamespace,
-                          String setName, String kafkaBroker, String kafkaTopic, String consumerGroup) {
-        KafkaConsumer<byte[], byte[]> kafkaConsumer = null;
-        AerospikeClient destinationClient = null;
 
-        try {
-            // Initialize services
-            rateControlService = new RateControlService(8000.0, MAX_RATE, MIN_RATE, 
-                                                      LAG_THRESHOLD, MONITORING_INTERVAL_SECONDS);
-            kafkaService = new KafkaService(kafkaBroker, kafkaTopic, consumerGroup);
-            messageService = new MessageService();
+    // Consumer metrics for each prefix
+    private static class ConsumerMetrics {
+        volatile double currentRate;
+        final RateLimiter rateLimiter;
+        final RateControlService rateControlService;
+        final KafkaService kafkaService;
+        final KafkaConsumer<byte[], byte[]> consumer;
+        final ExecutorService workers;
+        final String targetNamespace;
+        final String prefix;
 
-            // Initialize Aerospike client
-            destinationClient = new AerospikeClient(destinationHost, destinationPort);
-            WritePolicy writePolicy = new WritePolicy();
-            writePolicy.totalTimeout = 200;
-
-            // Initialize Kafka consumer
-            kafkaConsumer = kafkaService.createConsumer();
-
-            // Initialize worker pool
-            ExecutorService workers = Executors.newFixedThreadPool(workerPoolSize,
+        ConsumerMetrics(String sourceNamespace, String kafkaBroker, 
+                       String consumerGroup, String targetNamespace,
+                       String prefix, int workerPoolSize) {
+            this.currentRate = 8000.0;
+            this.rateLimiter = RateLimiter.create(currentRate);
+            this.rateControlService = new RateControlService(currentRate, MAX_RATE, MIN_RATE, 
+                                                           LAG_THRESHOLD, MONITORING_INTERVAL_SECONDS);
+            
+            // Create topic for specific prefix
+            String topic = String.format("%s.profile.%s.produce", sourceNamespace, prefix);
+            
+            // Create consumer for specific topic
+            this.kafkaService = new KafkaService(kafkaBroker, topic, consumerGroup);
+            this.consumer = this.kafkaService.createConsumer();
+            this.consumer.subscribe(Collections.singletonList(topic));
+            this.targetNamespace = targetNamespace;
+            this.prefix = prefix;
+            
+            // Create worker pool for this consumer
+            this.workers = Executors.newFixedThreadPool(workerPoolSize,
                 new ThreadFactory() {
                     private final AtomicInteger threadCount = new AtomicInteger(1);
                     @Override
                     public Thread newThread(Runnable r) {
                         Thread thread = new Thread(r);
-                        thread.setName("consumer-worker-" + threadCount.getAndIncrement());
+                        thread.setName(prefix + "-worker-" + threadCount.getAndIncrement());
                         return thread;
                     }
                 });
+        }
 
-            // Create RateLimiter
-            RateLimiter rateLimiter = RateLimiter.create(currentRate);
+        void monitorAndAdjustLag() {
+            double newRate = rateControlService.calculateNewRateForConsumer(
+                kafkaService.getCurrentOffset(), 
+                kafkaService.getLastProcessedOffset()
+            );
+            rateControlService.updateRate(newRate);
+            currentRate = rateControlService.getCurrentRate();
+        }
 
-            // Start lag monitoring thread
-            new Thread(() -> {
-                while (!Thread.currentThread().isInterrupted()) {
-                    try {
-                        if (rateControlService.shouldCheckRateAdjustment()) {
-                            double oldRate = currentRate;
-                            monitorAndAdjustLag();
-                            if (oldRate != currentRate) {
-                                System.out.printf("Consumer rate adjusted from %.2f to %.2f messages/second%n", 
-                                                oldRate, currentRate);
-                            }
-                        }
-                        Thread.sleep(1000);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        break;
-                    }
-                }
-            }).start();
+        void shutdown() {
+            if (rateControlService != null) {
+                rateControlService.shutdown();
+            }
+            if (kafkaService != null) {
+                kafkaService.shutdown();
+            }
+            if (consumer != null) {
+                consumer.close();
+            }
+            if (workers != null) {
+                workers.shutdown();
+            }
+        }
+    }
 
-            // Start processing
-            processMessages(kafkaConsumer, destinationClient, writePolicy, 
-                          destinationNamespace, setName, rateLimiter, workers);
+    public static void main(String[] args, int workerPoolSize, int maxMessagesPerSecond,
+                          String sourceHost, int sourcePort, String sourceNamespace,
+                          String destinationHost, int destinationPort, 
+                          String consumerNamespace096, String consumerNamespace033,
+                          String setName, String kafkaBroker, 
+                          String consumerGroup096, String consumerGroup033) {
+        try {
+            // Initialize Aerospike client
+            final AerospikeClient destinationClient = new AerospikeClient(destinationHost, destinationPort);
+            final WritePolicy writePolicy = new WritePolicy();
+            writePolicy.totalTimeout = 5000; // 5 seconds timeout
+            writePolicy.sendKey = true;
+
+            // Create consumer metrics for each prefix
+            Map<String, ConsumerMetrics> metricsMap = new HashMap<>();
+            
+            // Create consumer for prefix 096
+            metricsMap.put("096", new ConsumerMetrics(
+                sourceNamespace, kafkaBroker,
+                consumerGroup096, consumerNamespace096,
+                "096", workerPoolSize
+            ));
+            
+            // Create consumer for prefix 033
+            metricsMap.put("033", new ConsumerMetrics(
+                sourceNamespace, kafkaBroker,
+                consumerGroup033, consumerNamespace033,
+                "033", workerPoolSize
+            ));
+
+            System.out.println("Consumers subscribed to topics:");
+            for (String prefix : PREFIXES) {
+                System.out.println("- " + String.format("%s.profile.%s.produce", sourceNamespace, prefix));
+            }
+
+            // Start monitoring threads for each consumer
+            for (ConsumerMetrics metrics : metricsMap.values()) {
+                startMonitoringThread(metrics);
+            }
+            
+            // Start processing threads for each consumer
+            for (ConsumerMetrics metrics : metricsMap.values()) {
+                startProcessingThread(metrics, destinationClient, writePolicy, setName);
+            }
+
+            // Keep the main thread alive
+            Thread.currentThread().join();
 
         } catch (Exception e) {
             System.err.println("Critical error: " + e.getMessage());
             e.printStackTrace();
-        } finally {
-            shutdownGracefully(kafkaConsumer, destinationClient);
         }
     }
 
-    private static void monitorAndAdjustLag() {
-        double newRate = rateControlService.calculateNewRateForConsumer(
-            kafkaService.getCurrentOffset(), 
-            kafkaService.getLastProcessedOffset()
-        );
-        rateControlService.updateRate(newRate);
-        currentRate = rateControlService.getCurrentRate();
+    private static void startMonitoringThread(ConsumerMetrics metrics) {
+        new Thread(() -> {
+            while (!Thread.currentThread().isInterrupted()) {
+                try {
+                    if (metrics.rateControlService.shouldCheckRateAdjustment()) {
+                        double oldRate = metrics.currentRate;
+                        metrics.monitorAndAdjustLag();
+                        if (oldRate != metrics.currentRate) {
+                            System.out.printf("[%s] Rate adjusted from %.2f to %.2f messages/second%n", 
+                                            metrics.prefix, oldRate, metrics.currentRate);
+                        }
+                    }
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }, metrics.prefix + "-monitor").start();
+    }
+
+    private static void startProcessingThread(ConsumerMetrics metrics,
+                                           AerospikeClient destinationClient,
+                                           WritePolicy writePolicy,
+                                           String setName) {
+        Thread processorThread = new Thread(() -> {
+            processMessages(metrics.consumer, destinationClient, writePolicy,
+                          metrics.targetNamespace, setName, metrics.rateLimiter,
+                          metrics.workers, metrics.currentRate,
+                          metrics.rateControlService, metrics.prefix);
+        });
+        processorThread.setName(metrics.prefix + "-processor");
+        processorThread.start();
     }
 
     private static void processMessages(KafkaConsumer<byte[], byte[]> consumer,
@@ -121,85 +195,49 @@ public class AConsumer {
                                      String destinationNamespace,
                                      String setName,
                                      RateLimiter rateLimiter,
-                                     ExecutorService workers) {
+                                     ExecutorService workers,
+                                     double currentRate,
+                                     RateControlService rateControlService,
+                                     String prefix) {
         try {
             while (!Thread.currentThread().isInterrupted()) {
-                ConsumerRecords<byte[], byte[]> records = messageService.pollMessages(consumer);
+                ConsumerRecords<byte[], byte[]> records = consumer.poll(Duration.ofMillis(100));
                 
                 for (ConsumerRecord<byte[], byte[]> record : records) {
-                    kafkaService.updateOffsets(record.offset(), record.offset());
-                    
                     if (!processingSemaphore.tryAcquire()) {
-                        messageService.processPendingConsumerMessages(Collections.singletonList(record));
                         continue;
                     }
 
                     try {
                         if (currentRate < rateControlService.getTargetRate() * 0.8) {
-                            messageService.processPendingConsumerMessages(Collections.singletonList(record));
+                            // Process immediately if rate is low
+                            processRecord(record, destinationClient, writePolicy, 
+                                        destinationNamespace, setName);
                         } else {
-                            processRecordWithRetry(record, destinationClient, writePolicy, 
-                                                destinationNamespace, setName, workers);
+                            // Use worker pool for normal processing
+                            workers.submit(() -> {
+                                try {
+                                    processRecord(record, destinationClient, writePolicy, 
+                                                destinationNamespace, setName);
+                                } catch (Exception e) {
+                                    System.err.printf("[%s] Error processing record: %s%n", 
+                                                    prefix, e.getMessage());
+                                } finally {
+                                    processingSemaphore.release();
+                                }
+                            });
                         }
-                    } finally {
+                    } catch (Exception e) {
                         processingSemaphore.release();
-                    }
-
-                    if (messageService.hasPendingConsumerMessages() && 
-                        currentRate >= rateControlService.getTargetRate() * 0.9) {
-                        processPendingMessages(destinationClient, writePolicy,
-                                            destinationNamespace, setName, workers);
+                        System.err.printf("[%s] Error in message processing: %s%n", 
+                                        prefix, e.getMessage());
                     }
                 }
             }
         } catch (Exception e) {
-            System.err.println("Error in message processing: " + e.getMessage());
+            System.err.printf("[%s] Error in message processing: %s%n", prefix, e.getMessage());
             e.printStackTrace();
         }
-    }
-
-    private static void processPendingMessages(AerospikeClient destinationClient,
-                                            WritePolicy writePolicy,
-                                            String destinationNamespace,
-                                            String setName,
-                                            ExecutorService workers) {
-        List<ConsumerRecord<byte[], byte[]>> batch = new ArrayList<>(100);
-        ConsumerRecord<byte[], byte[]> record;
-        while ((record = messageService.pollConsumerMessage()) != null && batch.size() < 100) {
-            batch.add(record);
-        }
-        if (!batch.isEmpty()) {
-            for (ConsumerRecord<byte[], byte[]> r : batch) {
-                if (processingSemaphore.tryAcquire()) {
-                    try {
-                        processRecordWithRetry(r, destinationClient, writePolicy, 
-                                            destinationNamespace, setName, workers);
-                    } finally {
-                        processingSemaphore.release();
-                    }
-                } else {
-                    messageService.processPendingConsumerMessages(Collections.singletonList(r));
-                }
-            }
-        }
-    }
-
-    private static void processRecordWithRetry(ConsumerRecord<byte[], byte[]> record,
-                                            AerospikeClient destinationClient,
-                                            WritePolicy writePolicy,
-                                            String destinationNamespace,
-                                            String setName,
-                                            ExecutorService workers) {
-        workers.submit(() -> {
-            try {
-                processRecord(record, destinationClient, writePolicy, 
-                            destinationNamespace, setName);
-                kafkaService.updateOffsets(record.offset(), record.offset());
-            } catch (Exception e) {
-                System.err.println("Error processing record: " + e.getMessage());
-                messageService.processPendingConsumerMessages(Collections.singletonList(record));
-            }
-        });
     }
 
     private static void processRecord(ConsumerRecord<byte[], byte[]> record,
@@ -300,46 +338,5 @@ public class AConsumer {
         long maxDelay = 10000;
         long delay = Math.min(baseDelay * (1L << retryCount), maxDelay);
         return delay + (long)(Math.random() * 1000);
-    }
-
-    private static void shutdownGracefully(KafkaConsumer<byte[], byte[]> kafkaConsumer,
-                                         AerospikeClient aerospikeClient) {
-        if (executor != null) {
-            executor.shutdown();
-            try {
-                if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-                    executor.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                executor.shutdownNow();
-                Thread.currentThread().interrupt();
-            }
-        }
-
-        if (rateControlService != null) {
-            rateControlService.shutdown();
-        }
-
-        if (kafkaService != null) {
-            kafkaService.shutdown();
-        }
-
-        if (kafkaConsumer != null) {
-            try {
-                kafkaConsumer.close();
-                System.out.println("Kafka Consumer closed successfully.");
-            } catch (Exception e) {
-                System.err.println("Error closing Kafka consumer: " + e.getMessage());
-            }
-        }
-
-        if (aerospikeClient != null) {
-            try {
-                aerospikeClient.close();
-                System.out.println("Aerospike Client closed successfully.");
-            } catch (Exception e) {
-                System.err.println("Error closing Aerospike client: " + e.getMessage());
-            }
-        }
     }
 }

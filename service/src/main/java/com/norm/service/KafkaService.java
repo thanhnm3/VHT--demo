@@ -99,6 +99,10 @@ public class KafkaService {
         }
     }
 
+    public void createTopic(String topicName) {
+        // Logic để tạo topic trong Kafka
+    }
+
     public void updateOffsets(long currentOffset, long lastProcessedOffset) {
         this.currentOffset.set(currentOffset);
         this.lastProcessedOffset.set(lastProcessedOffset);

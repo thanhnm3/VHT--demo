@@ -21,20 +21,21 @@ public class Main {
         String sourceNamespace = dotenv.get("PRODUCER_NAMESPACE");
         String destinationHost = dotenv.get("AEROSPIKE_CONSUMER_HOST");
         int destinationPort = Integer.parseInt(dotenv.get("AEROSPIKE_CONSUMER_PORT"));
-        String destinationNamespace = dotenv.get("CONSUMER_NAMESPACE");
+        String consumerNamespace096 = dotenv.get("CONSUMER_NAMESPACE_096");
+        String consumerNamespace033 = dotenv.get("CONSUMER_NAMESPACE_033");
         String producerSetName = dotenv.get("PRODUCER_SET_NAME");
         String consumerSetName = dotenv.get("CONSUMER_SET_NAME");
         String kafkaBroker = dotenv.get("KAFKA_BROKER");
-        String kafkaTopic = dotenv.get("KAFKA_TOPIC");
-        String consumerGroup = dotenv.get("CONSUMER_GROUP");
+        String consumerGroup096 = dotenv.get("CONSUMER_GROUP_096");
+        String consumerGroup033 = dotenv.get("CONSUMER_GROUP_033");
         int producerThreadPoolSize = 2; // Số thread cho Producer
         int consumerThreadPoolSize = 8; // Số thread cho Consumer
         int maxMessagesPerSecond = Integer.parseInt(dotenv.get("MAX_MESSAGES_PER_SECOND"));
         int maxRetries = Integer.parseInt(dotenv.get("MAX_RETRIES"));
 
         // Xóa và tạo lại topic trước khi bắt đầu
-        System.out.println("Dang xoa va tao lai topic...");
-        DeleteTopic.deleteTopic(kafkaBroker, kafkaTopic);
+        System.out.println("Dang xoa tat ca topic...");
+        DeleteTopic.deleteAllTopics(kafkaBroker);
 
         // Tạo thread pool cho Producer và Consumer
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -45,8 +46,10 @@ public class Main {
                 System.out.println("Khoi dong Consumer...");
                 AConsumer.main(args, consumerThreadPoolSize, maxMessagesPerSecond,
                         sourceHost, sourcePort, sourceNamespace,
-                        destinationHost, destinationPort, destinationNamespace,
-                        consumerSetName, kafkaBroker, kafkaTopic, consumerGroup);
+                        destinationHost, destinationPort, 
+                        consumerNamespace096, consumerNamespace033,
+                        consumerSetName, kafkaBroker, 
+                        consumerGroup096, consumerGroup033);
                 consumerReady.countDown(); // Bao hieu consumer da san sang
             } catch (Exception e) {
                 System.err.println("Loi trong Consumer: " + e.getMessage());
@@ -56,7 +59,7 @@ public class Main {
 
         // Đợi consumer khởi động và ổn định
         try {
-            Thread.sleep( 1000);
+            Thread.sleep(1000);
             System.out.println("Consumer da san sang, bat dau Producer...");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -69,7 +72,7 @@ public class Main {
             try {
                 AProducer.main(args, producerThreadPoolSize, maxMessagesPerSecond,
                         sourceHost, sourcePort, sourceNamespace, producerSetName,
-                        kafkaBroker, kafkaTopic, maxRetries,consumerGroup);
+                        kafkaBroker, maxRetries, consumerGroup096);
             } catch (Exception e) {
                 System.err.println("Loi trong Producer: " + e.getMessage());
                 e.printStackTrace();
