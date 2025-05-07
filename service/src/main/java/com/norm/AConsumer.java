@@ -31,7 +31,8 @@ public class AConsumer {
     private static final int LAG_THRESHOLD = 1000;
     private static final int MONITORING_INTERVAL_SECONDS = 10;
     private static final String[] PREFIXES = {"096", "033"};
-
+    private static volatile boolean isShuttingDown = false;
+    private static final CountDownLatch shutdownLatch = new CountDownLatch(1);
 
     // Consumer metrics for each prefix
     private static class ConsumerMetrics {
@@ -43,6 +44,7 @@ public class AConsumer {
         final ExecutorService workers;
         final String targetNamespace;
         final String prefix;
+        volatile boolean isRunning = true;
 
         ConsumerMetrics(String sourceNamespace, String kafkaBroker, 
                        String consumerGroup, String targetNamespace,
@@ -82,9 +84,12 @@ public class AConsumer {
             );
             rateControlService.updateRate(newRate);
             currentRate = rateControlService.getCurrentRate();
+            // Update RateLimiter with new rate
+            rateLimiter.setRate(currentRate);
         }
 
         void shutdown() {
+            isRunning = false;
             if (rateControlService != null) {
                 rateControlService.shutdown();
             }
@@ -92,10 +97,18 @@ public class AConsumer {
                 kafkaService.shutdown();
             }
             if (consumer != null) {
+                consumer.wakeup();
                 consumer.close();
             }
             if (workers != null) {
                 workers.shutdown();
+                try {
+                    if (!workers.awaitTermination(30, TimeUnit.SECONDS)) {
+                        workers.shutdownNow();
+                    }
+                } catch (InterruptedException e) {
+                    workers.shutdownNow();
+                }
             }
         }
     }
@@ -107,6 +120,13 @@ public class AConsumer {
                           String setName, String kafkaBroker, 
                           String consumerGroup096, String consumerGroup033) {
         try {
+            // Add shutdown hook
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                System.out.println("Shutdown signal received. Starting graceful shutdown...");
+                isShuttingDown = true;
+                shutdownLatch.countDown();
+            }));
+
             // Initialize Aerospike client
             final AerospikeClient destinationClient = new AerospikeClient(destinationHost, destinationPort);
             final WritePolicy writePolicy = new WritePolicy();
@@ -145,9 +165,23 @@ public class AConsumer {
                 startProcessingThread(metrics, destinationClient, writePolicy, setName);
             }
 
-            // Keep the main thread alive
-            Thread.currentThread().join();
+            // Wait for shutdown signal
+            shutdownLatch.await();
+            
+            // Graceful shutdown
+            System.out.println("Initiating graceful shutdown...");
+            for (ConsumerMetrics metrics : metricsMap.values()) {
+                metrics.shutdown();
+            }
+            
+            // Wait for all processing to complete
+            try {
+                processingSemaphore.acquire(300); // Wait for all permits to be released
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
 
+            System.out.println("Shutdown completed successfully.");
         } catch (Exception e) {
             System.err.println("Critical error: " + e.getMessage());
             e.printStackTrace();
@@ -156,7 +190,7 @@ public class AConsumer {
 
     private static void startMonitoringThread(ConsumerMetrics metrics) {
         new Thread(() -> {
-            while (!Thread.currentThread().isInterrupted()) {
+            while (!Thread.currentThread().isInterrupted() && metrics.isRunning) {
                 try {
                     if (metrics.rateControlService.shouldCheckRateAdjustment()) {
                         double oldRate = metrics.currentRate;
@@ -200,43 +234,53 @@ public class AConsumer {
                                      RateControlService rateControlService,
                                      String prefix) {
         try {
-            while (!Thread.currentThread().isInterrupted()) {
+            while (!Thread.currentThread().isInterrupted() && !isShuttingDown) {
                 ConsumerRecords<byte[], byte[]> records = consumer.poll(Duration.ofMillis(100));
                 
-                for (ConsumerRecord<byte[], byte[]> record : records) {
-                    if (!processingSemaphore.tryAcquire()) {
-                        continue;
-                    }
-
-                    try {
-                        if (currentRate < rateControlService.getTargetRate() * 0.8) {
-                            // Process immediately if rate is low
-                            processRecord(record, destinationClient, writePolicy, 
-                                        destinationNamespace, setName);
-                        } else {
-                            // Use worker pool for normal processing
-                            workers.submit(() -> {
-                                try {
-                                    processRecord(record, destinationClient, writePolicy, 
-                                                destinationNamespace, setName);
-                                } catch (Exception e) {
-                                    System.err.printf("[%s] Error processing record: %s%n", 
-                                                    prefix, e.getMessage());
-                                } finally {
-                                    processingSemaphore.release();
-                                }
-                            });
+                if (!records.isEmpty()) {
+                    for (ConsumerRecord<byte[], byte[]> record : records) {
+                        if (!processingSemaphore.tryAcquire()) {
+                            continue;
                         }
+
+                        try {
+                            if (currentRate < rateControlService.getTargetRate() * 0.8) {
+                                processRecord(record, destinationClient, writePolicy, 
+                                            destinationNamespace, setName);
+                            } else {
+                                workers.submit(() -> {
+                                    try {
+                                        processRecord(record, destinationClient, writePolicy, 
+                                                    destinationNamespace, setName);
+                                    } catch (Exception e) {
+                                        System.err.printf("[%s] Error processing record: %s%n", 
+                                                        prefix, e.getMessage());
+                                    } finally {
+                                        processingSemaphore.release();
+                                    }
+                                });
+                            }
+                        } catch (Exception e) {
+                            processingSemaphore.release();
+                            System.err.printf("[%s] Error in message processing: %s%n", 
+                                            prefix, e.getMessage());
+                        }
+                    }
+                    
+                    // Commit offsets after successful batch processing
+                    try {
+                        consumer.commitSync();
                     } catch (Exception e) {
-                        processingSemaphore.release();
-                        System.err.printf("[%s] Error in message processing: %s%n", 
+                        System.err.printf("[%s] Error committing offsets: %s%n", 
                                         prefix, e.getMessage());
                     }
                 }
             }
         } catch (Exception e) {
-            System.err.printf("[%s] Error in message processing: %s%n", prefix, e.getMessage());
-            e.printStackTrace();
+            if (!isShuttingDown) {
+                System.err.printf("[%s] Error in message processing: %s%n", prefix, e.getMessage());
+                e.printStackTrace();
+            }
         }
     }
 

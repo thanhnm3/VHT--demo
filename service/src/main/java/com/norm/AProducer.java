@@ -252,7 +252,7 @@ public class AProducer {
 
     private static ProducerRecord<byte[], byte[]> createKafkaRecord(Key key, com.aerospike.client.Record record) {
         byte[] personData = (byte[]) record.getValue("personData");
-        long lastUpdate = System.currentTimeMillis();
+        long lastUpdate = (long) record.getValue("lastUpdate");
         byte[] keyBytes = (byte[]) key.userKey.getObject();
 
         String message = String.format("{\"personData\": \"%s\", \"lastUpdate\": %d}",
