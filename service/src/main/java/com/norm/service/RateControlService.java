@@ -61,7 +61,7 @@ public class RateControlService {
                 } else {
                     currentRate = Math.max(newRate, targetRate);
                 }
-                System.out.printf("Rate adjusted to %.2f messages/second%n", currentRate);
+                // System.out.printf("Rate adjusted to %.2f messages/second%n", currentRate);
             }, step * 1000, TimeUnit.MILLISECONDS);
         }
 

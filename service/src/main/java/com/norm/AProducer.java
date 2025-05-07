@@ -85,7 +85,7 @@ public class AProducer {
                             double oldRate = currentRate;
                             monitorAndAdjustLag();
                             if (oldRate != currentRate) {
-                                System.out.printf("Rate adjusted from %.2f to %.2f messages/second%n", 
+                                System.out.printf("[Producer] Rate adjusted from %.2f to %.2f messages/second%n", 
                                                 oldRate, currentRate);
                             }
                         }

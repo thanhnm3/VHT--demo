@@ -22,19 +22,9 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.time.Duration;
 import java.util.HashMap;
-import java.lang.management.ManagementFactory;
-import java.lang.management.OperatingSystemMXBean;
-import com.norm.service.DynamicSemaphore;
 
 public class AConsumer {
     private static final ObjectMapper objectMapper = new ObjectMapper();
-    private static final DynamicSemaphore processingSemaphore = new DynamicSemaphore(
-        300,    // initial permits
-        100,    // min permits
-        1000,   // max permits
-        80.0,   // target CPU usage (%)
-        80.0    // target memory usage (%)
-    );
     private static final double MAX_RATE = 10000.0;
     private static final double MIN_RATE = 2000.0;
     private static final int LAG_THRESHOLD = 1000;
@@ -50,7 +40,7 @@ public class AConsumer {
         final RateControlService rateControlService;
         final KafkaService kafkaService;
         final KafkaConsumer<byte[], byte[]> consumer;
-        final ExecutorService workers;
+        final ThreadPoolExecutor workers;
         final String targetNamespace;
         final String prefix;
         volatile boolean isRunning = true;
@@ -73,8 +63,12 @@ public class AConsumer {
             this.targetNamespace = targetNamespace;
             this.prefix = prefix;
             
-            // Create worker pool for this consumer
-            this.workers = Executors.newFixedThreadPool(workerPoolSize,
+            // Create worker pool with CallerRunsPolicy
+            this.workers = new ThreadPoolExecutor(
+                workerPoolSize,
+                workerPoolSize,
+                60L, TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(1000),
                 new ThreadFactory() {
                     private final AtomicInteger threadCount = new AtomicInteger(1);
                     @Override
@@ -83,7 +77,9 @@ public class AConsumer {
                         thread.setName(prefix + "-worker-" + threadCount.getAndIncrement());
                         return thread;
                     }
-                });
+                },
+                new ThreadPoolExecutor.CallerRunsPolicy()
+            );
         }
 
         void monitorAndAdjustLag() {
@@ -93,7 +89,6 @@ public class AConsumer {
             );
             rateControlService.updateRate(newRate);
             currentRate = rateControlService.getCurrentRate();
-            // Update RateLimiter with new rate
             rateLimiter.setRate(currentRate);
         }
 
@@ -184,9 +179,6 @@ public class AConsumer {
                 metrics.shutdown();
             }
             
-            // Wait for all processing to complete
-            processingSemaphore.tryAcquire(); // Wait for all permits to be released
-
             System.out.println("Shutdown completed successfully.");
         } catch (Exception e) {
             System.err.println("Critical error: " + e.getMessage());
@@ -235,7 +227,7 @@ public class AConsumer {
                                      String destinationNamespace,
                                      String setName,
                                      RateLimiter rateLimiter,
-                                     ExecutorService workers,
+                                     ThreadPoolExecutor workers,
                                      double currentRate,
                                      RateControlService rateControlService,
                                      String prefix) {
@@ -246,9 +238,6 @@ public class AConsumer {
                 if (!records.isEmpty()) {
                     for (ConsumerRecord<byte[], byte[]> record : records) {
                         try {
-                            // Wait for permit instead of skipping
-                            processingSemaphore.acquire();
-                            
                             if (currentRate < rateControlService.getTargetRate() * 0.8) {
                                 processRecord(record, destinationClient, writePolicy, 
                                             destinationNamespace, setName);
@@ -260,17 +249,10 @@ public class AConsumer {
                                     } catch (Exception e) {
                                         System.err.printf("[%s] Error processing record: %s%n", 
                                                         prefix, e.getMessage());
-                                    } finally {
-                                        processingSemaphore.release();
                                     }
                                 });
                             }
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                            System.err.printf("[%s] Interrupted while waiting for permit%n", prefix);
-                            break;
                         } catch (Exception e) {
-                            processingSemaphore.release();
                             System.err.printf("[%s] Error in message processing: %s%n", 
                                             prefix, e.getMessage());
                         }
