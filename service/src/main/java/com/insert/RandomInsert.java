@@ -23,7 +23,7 @@ public class RandomInsert {
         int numThreads = 2; // Số lượng luồng song song (mỗi luồng xử lý 1 prefix)
         ExecutorService executor = Executors.newFixedThreadPool(numThreads);
 
-        int maxRecordsPerPrefix = 300_000; // 300 000 bản ghi cho mỗi prefix
+        int maxRecordsPerPrefix = 200_000; // 200 000 bản ghi cho mỗi prefix
         AtomicInteger totalCount = new AtomicInteger(0); // Tổng số bản ghi đã insert
 
         // 🛠 Luồng thực hiện ghi dữ liệu

@@ -22,10 +22,19 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.time.Duration;
 import java.util.HashMap;
+import java.lang.management.ManagementFactory;
+import java.lang.management.OperatingSystemMXBean;
+import com.norm.service.DynamicSemaphore;
 
 public class AConsumer {
     private static final ObjectMapper objectMapper = new ObjectMapper();
-    private static final Semaphore processingSemaphore = new Semaphore(300);
+    private static final DynamicSemaphore processingSemaphore = new DynamicSemaphore(
+        300,    // initial permits
+        100,    // min permits
+        1000,   // max permits
+        80.0,   // target CPU usage (%)
+        80.0    // target memory usage (%)
+    );
     private static final double MAX_RATE = 10000.0;
     private static final double MIN_RATE = 2000.0;
     private static final int LAG_THRESHOLD = 1000;
@@ -176,11 +185,7 @@ public class AConsumer {
             }
             
             // Wait for all processing to complete
-            try {
-                processingSemaphore.acquire(300); // Wait for all permits to be released
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
+            processingSemaphore.tryAcquire(); // Wait for all permits to be released
 
             System.out.println("Shutdown completed successfully.");
         } catch (Exception e) {
@@ -240,11 +245,10 @@ public class AConsumer {
                 
                 if (!records.isEmpty()) {
                     for (ConsumerRecord<byte[], byte[]> record : records) {
-                        if (!processingSemaphore.tryAcquire()) {
-                            continue;
-                        }
-
                         try {
+                            // Wait for permit instead of skipping
+                            processingSemaphore.acquire();
+                            
                             if (currentRate < rateControlService.getTargetRate() * 0.8) {
                                 processRecord(record, destinationClient, writePolicy, 
                                             destinationNamespace, setName);
@@ -261,6 +265,10 @@ public class AConsumer {
                                     }
                                 });
                             }
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            System.err.printf("[%s] Interrupted while waiting for permit%n", prefix);
+                            break;
                         } catch (Exception e) {
                             processingSemaphore.release();
                             System.err.printf("[%s] Error in message processing: %s%n", 

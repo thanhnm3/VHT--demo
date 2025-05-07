@@ -180,6 +180,8 @@ public class AProducer {
         RateLimiter rateLimiter = RateLimiter.create(currentRate);
         List<ProducerRecord<byte[], byte[]>> batch = new ArrayList<>(100);
         Object batchLock = new Object();
+        final AtomicLong lastBatchTime = new AtomicLong(System.currentTimeMillis());
+        final long BATCH_INTERVAL_MS = 1000; // Gửi batch mỗi 1 giây nếu có message
 
         try {
             System.out.println("Starting to read data from Aerospike...");
@@ -202,10 +204,15 @@ public class AProducer {
                                 messageService.offerProducerMessage(kafkaRecord);
                             } else {
                                 batch.add(kafkaRecord);
-                                if (batch.size() >= 100) {
+                                
+                                // Gửi batch nếu đủ 100 records hoặc đã qua 1 giây
+                                long currentTime = System.currentTimeMillis();
+                                if (batch.size() >= 100 || 
+                                    (batch.size() > 0 && currentTime - lastBatchTime.get() >= BATCH_INTERVAL_MS)) {
                                     messageService.sendBatch(producer, new ArrayList<>(batch), maxRetries);
                                     producedCount.addAndGet(batch.size());
                                     batch.clear();
+                                    lastBatchTime.set(currentTime);
                                 }
                             }
                         }
