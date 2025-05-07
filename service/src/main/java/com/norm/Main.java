@@ -23,13 +23,14 @@ public class Main {
         int destinationPort = Integer.parseInt(dotenv.get("AEROSPIKE_CONSUMER_PORT"));
         String consumerNamespace096 = dotenv.get("CONSUMER_NAMESPACE_096");
         String consumerNamespace033 = dotenv.get("CONSUMER_NAMESPACE_033");
+        String consumerSetName096 = dotenv.get("CONSUMER_SET_NAME_096");
+        String consumerSetName033 = dotenv.get("CONSUMER_SET_NAME_033");
         String producerSetName = dotenv.get("PRODUCER_SET_NAME");
-        String consumerSetName = dotenv.get("CONSUMER_SET_NAME");
         String kafkaBroker = dotenv.get("KAFKA_BROKER");
         String consumerGroup096 = dotenv.get("CONSUMER_GROUP_096");
         String consumerGroup033 = dotenv.get("CONSUMER_GROUP_033");
         int producerThreadPoolSize = 2; // Số thread cho Producer
-        int consumerThreadPoolSize = 8; // Số thread cho Consumer
+        int consumerThreadPoolSize = 4; // Số thread cho Consumer
         int maxMessagesPerSecond = Integer.parseInt(dotenv.get("MAX_MESSAGES_PER_SECOND"));
         int maxRetries = Integer.parseInt(dotenv.get("MAX_RETRIES"));
 
@@ -48,7 +49,7 @@ public class Main {
                         sourceHost, sourcePort, sourceNamespace,
                         destinationHost, destinationPort, 
                         consumerNamespace096, consumerNamespace033,
-                        consumerSetName, kafkaBroker, 
+                        consumerSetName096, consumerSetName033, kafkaBroker, 
                         consumerGroup096, consumerGroup033);
                 consumerReady.countDown(); // Bao hieu consumer da san sang
             } catch (Exception e) {

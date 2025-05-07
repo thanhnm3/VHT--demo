@@ -117,8 +117,8 @@ public class AConsumer {
                           String sourceHost, int sourcePort, String sourceNamespace,
                           String destinationHost, int destinationPort, 
                           String consumerNamespace096, String consumerNamespace033,
-                          String setName, String kafkaBroker, 
-                          String consumerGroup096, String consumerGroup033) {
+                          String consumerSetName096, String consumerSetName033,
+                          String kafkaBroker, String consumerGroup096, String consumerGroup033) {
         try {
             // Add shutdown hook
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -162,6 +162,7 @@ public class AConsumer {
             
             // Start processing threads for each consumer
             for (ConsumerMetrics metrics : metricsMap.values()) {
+                String setName = metrics.prefix.equals("096") ? consumerSetName096 : consumerSetName033;
                 startProcessingThread(metrics, destinationClient, writePolicy, setName);
             }
 

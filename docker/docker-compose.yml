@@ -132,6 +132,9 @@ services:
   # docker exec -it aerospike-tools aql -h aerospike
   # Để truy cập vào aql của DB, để kiểm thử
 
+  # docker exec -it aerospike-tools aql -h aerospike -c "show sets"
+  # docker exec -it aerospike-tools aql -h aerospike2 -c "show sets"
+
 networks:
   kafka-platform:
     name: kafka-platform
