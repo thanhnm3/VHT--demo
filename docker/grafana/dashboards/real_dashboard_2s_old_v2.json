@@ -15,7 +15,7 @@
             }
         ]
     },
-    "description": "Kafka metrics with 2-second aggregation for consistent monitoring",
+    "description": "Kafka metrics with 2-second aggregation",
     "editable": true,
     "fiscalYearStartMonth": 0,
     "gnetId": null,
@@ -77,7 +77,7 @@
                         "uid": "PBFA97CFB590B2093"
                     },
                     "editorMode": "code",
-                    "expr": "avg_over_time(rate(kafka_topic_partition_current_offset{topic=\"$topic\"}[5s])[30s:1s])",
+                    "expr": "sum(irate(kafka_topic_partition_current_offset{instance=~'$instance', topic=~\"$topic\"}[2s]))",
                     "legendFormat": "Producer Rate",
                     "range": true,
                     "refId": "A"
@@ -88,13 +88,13 @@
                         "uid": "PBFA97CFB590B2093"
                     },
                     "editorMode": "code",
-                    "expr": "avg_over_time(rate(kafka_consumergroup_current_offset{instance=~\"$instance\", topic=~\"$topic\"}[5s])[30s:1s]) by (consumergroup, topic)",
+                    "expr": "sum(irate(kafka_consumergroup_current_offset{instance=~\"$instance\", topic=~\"$topic\"}[2s])) by (consumergroup, topic)",
                     "legendFormat": "Consumer Rate ({{consumergroup}})",
                     "range": true,
                     "refId": "B"
                 }
             ],
-            "title": "Message Rate Comparison (30s moving average)",
+            "title": "Message Rate Comparison (2s)",
             "type": "timeseries"
         },
         {
@@ -150,13 +150,13 @@
                         "uid": "PBFA97CFB590B2093"
                     },
                     "editorMode": "code",
-                    "expr": "avg_over_time(rate(kafka_topic_partition_current_offset{instance=~'$instance', topic=~\"$topic\"}[5s])[30s:1s])",
+                    "expr": "sum(irate(kafka_topic_partition_current_offset{instance=~'$instance', topic=~\"$topic\"}[2s]))",
                     "legendFormat": "{{topic}}",
                     "range": true,
                     "refId": "A"
                 }
             ],
-            "title": "Producer Message Rate (30s moving average)",
+            "title": "Producer Message Rate (2s)",
             "type": "timeseries"
         },
         {
@@ -212,13 +212,13 @@
                         "uid": "PBFA97CFB590B2093"
                     },
                     "editorMode": "code",
-                    "expr": "avg_over_time(rate(kafka_consumergroup_current_offset{instance=~\"$instance\", topic=~\"$topic\"}[5s])[30s:1s]) by (consumergroup, topic)",
+                    "expr": "sum(irate(kafka_consumergroup_current_offset{instance=~\"$instance\", topic=~\"$topic\"}[2s])) by (consumergroup, topic)",
                     "legendFormat": "{{consumergroup}}",
                     "range": true,
                     "refId": "A"
                 }
             ],
-            "title": "Consumer Message Rate (30s moving average)",
+            "title": "Consumer Message Rate (2s)",
             "type": "timeseries"
         },
         {
@@ -483,7 +483,7 @@
         ]
     },
     "timezone": "browser",
-    "title": "Kafka Metrics (2s Aggregation)",
-    "uid": "kafka-2s-metrics",
+    "title": "Kafka Metrics (2s) - Original Ver2",
+    "uid": "kafka-2s-metrics-old-ver2",
     "version": 1
 } 

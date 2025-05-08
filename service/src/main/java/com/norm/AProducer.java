@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class AProducer {
     private static ExecutorService executor;
-    private static volatile double currentRate = 5000.0;
+    private static volatile double currentRate = 5000.0; // Tốc độ hiện tại
     private static final double MAX_RATE = 100000.0;
     private static final double MIN_RATE = 1000.0;
     private static final int LAG_THRESHOLD = 1000; // Ngưỡng lag để điều chỉnh tốc độ
@@ -31,7 +31,6 @@ public class AProducer {
     private static final int MONITORING_INTERVAL_SECONDS = 10; // Thêm hằng số cho interval
     private static final AtomicLong failedMessages = new AtomicLong(0);
     private static final AtomicLong skippedMessages = new AtomicLong(0);
-    private static volatile double targetRate = 5000.0; // Rate mục tiêu
     private static final ScheduledExecutorService rateAdjustmentExecutor = Executors.newSingleThreadScheduledExecutor();
     private static RateControlService rateControlService;
     private static KafkaService kafkaService;
@@ -55,7 +54,7 @@ public class AProducer {
             initializeTopicMapping(namespace);
 
             // Initialize services
-            rateControlService = new RateControlService(5000.0, MAX_RATE, MIN_RATE, 
+            rateControlService = new RateControlService(10000.0, MAX_RATE, MIN_RATE, 
                                                       LAG_THRESHOLD, MONITORING_INTERVAL_SECONDS);
             kafkaService = new KafkaService(kafkaBroker, defaultTopic, consumerGroup);
             messageService = new MessageService();
@@ -159,10 +158,19 @@ public class AProducer {
 
     private static void monitorAndAdjustLag() {
         try {
+            // Tính toán tổng lag từ Kafka
             long totalLag = kafkaService.calculateTotalLag();
+
+            // Sử dụng RateControlService để tính tốc độ mới
             double newRate = rateControlService.calculateNewRateForProducer(totalLag);
+
+            // Cập nhật tốc độ mới
             rateControlService.updateRate(newRate);
+
+            // Lấy tốc độ hiện tại từ RateControlService
             currentRate = rateControlService.getCurrentRate();
+
+            System.out.printf("[Producer] Adjusted rate to %.2f messages/second based on lag: %d%n", currentRate, totalLag);
         } catch (Exception e) {
             System.err.println("Error monitoring lag: " + e.getMessage());
         }
@@ -177,6 +185,7 @@ public class AProducer {
         scanPolicy.maxConcurrentNodes = 4;
         scanPolicy.recordsPerSecond = (int) currentRate;
 
+        // Sử dụng RateLimiter để giới hạn tốc độ
         RateLimiter rateLimiter = RateLimiter.create(currentRate);
         List<ProducerRecord<byte[], byte[]>> batch = new ArrayList<>(100);
         Object batchLock = new Object();
@@ -186,7 +195,7 @@ public class AProducer {
         try {
             System.out.println("Starting to read data from Aerospike...");
             client.scanAll(scanPolicy, namespace, setName, (key, record) -> {
-                rateLimiter.acquire();
+                rateLimiter.acquire(); // Giới hạn tốc độ đọc
 
                 executor.submit(() -> {
                     try {
@@ -198,27 +207,23 @@ public class AProducer {
                         }
 
                         ProducerRecord<byte[], byte[]> kafkaRecord = createKafkaRecord(key, record);
-                        
+
                         synchronized (batchLock) {
-                            if (currentRate < targetRate * 0.8) { // Nếu rate đang giảm mạnh
-                                messageService.offerProducerMessage(kafkaRecord);
-                            } else {
-                                batch.add(kafkaRecord);
-                                
-                                // Gửi batch nếu đủ 100 records hoặc đã qua 1 giây
-                                long currentTime = System.currentTimeMillis();
-                                if (batch.size() >= 100 || 
-                                    (batch.size() > 0 && currentTime - lastBatchTime.get() >= BATCH_INTERVAL_MS)) {
-                                    messageService.sendBatch(producer, new ArrayList<>(batch), maxRetries);
-                                    producedCount.addAndGet(batch.size());
-                                    batch.clear();
-                                    lastBatchTime.set(currentTime);
-                                }
+                            batch.add(kafkaRecord);
+
+                            // Gửi batch nếu đủ 100 records hoặc đã qua 1 giây
+                            long currentTime = System.currentTimeMillis();
+                            if (batch.size() >= 100 || 
+                                (batch.size() > 0 && currentTime - lastBatchTime.get() >= BATCH_INTERVAL_MS)) {
+                                messageService.sendBatch(producer, new ArrayList<>(batch), maxRetries);
+                                producedCount.addAndGet(batch.size());
+                                batch.clear();
+                                lastBatchTime.set(currentTime);
                             }
                         }
 
-                        // Xử lý message đang chờ khi có cơ hội
-                        if (messageService.hasPendingProducerMessages() && currentRate >= targetRate * 0.9) {
+                        // Xử lý tất cả các message đang chờ mà không kiểm tra tốc độ
+                        if (messageService.hasPendingProducerMessages()) {
                             messageService.processPendingProducerMessages(producer, maxRetries);
                         }
 
