@@ -1,0 +1,37 @@
+producers:
+  - name: producer1
+    host: 192.168.1.10
+    port: 3000
+    namespace: ns1
+    set: set1
+  - name: producer2
+    host: 192.168.1.11
+    port: 3000
+    namespace: ns2
+    set: set2
+
+consumers:
+  - name: consumer1
+    host: 192.168.2.10
+    port: 3000
+    namespace: ns3
+    set: set3
+  - name: consumer2
+    host: 192.168.2.11
+    port: 3000
+    namespace: ns4
+    set: set4
+  - name: consumer3
+    host: 192.168.2.12
+    port: 3000
+    namespace: ns5
+    set: set5
+  - name: consumer4
+    host: 192.168.2.13
+    port: 3000
+    namespace: ns6
+    set: set6
+
+prefix_mapping:
+  "096": ["consumer1", "consumer2"]
+  "033": ["consumer3", "consumer4"]
