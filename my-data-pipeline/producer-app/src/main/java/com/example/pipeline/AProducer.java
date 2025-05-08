@@ -39,8 +39,7 @@ public class AProducer {
     private static KafkaService kafkaService;
     private static MessageService messageService;
 
-    // Định nghĩa các prefix
-    private static final String[] PREFIXES = {"096", "033"};
+
     private static final Map<String, String> prefixToTopicMap = new ConcurrentHashMap<>();
     private static String defaultTopic;
 
@@ -53,8 +52,8 @@ public class AProducer {
         KafkaProducer<byte[], byte[]> kafkaProducer = null;
 
         try {
-            // Khởi tạo mapping prefix -> topic
-            initializeTopicMapping(namespace);
+            // Khởi tạo mapping prefix -> topic bằng cách sử dụng TopicGenerator
+            initializeTopicMapping();
 
             // Initialize services
             rateControlService = new RateControlService(10000.0, MAX_RATE, MIN_RATE, 
@@ -122,11 +121,14 @@ public class AProducer {
     }
 
     // Khởi tạo mapping giữa prefix và topic
-    private static void initializeTopicMapping(String namespace) {
-        for (String prefix : PREFIXES) {
-            String topicName = String.format("%s.profile.%s.produce", namespace, prefix);
-            prefixToTopicMap.put(prefix, topicName);
-        }
+    private static void initializeTopicMapping() {
+        // Gọi TopicGenerator để lấy danh sách các topic
+        Map<String, String> generatedTopics = TopicGenerator.generateTopics();
+
+        // Lưu danh sách topic vào prefixToTopicMap
+        prefixToTopicMap.putAll(generatedTopics);
+
+        System.out.println("Initialized topic mapping: " + prefixToTopicMap);
     }
 
     // Tạo các topic trong Kafka
