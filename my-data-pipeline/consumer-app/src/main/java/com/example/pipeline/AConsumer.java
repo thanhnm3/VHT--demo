@@ -9,6 +9,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.example.pipeline.service.RateControlService;
 import com.example.pipeline.service.KafkaService;
+import com.example.pipeline.service.TopicGenerator;
+import com.example.pipeline.service.ConfigLoader;
+import com.example.pipeline.service.config.Config;
+import com.example.pipeline.service.config.ConsumerConfig;
 
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -22,6 +26,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.List;
 
 public class AConsumer {
     private static final ObjectMapper objectMapper = new ObjectMapper();
@@ -29,9 +34,10 @@ public class AConsumer {
     private static final double MIN_RATE = 2000.0;
     private static final int LAG_THRESHOLD = 1000;
     private static final int MONITORING_INTERVAL_SECONDS = 10;
-    private static final String[] PREFIXES = {"096", "033"};
     private static volatile boolean isShuttingDown = false;
     private static final CountDownLatch shutdownLatch = new CountDownLatch(1);
+    private static Map<String, String> prefixToTopicMap;
+    private static Config config;
 
     // Consumer metrics for each prefix
     private static class ConsumerMetrics {
@@ -43,18 +49,22 @@ public class AConsumer {
         final ThreadPoolExecutor workers;
         final String targetNamespace;
         final String prefix;
+        final String setName;
         volatile boolean isRunning = true;
 
         ConsumerMetrics(String sourceNamespace, String kafkaBroker, 
                        String consumerGroup, String targetNamespace,
-                       String prefix, int workerPoolSize) {
+                       String prefix, String setName, int workerPoolSize) {
             this.currentRate = 8000.0;
             this.rateLimiter = RateLimiter.create(currentRate);
             this.rateControlService = new RateControlService(currentRate, MAX_RATE, MIN_RATE, 
                                                            LAG_THRESHOLD, MONITORING_INTERVAL_SECONDS);
             
-            // Create topic for specific prefix
-            String topic = String.format("%s.profile.%s.produce", sourceNamespace, prefix);
+            // Get topic from prefix mapping
+            String topic = prefixToTopicMap.get(prefix);
+            if (topic == null) {
+                throw new IllegalArgumentException("No topic mapping found for prefix: " + prefix);
+            }
             
             // Create consumer for specific topic
             this.kafkaService = new KafkaService(kafkaBroker, topic, consumerGroup);
@@ -62,6 +72,7 @@ public class AConsumer {
             this.consumer.subscribe(Collections.singletonList(topic));
             this.targetNamespace = targetNamespace;
             this.prefix = prefix;
+            this.setName = setName;
             
             // Create worker pool with CallerRunsPolicy
             this.workers = new ThreadPoolExecutor(
@@ -131,32 +142,60 @@ public class AConsumer {
                 shutdownLatch.countDown();
             }));
 
+            // Load configuration
+            config = ConfigLoader.getConfig();
+            if (config == null) {
+                throw new IllegalStateException("Failed to load configuration");
+            }
+
             // Initialize Aerospike client
             final AerospikeClient destinationClient = new AerospikeClient(destinationHost, destinationPort);
             final WritePolicy writePolicy = new WritePolicy();
             writePolicy.totalTimeout = 5000; // 5 seconds timeout
             writePolicy.sendKey = true;
 
-            // Create consumer metrics for each prefix
+            // Initialize prefix mapping from config
+            prefixToTopicMap = TopicGenerator.generateTopics();
+            System.out.println("Initialized prefix mapping: " + prefixToTopicMap);
+
+            // Create consumer metrics for each prefix in config
             Map<String, ConsumerMetrics> metricsMap = new HashMap<>();
             
-            // Create consumer for prefix 096
-            metricsMap.put("096", new ConsumerMetrics(
-                sourceNamespace, kafkaBroker,
-                consumerGroup096, consumerNamespace096,
-                "096", workerPoolSize
-            ));
-            
-            // Create consumer for prefix 033
-            metricsMap.put("033", new ConsumerMetrics(
-                sourceNamespace, kafkaBroker,
-                consumerGroup033, consumerNamespace033,
-                "033", workerPoolSize
-            ));
+            // Get consumer configurations from config
+            Map<String, ConsumerConfig> consumerConfigs = new HashMap<>();
+            for (ConsumerConfig consumerConfig : config.getConsumers()) {
+                consumerConfigs.put(consumerConfig.getName(), consumerConfig);
+            }
+
+            // Create consumers based on prefix mapping
+            for (Map.Entry<String, List<String>> entry : config.getPrefix_mapping().entrySet()) {
+                String prefix = entry.getKey();
+                List<String> consumerNames = entry.getValue();
+                
+                // Get the first consumer for this prefix
+                String consumerName = consumerNames.get(0);
+                ConsumerConfig consumerConfig = consumerConfigs.get(consumerName);
+                
+                if (consumerConfig == null) {
+                    System.err.println("Warning: No consumer config found for " + consumerName);
+                    continue;
+                }
+
+                // Determine consumer group based on prefix
+                String consumerGroup = prefix.equals("096") ? consumerGroup096 : consumerGroup033;
+                String consumerNamespace = prefix.equals("096") ? consumerNamespace096 : consumerNamespace033;
+                String consumerSetName = prefix.equals("096") ? consumerSetName096 : consumerSetName033;
+
+                metricsMap.put(prefix, new ConsumerMetrics(
+                    sourceNamespace, kafkaBroker,
+                    consumerGroup, consumerNamespace,
+                    prefix, consumerSetName, workerPoolSize
+                ));
+            }
 
             System.out.println("Consumers subscribed to topics:");
-            for (String prefix : PREFIXES) {
-                System.out.println("- " + String.format("%s.profile.%s.produce", sourceNamespace, prefix));
+            for (String prefix : prefixToTopicMap.keySet()) {
+                System.out.println("- " + prefixToTopicMap.get(prefix));
             }
 
             // Start monitoring threads for each consumer
@@ -166,8 +205,7 @@ public class AConsumer {
             
             // Start processing threads for each consumer
             for (ConsumerMetrics metrics : metricsMap.values()) {
-                String setName = metrics.prefix.equals("096") ? consumerSetName096 : consumerSetName033;
-                startProcessingThread(metrics, destinationClient, writePolicy, setName);
+                startProcessingThread(metrics, destinationClient, writePolicy);
             }
 
             // Wait for shutdown signal
@@ -209,11 +247,10 @@ public class AConsumer {
 
     private static void startProcessingThread(ConsumerMetrics metrics,
                                            AerospikeClient destinationClient,
-                                           WritePolicy writePolicy,
-                                           String setName) {
+                                           WritePolicy writePolicy) {
         Thread processorThread = new Thread(() -> {
             processMessages(metrics.consumer, destinationClient, writePolicy,
-                          metrics.targetNamespace, setName, metrics.rateLimiter,
+                          metrics.targetNamespace, metrics.setName, metrics.rateLimiter,
                           metrics.workers, metrics.currentRate,
                           metrics.rateControlService, metrics.prefix);
         });

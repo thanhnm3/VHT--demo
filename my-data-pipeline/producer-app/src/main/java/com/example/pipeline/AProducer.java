@@ -9,6 +9,7 @@ import com.google.common.util.concurrent.RateLimiter;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.admin.AdminClient;
 import com.example.pipeline.service.RateControlService;
+import com.example.pipeline.service.TopicGenerator;
 import com.example.pipeline.service.KafkaService;
 import com.example.pipeline.service.MessageService;
 
@@ -42,19 +43,21 @@ public class AProducer {
 
     private static final Map<String, String> prefixToTopicMap = new ConcurrentHashMap<>();
     private static String defaultTopic;
+    private static String sourceNamespace;
 
     public static void main(String[] args, int workerPoolSize, int maxMessagesPerSecond,
                           String aerospikeHost, int aerospikePort, String namespace, String setName,
                           String kafkaBroker, int maxRetries, String consumerGroup) {
         AProducer.consumerGroup = consumerGroup;
-        AProducer.defaultTopic = namespace + ".profile.default.produce";
+        AProducer.sourceNamespace = namespace;
+        
+        // Initialize topic mapping
+        initializeTopicMapping();
+        
         AerospikeClient aerospikeClient = null;
         KafkaProducer<byte[], byte[]> kafkaProducer = null;
 
         try {
-            // Khởi tạo mapping prefix -> topic bằng cách sử dụng TopicGenerator
-            initializeTopicMapping();
-
             // Initialize services
             rateControlService = new RateControlService(10000.0, MAX_RATE, MIN_RATE, 
                                                       LAG_THRESHOLD, MONITORING_INTERVAL_SECONDS);
@@ -128,7 +131,11 @@ public class AProducer {
         // Lưu danh sách topic vào prefixToTopicMap
         prefixToTopicMap.putAll(generatedTopics);
 
+        // Thêm default topic
+        defaultTopic = String.format("%s.profile.default.produce", sourceNamespace);
+
         System.out.println("Initialized topic mapping: " + prefixToTopicMap);
+        System.out.println("Default topic: " + defaultTopic);
     }
 
     // Tạo các topic trong Kafka

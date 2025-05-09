@@ -1,12 +1,11 @@
-package com.example.pipeline;
-
-import com.example.pipeline.service.ConfigLoader;
-import com.example.pipeline.service.config.Config;
-import com.example.pipeline.service.config.ProducerConfig;
+package com.example.pipeline.service;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import com.example.pipeline.service.config.Config;
+import com.example.pipeline.service.config.ProducerConfig;
 
 public class TopicGenerator {
 

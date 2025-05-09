@@ -1,1 +1,2 @@
-com/example/pipeline/App.class
+com\example\pipeline\AProducer.class
+com\example\pipeline\CdcProducer.class

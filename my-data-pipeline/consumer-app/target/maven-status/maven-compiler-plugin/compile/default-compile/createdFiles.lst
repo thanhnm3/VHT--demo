@@ -1,1 +1,6 @@
-com/example/pipeline/App.class
+com\example\pipeline\AConsumer.class
+com\example\pipeline\AConsumer$ConsumerMetrics$1.class
+com\example\pipeline\AConsumer$ConsumerMetrics.class
+com\example\pipeline\CdcConsumer$1.class
+com\example\pipeline\CdcConsumer.class
+com\example\pipeline\AConsumer$1.class
