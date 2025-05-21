@@ -30,7 +30,8 @@ public class Main {
         String consumerSetName096 = dotenv.get("CONSUMER_SET_NAME_096");
         String consumerSetName033 = dotenv.get("CONSUMER_SET_NAME_033");
         String producerSetName = dotenv.get("PRODUCER_SET_NAME");
-        String kafkaBroker = dotenv.get("KAFKA_BROKER");
+        String kafkaBrokerSource = dotenv.get("KAFKA_BROKER_SOURCE");
+        String kafkaBrokerTarget = dotenv.get("KAFKA_BROKER_TARGET");
         String consumerGroup096 = dotenv.get("CONSUMER_GROUP_096");
         String consumerGroup033 = dotenv.get("CONSUMER_GROUP_033");
         int producerThreadPoolSize = 2; // Số thread cho Producer
@@ -39,8 +40,9 @@ public class Main {
         int maxRetries = Integer.parseInt(dotenv.get("MAX_RETRIES"));
 
         // Xóa và tạo lại topic trước khi bắt đầu
-        System.out.println("Dang xoa tat ca topic...");
-        DeleteTopic.deleteAllTopics(kafkaBroker);
+        System.out.println("Dang xoa tat ca topic tu 2 kafka ...");
+        DeleteTopic.deleteAllTopics(kafkaBrokerSource);
+        DeleteTopic.deleteAllTopics(kafkaBrokerTarget);
 
         // Tạo thread pool cho Producer và Consumer
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -53,7 +55,7 @@ public class Main {
                         sourceHost, sourcePort, sourceNamespace,
                         destinationHost, destinationPort, 
                         consumerNamespace096, consumerNamespace033,
-                        consumerSetName096, consumerSetName033, kafkaBroker, 
+                        consumerSetName096, consumerSetName033, kafkaBrokerTarget, 
                         consumerGroup096, consumerGroup033);
                 consumerReady.countDown(); // Bao hieu consumer da san sang
             } catch (Exception e) {
@@ -77,7 +79,7 @@ public class Main {
             try {
                 AProducer.main(args, producerThreadPoolSize, maxMessagesPerSecond,
                         sourceHost, sourcePort, sourceNamespace, producerSetName,
-                        kafkaBroker, maxRetries, consumerGroup096);
+                        kafkaBrokerSource, maxRetries, consumerGroup096);
             } catch (Exception e) {
                 System.err.println("Loi trong Producer: " + e.getMessage());
                 e.printStackTrace();

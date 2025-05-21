@@ -382,7 +382,7 @@
                 "multi": false,
                 "name": "job",
                 "options": [],
-                "query": "label_values(kafka_consumergroup_current_offset, job)",
+                "query": "label_values(up, job)",
                 "refresh": 1,
                 "regex": "",
                 "skipUrlSync": false,
@@ -394,9 +394,13 @@
             },
             {
                 "current": {
-                    "selected": false,
-                    "text": "kafka-exporter:9308",
-                    "value": "kafka-exporter:9308"
+                    "selected": true,
+                    "text": [
+                        "All"
+                    ],
+                    "value": [
+                        "$__all"
+                    ]
                 },
                 "datasource": {
                     "type": "prometheus",
@@ -404,12 +408,12 @@
                 },
                 "definition": "",
                 "hide": 0,
-                "includeAll": false,
+                "includeAll": true,
                 "label": "Instance",
-                "multi": false,
+                "multi": true,
                 "name": "instance",
                 "options": [],
-                "query": "label_values(kafka_consumergroup_current_offset{job=~\"$job\"}, instance)",
+                "query": "label_values(kafka_brokers{job=\"$job\"}, instance)",
                 "refresh": 1,
                 "regex": "",
                 "skipUrlSync": false,
@@ -486,4 +490,4 @@
     "title": "Kafka Metrics (2s) - Original Ver2",
     "uid": "kafka-2s-metrics-old-ver2",
     "version": 1
-} 
+}

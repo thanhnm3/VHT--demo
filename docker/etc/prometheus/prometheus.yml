@@ -21,7 +21,12 @@ rule_files:
 scrape_configs:
   # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
 
-  - job_name: 'kafka-exporter'
+  - job_name: 'kafka-exporter-source'
     static_configs:
-      - targets: ['kafka-exporter:9308']
+      - targets: ['kafka-exporter-source:9308']
+    scrape_interval: 1s
+
+  - job_name: 'kafka-exporter-target'
+    static_configs:
+      - targets: ['kafka-exporter-target:9308']
     scrape_interval: 1s

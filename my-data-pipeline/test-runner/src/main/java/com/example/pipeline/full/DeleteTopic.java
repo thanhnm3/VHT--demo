@@ -15,40 +15,32 @@ public class DeleteTopic {
     public static void deleteAllTopics(String bootstrapServers) {
         Properties props = new Properties();
         props.put("bootstrap.servers", bootstrapServers);
-        
+
         try (AdminClient adminClient = KafkaAdminClient.create(props)) {
-            // Lấy danh sách tất cả các topic
-            ListTopicsResult topics = adminClient.listTopics();
-            Set<String> topicNames = topics.names().get(5, TimeUnit.SECONDS);
-            
-            if (topicNames.isEmpty()) {
+            Set<String> allTopics = adminClient.listTopics().names().get(5, TimeUnit.SECONDS);
+
+            if (allTopics.isEmpty()) {
                 System.out.println("Khong co topic nao de xoa.");
                 return;
             }
 
-            // Xóa tất cả các topic
-            DeleteTopicsResult deleteTopicsResult = adminClient.deleteTopics(topicNames);
-            deleteTopicsResult.all().get(30, TimeUnit.SECONDS);
-            System.out.println("Da danh dau xoa " + topicNames.size() + " topic.");
-
-            // Đợi tất cả các topic được xóa hoàn toàn
-            boolean topicsExist = true;
-            int retries = 0;
-            while (topicsExist && retries < 10) {
-                Thread.sleep(1000); // Đợi 1 giây
-                topics = adminClient.listTopics();
-                Set<String> remainingTopics = topics.names().get(5, TimeUnit.SECONDS);
-                topicsExist = !remainingTopics.isEmpty();
-                retries++;
+            for (String topic : allTopics) {
+                if (
+                    topic.equals("mm2-status") ||
+                    topic.equals("mm2-offsets") ||
+                    topic.equals("mm2-configs") ||
+                    topic.equals("source-kafka.heartbeats")
+                ) {
+                    continue; // Không xóa các topic này
+                }
+                try {
+                    adminClient.deleteTopics(Collections.singletonList(topic)).all().get(30, TimeUnit.SECONDS);
+                    System.out.println("Da xoa topic: " + topic);
+                } catch (Exception e) {
+                    System.err.println("Loi khi xoa topic " + topic + ": " + e.getMessage());
+                }
             }
-
-            if (topicsExist) {
-                System.err.println("Khong the xoa tat ca topic sau " + retries + " lan thu.");
-                return;
-            }
-
-            System.out.println("Da xoa thanh cong tat ca " + topicNames.size() + " topic.");
-            
+            System.out.println("Da xoa xong cac topic khong can thiet.");
         } catch (Exception e) {
             System.err.println("Loi khi xoa topic: " + e.getMessage());
             e.printStackTrace();
@@ -94,4 +86,4 @@ public class DeleteTopic {
             e.printStackTrace();
         }
     }
-} 
+}

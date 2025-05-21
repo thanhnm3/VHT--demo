@@ -1,46 +1,61 @@
 version: '4'
 services:
-  # grafana:
-  #   image: "grafana/grafana:${GRAFANA_VERSION}"
-  #   ports:
-  #    - "4040:3000"
-  #   environment:
-  #     GF_PATHS_DATA : /var/lib/grafana
-  #     GF_SECURITY_ADMIN_PASSWORD : kafka
-  #   volumes:
-  #    - ./grafana/provisioning:/etc/grafana/provisioning
-  #    - ./grafana/dashboards:/var/lib/grafana/dashboards
-  #   container_name: grafana
-  #   depends_on:
-  #    - prometheus
-  #   networks:
-  #     - kafka-platform
+  grafana:
+    image: "grafana/grafana:${GRAFANA_VERSION}"
+    ports:
+     - "4040:3000"
+    environment:
+      GF_PATHS_DATA : /var/lib/grafana
+      GF_SECURITY_ADMIN_PASSWORD : kafka
+    volumes:
+     - ./etc/grafana/provisioning:/etc/grafana/provisioning
+     - ./etc/grafana/dashboards:/var/lib/grafana/dashboards
+    container_name: grafana
+    depends_on:
+     - prometheus
+    networks:
+      - kafka-platform
 
-  # prometheus:
-  #   image: "prom/prometheus:${PROMETHEUS_VERSION}"
-  #   ports:
-  #    - "9090:9090"
-  #   volumes:
-  #    - ./etc/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-  #   command: "--config.file=/etc/prometheus/prometheus.yml"
-  #   container_name: prometheus
-  #   networks:
-  #     - kafka-platform
+  prometheus:
+    image: "prom/prometheus:${PROMETHEUS_VERSION}"
+    ports:
+     - "9090:9090"
+    volumes:
+     - ./etc/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command: "--config.file=/etc/prometheus/prometheus.yml"
+    container_name: prometheus
+    networks:
+      - kafka-platform
 
-  # kafka-exporter:
-  #   image: danielqsj/kafka-exporter:v1.7.0
-  #   ports:
-  #     - "9308:9308"
-  #   environment:
-  #     - SCRAPE_INTERVAL=1s
-  #   command:
-  #     - '--kafka.server=kafka1:29092'
-  #   container_name: kafka-exporter
-  #   depends_on:
-  #     kafka1:
-  #       condition: service_healthy
-  #   networks:
-  #     - kafka-platform
+  kafka-exporter-source:
+    image: danielqsj/kafka-exporter:v1.7.0
+    ports:
+      - "9308:9308"
+    environment:
+      - SCRAPE_INTERVAL=1s
+    command:
+      - '--kafka.server=source-kafka:29092'
+    container_name: kafka-exporter-source
+    depends_on:
+      source-kafka:
+        condition: service_healthy
+    networks:
+      - kafka-platform
+
+  kafka-exporter-target:
+    image: danielqsj/kafka-exporter:v1.7.0
+    ports:
+      - "9309:9308"
+    environment:
+      - SCRAPE_INTERVAL=1s
+    command:
+      - '--kafka.server=target-kafka:39092'
+    container_name: kafka-exporter-target
+    depends_on:
+      target-kafka:
+        condition: service_healthy
+    networks:
+      - kafka-platform
 
   # Source Zookeeper and Kafka
   zk1:
@@ -153,51 +168,51 @@ services:
 
   # # =============================== AEROSPIKE ===============================
 
-  # aerospike:
-  #   image: aerospike/aerospike-server
-  #   container_name: aerospike
-  #   ports:
-  #     - "3000:3000"
-  #     - "3001:3001"
-  #   volumes:
-  #     - ./aerospike.conf:/etc/aerospike/aerospike.conf
-  #     - ./aerospike_data:/opt/aerospike/data 
-  #   command: ["--config-file", "/etc/aerospike/aerospike.conf", "--foreground"]
-  #   networks:
-  #     - kafka-platform
+  aerospike:
+    image: aerospike/aerospike-server
+    container_name: aerospike
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+    volumes:
+      - ./etc/aerospike/aerospike.conf:/etc/aerospike/aerospike.conf
+      - ./aerospike_data:/opt/aerospike/data 
+    command: ["--config-file", "/etc/aerospike/aerospike.conf", "--foreground"]
+    networks:
+      - kafka-platform
 
-  # aerospike2:
-  #   image: aerospike/aerospike-server
-  #   container_name: aerospike2
-  #   ports:
-  #     - "4000:3000"
-  #     - "4001:3001"
-  #   volumes:
-  #     - ./aerospike2.conf:/etc/aerospike/aerospike.conf
-  #     - ./aerospike_data:/opt/aerospike/data 
-  #   command: ["--config-file", "/etc/aerospike/aerospike.conf", "--foreground"]
-  #   networks:
-  #     - kafka-platform
+  aerospike2:
+    image: aerospike/aerospike-server
+    container_name: aerospike2
+    ports:
+      - "4000:3000"
+      - "4001:3001"
+    volumes:
+      - ./etc/aerospike/aerospike2.conf:/etc/aerospike/aerospike.conf
+      - ./aerospike_data:/opt/aerospike/data 
+    command: ["--config-file", "/etc/aerospike/aerospike.conf", "--foreground"]
+    networks:
+      - kafka-platform
 
-  #   # Copyfile aerospike.conf vao container
-  #   # docker cp aerospike.conf aerospike:/etc/aerospike/aerospike.conf
-  #   # docker cp aerospike2.conf aerospike2:/etc/aerospike/aerospike.conf
+    # Copyfile aerospike.conf vao container
+    # docker cp aerospike.conf aerospike:/etc/aerospike/aerospike.conf
+    # docker cp aerospike2.conf aerospike2:/etc/aerospike/aerospike.conf
 
-  #   # docker restart aerospike
+    # docker restart aerospike
 
-  # aerospike-tools:
-  #   image: aerospike/aerospike-tools
-  #   container_name: aerospike-tools
-  #   depends_on:
-  #     - aerospike
-  #   networks:
-  #     - kafka-platform
-  #   entrypoint: [ "sleep", "infinity" ]
-  # # docker exec -it aerospike-tools aql -h aerospike
-  # # Để truy cập vào aql của DB, để kiểm thử
+  aerospike-tools:
+    image: aerospike/aerospike-tools
+    container_name: aerospike-tools
+    depends_on:
+      - aerospike
+    networks:
+      - kafka-platform
+    entrypoint: [ "sleep", "infinity" ]
+  # docker exec -it aerospike-tools aql -h aerospike
+  # Để truy cập vào aql của DB, để kiểm thử
 
-  # # docker exec -it aerospike-tools aql -h aerospike -c "show sets"
-  # # docker exec -it aerospike-tools aql -h aerospike2 -c "show sets"
+  # docker exec -it aerospike-tools aql -h aerospike -c "show sets"
+  # docker exec -it aerospike-tools aql -h aerospike2 -c "show sets"
 
 networks:
   kafka-platform:

@@ -147,8 +147,8 @@ public class TopicCheck {
                 if (isMirrored) {
                     // Lấy thông tin chi tiết về topic đã mirror
                     DescribeTopicsResult describeResult = targetAdminClient.describeTopics(Set.of(mirroredTopic));
-                    Map<String, TopicDescription> descriptions = describeResult.all().get();
-                    TopicDescription description = descriptions.get(mirroredTopic);
+                    Map<String, org.apache.kafka.common.KafkaFuture<TopicDescription>> topicFutures = describeResult.topicNameValues();
+                    TopicDescription description = topicFutures.get(mirroredTopic).get();
                     
                     System.out.println("Số partition: " + description.partitions().size());
                     System.out.println("Replication factor: " + description.partitions().get(0).replicas().size());

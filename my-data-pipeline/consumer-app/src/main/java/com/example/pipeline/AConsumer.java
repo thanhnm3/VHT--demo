@@ -66,10 +66,11 @@ public class AConsumer {
                 throw new IllegalArgumentException("No topic mapping found for prefix: " + prefix);
             }
             
-            // Create consumer for specific topic
-            this.kafkaService = new KafkaService(kafkaBroker, topic, consumerGroup);
+            // Khi tạo consumer cho target Kafka (kafka thứ 2)
+            String mirroredTopic = "source-kafka." + topic; // topic replicate từ source sang target
+            this.kafkaService = new KafkaService(kafkaBroker, mirroredTopic, consumerGroup);
             this.consumer = this.kafkaService.createConsumer();
-            this.consumer.subscribe(Collections.singletonList(topic));
+            this.consumer.subscribe(Collections.singletonList(mirroredTopic));
             this.targetNamespace = targetNamespace;
             this.prefix = prefix;
             this.setName = setName;

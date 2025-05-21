@@ -59,7 +59,7 @@ public class AProducer {
 
         try {
             // Initialize services
-            rateControlService = new RateControlService(10000.0, MAX_RATE, MIN_RATE, 
+            rateControlService = new RateControlService(5000.0, MAX_RATE, MIN_RATE, 
                                                       LAG_THRESHOLD, MONITORING_INTERVAL_SECONDS);
             kafkaService = new KafkaService(kafkaBroker, defaultTopic, consumerGroup);
             messageService = new MessageService();
