@@ -2,12 +2,7 @@ package com.example.pipeline.service;
 
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
-
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
@@ -16,16 +11,14 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-public class MessageService {
+public class MessageProducerService {
     private final Queue<ProducerRecord<byte[], byte[]>> producerPendingMessages;
-    private final Queue<ConsumerRecord<byte[], byte[]>> consumerPendingMessages;
     private final AtomicLong failedMessages;
     private final AtomicLong skippedMessages;
     private final AtomicLong timeoutMessages;
 
-    public MessageService() {
+    public MessageProducerService() {
         this.producerPendingMessages = new ConcurrentLinkedQueue<>();
-        this.consumerPendingMessages = new ConcurrentLinkedQueue<>();
         this.failedMessages = new AtomicLong(0);
         this.skippedMessages = new AtomicLong(0);
         this.timeoutMessages = new AtomicLong(0);
@@ -80,22 +73,22 @@ public class MessageService {
         producerPendingMessages.offer(record);
     }
 
-    // ======================= Consumer Methods =======================
-    public ConsumerRecords<byte[], byte[]> pollMessages(KafkaConsumer<byte[], byte[]> consumer) {
-        return consumer.poll(Duration.ofMillis(10));
+        private void logTimeoutMessage(ProducerRecord<byte[], byte[]> record) {
+        String key = new String(record.key(), StandardCharsets.UTF_8);
+        System.err.printf("[TIMEOUT_MESSAGE] Key: %s, Reason: Batch send timeout%n", key);
     }
 
-    public void processPendingConsumerMessages(List<ConsumerRecord<byte[], byte[]>> batch) {
-        for (ConsumerRecord<byte[], byte[]> record : batch) {
-            consumerPendingMessages.offer(record);
-        }
+    public void logFailedMessage(ProducerRecord<byte[], byte[]> record, String reason, Exception e) {
+        String key = new String(record.key(), StandardCharsets.UTF_8);
+        System.err.printf("[FAILED_MESSAGE] Key: %s, Reason: %s, Error: %s%n", 
+                        key, reason, e != null ? e.getMessage() : "Unknown");
     }
 
-    public ConsumerRecord<byte[], byte[]> pollConsumerMessage() {
-        return consumerPendingMessages.poll();
+    public void logSkippedMessage(String key, String reason) {
+        System.err.printf("[SKIPPED_MESSAGE] Key: %s, Reason: %s%n", key, reason);
     }
 
-    // ======================= Common Methods =======================
+
     private void handleSendError(KafkaProducer<byte[], byte[]> producer,
                                ProducerRecord<byte[], byte[]> record,
                                Exception exception,
@@ -122,19 +115,8 @@ public class MessageService {
         }
     }
 
-    public void logFailedMessage(ProducerRecord<byte[], byte[]> record, String reason, Exception e) {
-        String key = new String(record.key(), StandardCharsets.UTF_8);
-        System.err.printf("[FAILED_MESSAGE] Key: %s, Reason: %s, Error: %s%n", 
-                        key, reason, e != null ? e.getMessage() : "Unknown");
-    }
-
-    public void logSkippedMessage(String key, String reason) {
-        System.err.printf("[SKIPPED_MESSAGE] Key: %s, Reason: %s%n", key, reason);
-    }
-
-    private void logTimeoutMessage(ProducerRecord<byte[], byte[]> record) {
-        String key = new String(record.key(), StandardCharsets.UTF_8);
-        System.err.printf("[TIMEOUT_MESSAGE] Key: %s, Reason: Batch send timeout%n", key);
+    public boolean hasPendingProducerMessages() {
+        return !producerPendingMessages.isEmpty();
     }
 
     public void printMessageStats() {
@@ -147,11 +129,5 @@ public class MessageService {
                          timeoutMessages.get());
     }
 
-    public boolean hasPendingProducerMessages() {
-        return !producerPendingMessages.isEmpty();
-    }
 
-    public boolean hasPendingConsumerMessages() {
-        return !consumerPendingMessages.isEmpty();
-    }
-} 
+}

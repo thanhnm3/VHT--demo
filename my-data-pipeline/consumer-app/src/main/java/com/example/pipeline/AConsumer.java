@@ -8,7 +8,7 @@ import com.google.common.util.concurrent.RateLimiter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.example.pipeline.service.RateControlService;
-import com.example.pipeline.service.KafkaService;
+import com.example.pipeline.service.KafkaConsumerService;
 import com.example.pipeline.service.TopicGenerator;
 import com.example.pipeline.service.ConfigLoader;
 import com.example.pipeline.service.config.Config;
@@ -44,7 +44,7 @@ public class AConsumer {
         volatile double currentRate;
         final RateLimiter rateLimiter;
         final RateControlService rateControlService;
-        final KafkaService kafkaService;
+        final KafkaConsumerService kafkaService;
         final KafkaConsumer<byte[], byte[]> consumer;
         final ThreadPoolExecutor workers;
         final String targetNamespace;
@@ -68,7 +68,7 @@ public class AConsumer {
             
             // Khi tạo consumer cho target Kafka (kafka thứ 2)
             String mirroredTopic = "source-kafka." + topic; // topic replicate từ source sang target
-            this.kafkaService = new KafkaService(kafkaBroker, mirroredTopic, consumerGroup);
+            this.kafkaService = new KafkaConsumerService(kafkaBroker, mirroredTopic, consumerGroup);
             this.consumer = this.kafkaService.createConsumer();
             this.consumer.subscribe(Collections.singletonList(mirroredTopic));
             this.targetNamespace = targetNamespace;

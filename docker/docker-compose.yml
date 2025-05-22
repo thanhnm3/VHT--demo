@@ -195,8 +195,8 @@ services:
       - kafka-platform
 
     # Copyfile aerospike.conf vao container
-    # docker cp aerospike.conf aerospike:/etc/aerospike/aerospike.conf
-    # docker cp aerospike2.conf aerospike2:/etc/aerospike/aerospike.conf
+    # docker cp etc/aerospike/aerospike.conf aerospike:/etc/aerospike/aerospike.conf
+    # docker cp etc/aerospike/aerospike2.conf aerospike2:/etc/aerospike/aerospike.conf
 
     # docker restart aerospike
 

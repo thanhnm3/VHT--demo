@@ -10,8 +10,8 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.admin.AdminClient;
 import com.example.pipeline.service.RateControlService;
 import com.example.pipeline.service.TopicGenerator;
-import com.example.pipeline.service.KafkaService;
-import com.example.pipeline.service.MessageService;
+import com.example.pipeline.service.KafkaProducerService;
+import com.example.pipeline.service.MessageProducerService;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -37,8 +37,8 @@ public class AProducer {
     private static final AtomicLong skippedMessages = new AtomicLong(0);
     private static final ScheduledExecutorService rateAdjustmentExecutor = Executors.newSingleThreadScheduledExecutor();
     private static RateControlService rateControlService;
-    private static KafkaService kafkaService;
-    private static MessageService messageService;
+    private static KafkaProducerService kafkaService;
+    private static MessageProducerService messageService;
 
 
     private static final Map<String, String> prefixToTopicMap = new ConcurrentHashMap<>();
@@ -61,8 +61,8 @@ public class AProducer {
             // Initialize services
             rateControlService = new RateControlService(5000.0, MAX_RATE, MIN_RATE, 
                                                       LAG_THRESHOLD, MONITORING_INTERVAL_SECONDS);
-            kafkaService = new KafkaService(kafkaBroker, defaultTopic, consumerGroup);
-            messageService = new MessageService();
+            kafkaService = new KafkaProducerService(kafkaBroker, defaultTopic, consumerGroup);
+            messageService = new MessageProducerService();
 
             // Initialize Aerospike client
             ClientPolicy clientPolicy = new ClientPolicy();
