@@ -269,11 +269,15 @@ public class AConsumer {
                                      double currentRate,
                                      RateControlService rateControlService,
                                      String prefix) {
+        int emptyPollCount = 0;
+        final int maxEmptyPolls = 100; // 100 * 100ms = 10s
+
         try {
             while (!Thread.currentThread().isInterrupted() && !isShuttingDown) {
                 ConsumerRecords<byte[], byte[]> records = consumer.poll(Duration.ofMillis(100));
-                
+
                 if (!records.isEmpty()) {
+                    emptyPollCount = 0; // reset nếu có message
                     for (ConsumerRecord<byte[], byte[]> record : records) {
                         try {
                             if (currentRate < rateControlService.getTargetRate() * 0.8) {
@@ -302,6 +306,14 @@ public class AConsumer {
                     } catch (Exception e) {
                         System.err.printf("[%s] Error committing offsets: %s%n", 
                                         prefix, e.getMessage());
+                    }
+                } else {
+                    emptyPollCount++;
+                    if (emptyPollCount >= maxEmptyPolls) {
+                        System.out.printf("[%s] No messages received for 10 seconds. Initiating shutdown.%n", prefix);
+                        isShuttingDown = true;
+                        shutdownLatch.countDown();
+                        break;
                     }
                 }
             }

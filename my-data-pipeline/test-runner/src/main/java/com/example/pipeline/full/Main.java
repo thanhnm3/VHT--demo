@@ -47,6 +47,10 @@ public class Main {
         // Tạo thread pool cho Producer và Consumer
         ExecutorService executor = Executors.newFixedThreadPool(2);
 
+        // Tạo latch để chờ producer và consumer kết thúc
+        CountDownLatch producerDone = new CountDownLatch(1);
+        CountDownLatch consumerDone = new CountDownLatch(1);
+
         // Chạy Consumer trước
         executor.submit(() -> {
             try {
@@ -61,6 +65,8 @@ public class Main {
             } catch (Exception e) {
                 System.err.println("Loi trong Consumer: " + e.getMessage());
                 e.printStackTrace();
+            } finally {
+                consumerDone.countDown(); // Đánh dấu consumer đã xong
             }
         });
 
@@ -83,6 +89,8 @@ public class Main {
             } catch (Exception e) {
                 System.err.println("Loi trong Producer: " + e.getMessage());
                 e.printStackTrace();
+            } finally {
+                producerDone.countDown(); // Đánh dấu producer đã xong
             }
         });
 
@@ -99,5 +107,14 @@ public class Main {
                 Thread.currentThread().interrupt();
             }
         }));
+
+        // Chờ cả producer và consumer kết thúc
+        try {
+            producerDone.await();
+            consumerDone.await();
+            executor.shutdown();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

@@ -82,7 +82,7 @@ public class AProducer {
             createTopics();
 
             // Start lag monitoring thread
-            new Thread(() -> {
+            Thread monitorThread = new Thread(() -> {
                 while (!Thread.currentThread().isInterrupted()) {
                     try {
                         if (rateControlService.shouldCheckRateAdjustment()) {
@@ -99,7 +99,8 @@ public class AProducer {
                         break;
                     }
                 }
-            }).start();
+            });
+            monitorThread.start();
 
             // Initialize thread pool
             ThreadPoolExecutor customExecutor = new ThreadPoolExecutor(
@@ -114,6 +115,9 @@ public class AProducer {
             // Start processing
             readDataFromAerospike(aerospikeClient, kafkaProducer, maxMessagesPerSecond, 
                                 namespace, setName, maxRetries);
+
+            // Sau khi gửi xong dữ liệu, dừng thread monitor lag
+            monitorThread.interrupt();
 
         } catch (Exception e) {
             System.err.println("Critical error: " + e.getMessage());
