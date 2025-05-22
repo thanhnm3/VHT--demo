@@ -1,7 +1,7 @@
 version: '4'
 services:
   grafana:
-    image: "grafana/grafana:${GRAFANA_VERSION}"
+    image: grafana/grafana:9.5.12
     ports:
      - "4040:3000"
     environment:
@@ -17,7 +17,7 @@ services:
       - kafka-platform
 
   prometheus:
-    image: "prom/prometheus:${PROMETHEUS_VERSION}"
+    image: prom/prometheus:v2.47.1
     ports:
      - "9090:9090"
     volumes:

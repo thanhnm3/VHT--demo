@@ -1,5 +1,8 @@
-com\example\pipeline\cdc\RandomInsert.class
-com\example\pipeline\full\Main.class
-com\example\pipeline\cdc\Maincdc.class
-com\example\pipeline\cdc\RandomOperations.class
-com\example\pipeline\full\DeleteTopic.class
+com/example/pipeline/testmm2/TopicCheck.class
+com/example/pipeline/cdc/RandomOperations.class
+com/example/pipeline/testmm2/BulkMessageProducer.class
+com/example/pipeline/full/Main.class
+com/example/pipeline/cdc/Maincdc.class
+com/example/pipeline/testmm2/MessageProducer.class
+com/example/pipeline/cdc/RandomInsert.class
+com/example/pipeline/full/DeleteTopic.class
