@@ -1,10 +1,12 @@
 package com.example.pipeline;
 
-import com.example.pipeline.model.ConsumerMetrics;
+import com.example.pipeline.service.config.ConsumerConfig;
 import com.example.pipeline.service.config.ConfigurationService;
 import com.example.pipeline.service.AerospikeService;
 import com.example.pipeline.service.KafkaConsumerService;
 import com.example.pipeline.service.MessageService;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import java.util.Collections;
 
 import java.util.Map;
 import java.util.HashMap;
@@ -45,16 +47,32 @@ public class AConsumer {
 
             // Initialize message services
             messageServices = new HashMap<>();
-            for (Map.Entry<String, ConsumerMetrics> entry : kafkaService.getMetricsMap().entrySet()) {
+            for (Map.Entry<String, String> entry : kafkaService.getPrefixToTopicMap().entrySet()) {
                 String prefix = entry.getKey();
-                ConsumerMetrics metrics = entry.getValue();
+                String topic = entry.getValue();
+                
+                // Create consumer config
+                ConsumerConfig consumerConfig = new ConsumerConfig();
+                consumerConfig.setName("consumer" + prefix);
+                consumerConfig.setNamespace("consumer_" + prefix);
+                consumerConfig.setSet("users");
+                
+                // Create Kafka consumer using KafkaConsumerService
+                String consumerGroup = prefix + "-group";
+                KafkaConsumer<byte[], byte[]> consumer = kafkaService.createConsumer(topic, consumerGroup);
+                
+                // Subscribe to topic
+                String mirroredTopic = "source-kafka." + topic;
+                consumer.subscribe(Collections.singletonList(mirroredTopic));
                 
                 MessageService messageService = new MessageService(
                     aerospikeService.getClient(),
                     aerospikeService.getWritePolicy(),
-                    metrics.getTargetNamespace(),
-                    metrics.getSetName(),
-                    metrics
+                    consumerConfig.getNamespace(),
+                    consumerConfig.getSet(),
+                    prefix,
+                    consumer,
+                    workerPoolSize
                 );
                 messageServices.put(prefix, messageService);
                 

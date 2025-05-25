@@ -2,7 +2,6 @@ package com.example.pipeline.service;
 
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
-import com.example.pipeline.model.ConsumerMetrics;
 import com.example.pipeline.service.config.ConfigurationService;
 import com.example.pipeline.service.config.ConsumerConfig;
 
@@ -10,7 +9,6 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.Properties;
 import java.util.Map;
-import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -20,7 +18,6 @@ public class KafkaConsumerService {
     private final AtomicLong lastProcessedOffset;
     private final AtomicLong currentOffset;
     private final Map<String, String> prefixToTopicMap;
-    private final Map<String, ConsumerMetrics> metricsMap;
     private final ConfigurationService configService;
 
     public KafkaConsumerService(String kafkaBroker, ConfigurationService configService) {
@@ -28,7 +25,6 @@ public class KafkaConsumerService {
         this.configService = configService;
         this.lastProcessedOffset = new AtomicLong(-1);
         this.currentOffset = new AtomicLong(-1);
-        this.metricsMap = new HashMap<>();
         this.prefixToTopicMap = configService.getAllPrefixToTopicMappings();
 
         // Initialize AdminClient
@@ -38,14 +34,7 @@ public class KafkaConsumerService {
     }
 
     public void initializeConsumers(String sourceNamespace, int workerPoolSize) {
-        Map<String, ConsumerConfig> consumerConfigs = new HashMap<>();
-        
-        // Get consumer configurations
-        for (ConsumerConfig consumerConfig : configService.getConsumers()) {
-            consumerConfigs.put(consumerConfig.getName(), consumerConfig);
-        }
-
-        // Create metrics for each prefix
+        // Initialize prefix to topic mappings
         for (Map.Entry<String, List<String>> entry : configService.getPrefixMappings().entrySet()) {
             String prefix = entry.getKey();
             List<String> consumerNames = entry.getValue();
@@ -56,23 +45,17 @@ public class KafkaConsumerService {
             }
 
             String consumerName = consumerNames.get(0);
-            ConsumerConfig consumerConfig = consumerConfigs.get(consumerName);
+            ConsumerConfig consumerConfig = configService.getConsumerConfig(consumerName);
             
             if (consumerConfig == null) {
                 System.err.println("Warning: No consumer config found for " + consumerName);
                 continue;
             }
 
-            String consumerGroup = configService.getConsumerGroup(consumerName);
-            String consumerNamespace = consumerConfig.getNamespace();
-            String consumerSetName = consumerConfig.getSet();
-
-            metricsMap.put(prefix, new ConsumerMetrics(
-                sourceNamespace, kafkaBroker,
-                consumerGroup, consumerNamespace,
-                prefix, consumerSetName, workerPoolSize,
-                prefixToTopicMap
-            ));
+            // Topic mapping is already initialized in constructor
+            if (!prefixToTopicMap.containsKey(prefix)) {
+                System.err.println("Warning: No topic mapping found for prefix " + prefix);
+            }
         }
     }
 
@@ -105,10 +88,6 @@ public class KafkaConsumerService {
         return lastProcessedOffset.get();
     }
 
-    public Map<String, ConsumerMetrics> getMetricsMap() {
-        return metricsMap;
-    }
-
     public Map<String, String> getPrefixToTopicMap() {
         return prefixToTopicMap;
     }
@@ -116,9 +95,6 @@ public class KafkaConsumerService {
     public void shutdown() {
         if (adminClient != null) {
             adminClient.close(Duration.ofSeconds(5));
-        }
-        for (ConsumerMetrics metrics : metricsMap.values()) {
-            metrics.shutdown();
         }
     }
 } 
