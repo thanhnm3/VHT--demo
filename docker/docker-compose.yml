@@ -198,7 +198,7 @@ services:
     # docker cp etc/aerospike/aerospike.conf aerospike:/etc/aerospike/aerospike.conf
     # docker cp etc/aerospike/aerospike2.conf aerospike2:/etc/aerospike/aerospike.conf
 
-    # docker restart aerospike
+    # docker restart aerospike aerospike2
 
   aerospike-tools:
     image: aerospike/aerospike-tools

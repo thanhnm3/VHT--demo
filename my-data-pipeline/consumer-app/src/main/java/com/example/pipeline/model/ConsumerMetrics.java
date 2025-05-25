@@ -11,6 +11,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.Collections;
 import java.util.Map;
+import com.example.pipeline.service.config.ConfigurationService;
 
 public class ConsumerMetrics {
     private volatile double currentRate;
@@ -22,6 +23,7 @@ public class ConsumerMetrics {
     private final String targetNamespace;
     private final String prefix;
     private final String setName;
+    private final int workerPoolSize;
     private volatile boolean isRunning = true;
 
     public ConsumerMetrics(String sourceNamespace, String kafkaBroker, 
@@ -32,6 +34,7 @@ public class ConsumerMetrics {
         this.rateLimiter = RateLimiter.create(currentRate);
         this.rateControlService = new RateControlService(currentRate, 10000.0, 2000.0, 
                                                        1000, 10);
+        this.workerPoolSize = workerPoolSize;
         
         // Get topic from prefix mapping
         String topic = prefixToTopicMap.get(prefix);
@@ -40,8 +43,8 @@ public class ConsumerMetrics {
         }
         
         String mirroredTopic = "source-kafka." + topic;
-        this.kafkaService = new KafkaConsumerService(kafkaBroker, mirroredTopic, consumerGroup);
-        this.consumer = this.kafkaService.createConsumer();
+        this.kafkaService = new KafkaConsumerService(kafkaBroker, ConfigurationService.getInstance());
+        this.consumer = this.kafkaService.createConsumer(mirroredTopic, consumerGroup);
         this.consumer.subscribe(Collections.singletonList(mirroredTopic));
         this.targetNamespace = targetNamespace;
         this.prefix = prefix;
@@ -135,5 +138,9 @@ public class ConsumerMetrics {
 
     public boolean isRunning() {
         return isRunning;
+    }
+
+    public int getWorkerPoolSize() {
+        return workerPoolSize;
     }
 } 
