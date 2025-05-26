@@ -25,43 +25,42 @@ public class AConsumer {
                           String destinationHost, int destinationPort, 
                           String kafkaBroker) {
         try {
-            // Add shutdown hook
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                System.out.println("Shutdown signal received. Starting graceful shutdown...");
+                System.out.println("Nhan tin hieu tat. Bat dau qua trinh tat an toan...");
                 isShuttingDown = true;
                 shutdownLatch.countDown();
             }));
 
-            // Initialize configuration service
+            // Khởi tạo service cấu hình
             configService = ConfigurationService.getInstance();
             if (configService == null) {
-                throw new IllegalStateException("Failed to initialize configuration service");
+                throw new IllegalStateException("Khong the khoi tao service cau hinh");
             }
 
-            // Initialize Aerospike service
+            // Khởi tạo service Aerospike
             aerospikeService = new AerospikeService(destinationHost, destinationPort);
 
-            // Initialize Kafka service
+            // Khởi tạo service Kafka
             kafkaService = new KafkaConsumerService(kafkaBroker, configService);
             kafkaService.initializeConsumers(sourceNamespace, workerPoolSize);
 
-            // Initialize message services
+            // Khởi tạo các message service
             messageServices = new HashMap<>();
             for (Map.Entry<String, String> entry : kafkaService.getPrefixToTopicMap().entrySet()) {
                 String prefix = entry.getKey();
                 String topic = entry.getValue();
                 
-                // Create consumer config
+                // Tạo cấu hình consumer
                 ConsumerConfig consumerConfig = new ConsumerConfig();
                 consumerConfig.setName("consumer" + prefix);
                 consumerConfig.setNamespace("consumer_" + prefix);
                 consumerConfig.setSet("users");
                 
-                // Create Kafka consumer using KafkaConsumerService
+                // Tạo Kafka consumer thông qua KafkaConsumerService
                 String consumerGroup = prefix + "-group";
                 KafkaConsumer<byte[], byte[]> consumer = kafkaService.createConsumer(topic, consumerGroup);
                 
-                // Subscribe to topic
+                // Đăng ký nhận message từ topic
                 String mirroredTopic = "source-kafka." + topic;
                 consumer.subscribe(Collections.singletonList(mirroredTopic));
                 
@@ -76,24 +75,24 @@ public class AConsumer {
                 );
                 messageServices.put(prefix, messageService);
                 
-                // Start message service in a new thread
+                // Khởi chạy message service trong một thread riêng
                 new Thread(() -> {
                     try {
                         messageService.start();
                     } catch (Exception e) {
-                        System.err.printf("[%s] Error in message service: %s%n", 
+                        System.err.printf("[%s] Loi trong message service: %s%n", 
                                         prefix, e.getMessage());
                         e.printStackTrace();
                     }
                 }, prefix + "-message-service").start();
             }
 
-            // Wait for shutdown signal
+            // Đợi tín hiệu tắt
             shutdownLatch.await();
             
-            // Graceful shutdown
+            // Thực hiện tắt an toàn
             if (isShuttingDown) {
-                System.out.println("Initiating graceful shutdown...");
+                System.out.println("Bat dau qua trinh tat an toan...");
                 for (MessageService service : messageServices.values()) {
                     service.shutdown();
                 }
@@ -101,9 +100,9 @@ public class AConsumer {
                 aerospikeService.shutdown();
             }
             
-            System.out.println("Shutdown completed successfully.");
+            System.out.println("Da tat thanh cong.");
         } catch (Exception e) {
-            System.err.println("Critical error: " + e.getMessage());
+            System.err.println("Loi nghiem trong: " + e.getMessage());
             e.printStackTrace();
         }
     }

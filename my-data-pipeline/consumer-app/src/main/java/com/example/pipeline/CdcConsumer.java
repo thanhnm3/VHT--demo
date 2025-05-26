@@ -1,186 +1,158 @@
 package com.example.pipeline;
 
-import com.aerospike.client.AerospikeClient;
-import com.aerospike.client.Bin;
-import com.aerospike.client.Key;
-import com.aerospike.client.policy.WritePolicy;
-import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
+import com.example.pipeline.service.config.ConsumerConfig;
+import com.example.pipeline.service.config.ConfigurationService;
+import com.example.pipeline.service.AerospikeService;
+import com.example.pipeline.service.KafkaConsumerService;
+import com.example.pipeline.service.CdcService;
 import com.google.common.util.concurrent.RateLimiter;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.core.type.TypeReference;
-
-import java.util.Base64;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
 import java.util.Collections;
-import java.time.Duration;
 import java.util.Map;
-import java.util.Properties;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.HashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.nio.charset.StandardCharsets;
 
 public class CdcConsumer {
+    private static volatile boolean isShuttingDown = false;
+    private static final CountDownLatch shutdownLatch = new CountDownLatch(1);
+    private static ConfigurationService configService;
+    private static AerospikeService aerospikeService;
+    private static KafkaConsumerService kafkaService;
+    private static Map<String, CdcService> cdcServices;
+    private static Map<String, ExecutorService> workerPools;
+    private static Map<String, RateLimiter> rateLimiters;
+    private static Map<String, AtomicInteger> messagesProcessed;
 
-
-
-
-
-    private static final AtomicInteger messagesProcessedThisSecond = new AtomicInteger(0);
-    private static ExecutorService executor;
-
-    public static void main(String aeroHost, int aeroPort, String namespace, String setName, String kafkaBroker,
-                           String kafkaTopic, String groupId, int workerPoolSize, int maxMessagesPerSecond) {
-        executor = Executors.newFixedThreadPool(workerPoolSize);
-        KafkaConsumer<byte[], byte[]> kafkaConsumer = null;
-        AerospikeClient aerospikeClient = null;
-
-        // Tạo RateLimiter với maxMessagesPerSecond
-        RateLimiter rateLimiter = RateLimiter.create(maxMessagesPerSecond);
-
+    public static void main(String[] args, int workerPoolSize, int maxMessagesPerSecond,
+                          String sourceHost, int sourcePort, String sourceNamespace,
+                          String destinationHost, int destinationPort, 
+                          String kafkaBroker) {
         try {
-            aerospikeClient = new AerospikeClient(aeroHost, aeroPort);
-            WritePolicy writePolicy = new WritePolicy();
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                System.out.println("Nhan tin hieu tat. Bat dau qua trinh tat an toan...");
+                isShuttingDown = true;
+                shutdownLatch.countDown();
+            }));
 
-            Properties kafkaProps = new Properties();
-            kafkaProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBroker);
-            kafkaProps.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
-            kafkaProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.ByteArrayDeserializer");
-            kafkaProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.ByteArrayDeserializer");
-            kafkaProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-            kafkaProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
+            // Khởi tạo service cấu hình
+            configService = ConfigurationService.getInstance();
+            if (configService == null) {
+                throw new IllegalStateException("Khong the khoi tao service cau hinh");
+            }
 
-            // Thêm các cấu hình tối ưu hóa
-            kafkaProps.put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, "32768"); // Gom đủ 32KB trước khi gửi batch
-            kafkaProps.put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, "50");  // Chờ tối đa 50ms để gom batch
-            kafkaProps.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, "1048576"); // Tăng giới hạn lên 1MB cho mỗi partition
+            // Khởi tạo service Aerospike
+            aerospikeService = new AerospikeService(destinationHost, destinationPort);
 
-            kafkaConsumer = new KafkaConsumer<>(kafkaProps);
-            kafkaConsumer.subscribe(Collections.singletonList(kafkaTopic));
+            // Khởi tạo service Kafka
+            kafkaService = new KafkaConsumerService(kafkaBroker, configService);
+            kafkaService.initializeConsumers(sourceNamespace, workerPoolSize);
 
-            final AerospikeClient finalAerospikeClient = aerospikeClient;
-            final WritePolicy finalWritePolicy = writePolicy;
+            // Khởi tạo các service và pool
+            cdcServices = new HashMap<>();
+            workerPools = new HashMap<>();
+            rateLimiters = new HashMap<>();
+            messagesProcessed = new HashMap<>();
 
+            // Khởi tạo scheduler để theo dõi số lượng message
             ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
             scheduler.scheduleAtFixedRate(() -> {
-                System.out.println("Messages consumed: " + messagesProcessedThisSecond.get());
-                messagesProcessedThisSecond.set(0);
+                for (Map.Entry<String, AtomicInteger> entry : messagesProcessed.entrySet()) {
+                    System.out.printf("[%s] So message da xu ly: %d%n", 
+                        entry.getKey(), entry.getValue().get());
+                    entry.getValue().set(0);
+                }
             }, 0, 1, TimeUnit.SECONDS);
 
-            while (true) {
-                ConsumerRecords<byte[], byte[]> records = kafkaConsumer.poll(Duration.ofMillis(100));
-                for (ConsumerRecord<byte[], byte[]> record : records) {
-                    executor.submit(() -> {
-                        try {
-                            // Sử dụng RateLimiter để kiểm soát tốc độ
-                            rateLimiter.acquire(); // Chờ cho đến khi có "phép" xử lý tiếp theo
-
-                            processRecord(finalAerospikeClient, finalWritePolicy, record, namespace, setName);
-                            messagesProcessedThisSecond.incrementAndGet();
-                        } catch (Exception e) {
-                            System.err.println("Error processing record: " + e.getMessage());
-                            e.printStackTrace();
-                        }
-                    });
-                }
-            }
-
-        } catch (Exception e) {
-            System.err.println("Error: " + e.getMessage());
-            e.printStackTrace();
-        } finally {
-            if (kafkaConsumer != null) {
-                kafkaConsumer.close();
-                System.out.println("Kafka Consumer closed.");
-            }
-            if (aerospikeClient != null) {
-                aerospikeClient.close();
-                System.out.println("Aerospike Client closed.");
-            }
-            executor.shutdown();
-        }
-    }
-
-    private static void processRecord(AerospikeClient aerospikeClient, WritePolicy writePolicy, ConsumerRecord<byte[], byte[]> record,
-                                      String namespace, String setName) {
-        final int MAX_RETRIES = 3; // Số lần retry tối đa
-        int retryCount = 0;
-
-        while (retryCount <= MAX_RETRIES) {
-            try {
-                byte[] keyBytes = record.key();
-                byte[] value = record.value();
-
-                if (keyBytes == null || value == null) {
-                    System.err.println("Received null key or value, skipping record.");
-                    return;
-                }
-
-                // Tạo key từ Kafka key
-                byte[] userId = record.key();
-                Key aerospikeKey = new Key(namespace, setName, userId);
-
-                // Giải mã JSON từ Kafka value
-                String jsonString = new String(value, StandardCharsets.UTF_8);
-                ObjectMapper objectMapper = new ObjectMapper();
-                Map<String, Object> data = objectMapper.readValue(jsonString, new TypeReference<Map<String, Object>>() {});
-
-                // Tách các trường từ JSON
-                String personDataBase64 = (String) data.get("personData");
-                byte[] personData = null;
-                if (personDataBase64 != null) {
+            for (Map.Entry<String, String> entry : kafkaService.getPrefixToTopicMap().entrySet()) {
+                String prefix = entry.getKey();
+                String topic = entry.getValue();
+                
+                // Tạo cấu hình consumer
+                ConsumerConfig consumerConfig = new ConsumerConfig();
+                consumerConfig.setName("consumer-cdc-" + prefix);
+                consumerConfig.setNamespace("consumer_cdc_" + prefix);
+                consumerConfig.setSet("users");
+                
+                // Tạo Kafka consumer thông qua KafkaConsumerService
+                String consumerGroup = prefix + "-cdc-group";
+                KafkaConsumer<byte[], byte[]> consumer = kafkaService.createConsumer(topic, consumerGroup);
+                
+                // Đăng ký nhận message từ topic
+                String mirroredTopic = "source-kafka." + topic;
+                consumer.subscribe(Collections.singletonList(mirroredTopic));
+                
+                // Khởi tạo các service cho prefix này
+                CdcService cdcService = new CdcService(
+                    aerospikeService.getClient(),
+                    aerospikeService.getWritePolicy(),
+                    consumerConfig.getNamespace(),
+                    consumerConfig.getSet()
+                );
+                cdcServices.put(prefix, cdcService);
+                workerPools.put(prefix, Executors.newFixedThreadPool(workerPoolSize));
+                rateLimiters.put(prefix, RateLimiter.create(maxMessagesPerSecond));
+                messagesProcessed.put(prefix, new AtomicInteger(0));
+                
+                // Khởi chạy CDC service trong một thread riêng
+                new Thread(() -> {
                     try {
-                        personData = Base64.getDecoder().decode(personDataBase64);
-                    } catch (IllegalArgumentException e) {
-                        System.err.println("Invalid Base64 in personData, inserting as null.");
-                        personData = null;
+                        while (!isShuttingDown) {
+                            var records = consumer.poll(java.time.Duration.ofMillis(100));
+                            for (var record : records) {
+                                final String currentPrefix = prefix;
+                                workerPools.get(prefix).submit(() -> {
+                                    try {
+                                        // Sử dụng RateLimiter để kiểm soát tốc độ
+                                        rateLimiters.get(currentPrefix).acquire();
+                                        cdcService.processRecord(record);
+                                        messagesProcessed.get(currentPrefix).incrementAndGet();
+                                    } catch (Exception e) {
+                                        System.err.printf("[%s] Loi xu ly record: %s%n", 
+                                            currentPrefix, e.getMessage());
+                                        e.printStackTrace();
+                                    }
+                                });
+                            }
+                        }
+                    } catch (Exception e) {
+                        System.err.printf("[%s] Loi trong CDC service: %s%n", 
+                                        prefix, e.getMessage());
+                        e.printStackTrace();
+                    }
+                }, prefix + "-cdc-service").start();
+            }
+
+            // Đợi tín hiệu tắt
+            shutdownLatch.await();
+            
+            // Thực hiện tắt an toàn
+            if (isShuttingDown) {
+                System.out.println("Bat dau qua trinh tat an toan...");
+                // Tắt các worker pool
+                for (ExecutorService pool : workerPools.values()) {
+                    pool.shutdown();
+                    try {
+                        if (!pool.awaitTermination(60, TimeUnit.SECONDS)) {
+                            pool.shutdownNow();
+                        }
+                    } catch (InterruptedException e) {
+                        pool.shutdownNow();
                     }
                 }
-                // Nếu personDataBase64 là null hoặc decode lỗi thì personData vẫn là null và vẫn insert
-
-                Object lastUpdateObj = data.get("lastUpdate");
-                if (lastUpdateObj == null) {
-                    System.err.println("lastUpdate is null, skipping record.");
-                    return;
-                }
-                long lastUpdate;
-                try {
-                    lastUpdate = ((Number) lastUpdateObj).longValue();
-                } catch (Exception e) {
-                    System.err.println("Invalid lastUpdate value, skipping record.");
-                    return;
-                }
-
-                // Tạo các bin
-                Bin personBin = new Bin("personData", personData);
-                Bin lastUpdateBin = new Bin("lastUpdate", lastUpdate);
-
-                aerospikeClient.put(writePolicy, aerospikeKey, personBin, lastUpdateBin);
-                return; // Ghi thành công, thoát khỏi vòng lặp
-
-            } catch (Exception e) {
-                retryCount++;
-                System.err.println("Failed to process record (attempt " + retryCount + "): " + e.getMessage());
-
-                if (retryCount > MAX_RETRIES) {
-                    System.err.println("Max retries reached. Skipping record.");
-                    e.printStackTrace();
-                    return; // Thoát nếu đã retry đủ số lần
-                }
-
-                try {
-                    // Chờ một khoảng thời gian trước khi retry
-                    Thread.sleep(100 * retryCount); // Tăng thời gian chờ theo số lần retry
-                } catch (InterruptedException ie) {
-                    System.err.println("Retry sleep interrupted: " + ie.getMessage());
-                    Thread.currentThread().interrupt();
-                    return;
-                }
+                scheduler.shutdown();
+                kafkaService.shutdown();
+                aerospikeService.shutdown();
             }
+            
+            System.out.println("Da tat thanh cong.");
+        } catch (Exception e) {
+            System.err.println("Loi nghiem trong: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 }
