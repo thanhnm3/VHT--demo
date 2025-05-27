@@ -1,3 +1,4 @@
+---
 producers:
   - name: producer1
     host: 127.0.0.1
@@ -18,5 +19,14 @@ consumers:
     set: users
 
 prefix_mapping:
-  "096": ["consumer1"]
-  "033": ["consumer2"]
+  "096": ["consumer2"]
+  "033": ["consumer1"]
+
+kafka:
+  brokers:
+    source: localhost:9092
+    target: localhost:9093
+
+performance:
+  max_messages_per_second: 6000
+  max_retries: 5

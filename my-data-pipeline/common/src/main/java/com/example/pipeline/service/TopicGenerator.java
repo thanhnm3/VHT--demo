@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.example.pipeline.service.config.Config;
-import com.example.pipeline.service.config.ProducerConfig;
+import com.example.pipeline.service.config.Config.Producer;
 
 public class TopicGenerator {
 
@@ -17,7 +17,7 @@ public class TopicGenerator {
             Config config = ConfigLoader.getConfig();
 
             // Lấy danh sách producers và prefix_mapping
-            List<ProducerConfig> producers = config.getProducers();
+            List<Producer> producers = config.getProducers();
             Map<String, List<String>> prefixMapping = config.getPrefix_mapping();
 
             // Tạo tên topic từ danh sách producers và prefix_mapping
@@ -35,6 +35,26 @@ public class TopicGenerator {
             e.printStackTrace();
         }
         return topicMap;
+    }
+
+    // Tạo tên topic cho CDC consumer
+    public static String generateCdcTopicName(String baseTopic) {
+        return baseTopic + "-cdc";
+    }
+
+    // Tạo tên consumer group cho CDC
+    public static String generateCdcGroupName(String baseTopic) {
+        return baseTopic + "-cdc-group";
+    }
+
+    // Tạo tên topic cho A consumer
+    public static String generateATopicName(String baseTopic) {
+        return baseTopic + "-a";
+    }
+
+    // Tạo tên consumer group cho A
+    public static String generateAGroupName(String baseTopic) {
+        return baseTopic + "-a-group";
     }
 
     public static class TopicNameGenerator {

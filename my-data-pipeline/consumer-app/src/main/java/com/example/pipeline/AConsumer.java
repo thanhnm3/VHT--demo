@@ -1,15 +1,15 @@
 package com.example.pipeline;
 
-import com.example.pipeline.service.config.ConsumerConfig;
+import com.example.pipeline.service.config.Config;
 import com.example.pipeline.service.config.ConfigurationService;
 import com.example.pipeline.service.AerospikeService;
 import com.example.pipeline.service.KafkaConsumerService;
 import com.example.pipeline.service.MessageService;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import java.util.Collections;
-
 import java.util.Map;
 import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
 public class AConsumer {
@@ -46,31 +46,47 @@ public class AConsumer {
 
             // Khởi tạo các message service
             messageServices = new HashMap<>();
-            for (Map.Entry<String, String> entry : kafkaService.getPrefixToTopicMap().entrySet()) {
+            Map<String, List<String>> prefixMapping = configService.getPrefixMappings();
+            Map<String, String> prefixToTopicMap = kafkaService.getPrefixToTopicMap();
+            
+            for (Map.Entry<String, List<String>> entry : prefixMapping.entrySet()) {
                 String prefix = entry.getKey();
-                String topic = entry.getValue();
+                List<String> consumerNames = entry.getValue();
                 
-                // Tạo cấu hình consumer
-                ConsumerConfig consumerConfig = new ConsumerConfig();
-                consumerConfig.setName("consumer" + prefix);
-                consumerConfig.setNamespace("consumer_" + prefix);
-                consumerConfig.setSet("users");
+                if (consumerNames.isEmpty()) {
+                    System.err.println("Warning: No consumers found for prefix " + prefix);
+                    continue;
+                }
+
+                // Get the first consumer for this prefix
+                String consumerName = consumerNames.get(0);
+                Config.Consumer consumer = configService.getConsumerConfig(consumerName);
+                if (consumer == null) {
+                    System.err.println("Warning: No consumer config found for " + consumerName);
+                    continue;
+                }
+
+                String topic = prefixToTopicMap.get(prefix);
+                if (topic == null) {
+                    System.err.println("Warning: No topic found for prefix " + prefix);
+                    continue;
+                }
                 
                 // Tạo Kafka consumer thông qua KafkaConsumerService
-                String consumerGroup = prefix + "-group";
-                KafkaConsumer<byte[], byte[]> consumer = kafkaService.createConsumer(topic, consumerGroup);
+                String consumerGroup = configService.getConsumerGroup(consumerName);
+                KafkaConsumer<byte[], byte[]> kafkaConsumer = kafkaService.createConsumer(topic, consumerGroup);
                 
                 // Đăng ký nhận message từ topic
                 String mirroredTopic = "source-kafka." + topic;
-                consumer.subscribe(Collections.singletonList(mirroredTopic));
+                kafkaConsumer.subscribe(Collections.singletonList(mirroredTopic));
                 
                 MessageService messageService = new MessageService(
                     aerospikeService.getClient(),
                     aerospikeService.getWritePolicy(),
-                    consumerConfig.getNamespace(),
-                    consumerConfig.getSet(),
+                    consumer.getNamespace(),
+                    consumer.getSet(),
                     prefix,
-                    consumer,
+                    kafkaConsumer,
                     workerPoolSize
                 );
                 messageServices.put(prefix, messageService);

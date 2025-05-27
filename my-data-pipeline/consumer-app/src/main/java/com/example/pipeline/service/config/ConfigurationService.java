@@ -9,10 +9,14 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class ConfigurationService {
     private static ConfigurationService instance;
-    private final Map<String, ConsumerConfig> consumerConfigs;
+    private final Map<String, Config.Consumer> consumerConfigs;
     private final Map<String, List<String>> prefixMappings;
     private final Map<String, String> prefixToTopicMap;
     private Config baseConfig;
+    
+    // Consumer-specific configurations
+    private int workerPoolSize = 4;  // Default value
+    private int maxMessagesPerSecond = 1000;  // Default value
     
     private ConfigurationService() {
         this.consumerConfigs = new ConcurrentHashMap<>();
@@ -39,8 +43,8 @@ public class ConfigurationService {
     
     private void initializeConfigurations() {
         // Initialize consumer configurations
-        for (ConsumerConfig consumerConfig : baseConfig.getConsumers()) {
-            consumerConfigs.put(consumerConfig.getName(), consumerConfig);
+        for (Config.Consumer consumer : baseConfig.getConsumers()) {
+            consumerConfigs.put(consumer.getName(), consumer);
         }
         
         // Initialize prefix mappings
@@ -50,7 +54,7 @@ public class ConfigurationService {
         prefixToTopicMap.putAll(TopicGenerator.generateTopics());
     }
     
-    public List<ConsumerConfig> getConsumers() {
+    public List<Config.Consumer> getConsumers() {
         return baseConfig.getConsumers();
     }
     
@@ -58,7 +62,7 @@ public class ConfigurationService {
         return new HashMap<>(prefixMappings);
     }
     
-    public ConsumerConfig getConsumerConfig(String consumerName) {
+    public Config.Consumer getConsumerConfig(String consumerName) {
         return consumerConfigs.get(consumerName);
     }
     
@@ -78,36 +82,21 @@ public class ConfigurationService {
         return consumerName + "-group";
     }
     
+    // Consumer-specific configuration getters and setters
     public int getWorkerPoolSize() {
-        return baseConfig.getWorkerPoolSize();
+        return workerPoolSize;
+    }
+    
+    public void setWorkerPoolSize(int workerPoolSize) {
+        this.workerPoolSize = workerPoolSize;
     }
     
     public int getMaxMessagesPerSecond() {
-        return baseConfig.getMaxMessagesPerSecond();
+        return maxMessagesPerSecond;
     }
     
-    public String getSourceHost() {
-        return baseConfig.getSourceHost();
-    }
-    
-    public int getSourcePort() {
-        return baseConfig.getSourcePort();
-    }
-    
-    public String getSourceNamespace() {
-        return baseConfig.getSourceNamespace();
-    }
-    
-    public String getDestinationHost() {
-        return baseConfig.getDestinationHost();
-    }
-    
-    public int getDestinationPort() {
-        return baseConfig.getDestinationPort();
-    }
-    
-    public String getKafkaBroker() {
-        return baseConfig.getKafkaBroker();
+    public void setMaxMessagesPerSecond(int maxMessagesPerSecond) {
+        this.maxMessagesPerSecond = maxMessagesPerSecond;
     }
     
     public void reloadConfiguration() {

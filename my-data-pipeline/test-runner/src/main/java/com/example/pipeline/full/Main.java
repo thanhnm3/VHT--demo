@@ -1,113 +1,133 @@
 package com.example.pipeline.full;
 
-import io.github.cdimascio.dotenv.Dotenv;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.List;
+import java.util.Map;
 
 import com.example.pipeline.AConsumer;
 import com.example.pipeline.AProducer;
+import com.example.pipeline.service.config.Config;
+import com.example.pipeline.service.ConfigLoader;
 
 import java.util.concurrent.CountDownLatch;
 
 public class Main {
-    private static final CountDownLatch consumerReady = new CountDownLatch(1);
-
     public static void main(String[] args) {
-        // Load configuration from .env
-        Dotenv dotenv = Dotenv.configure()
-                .directory("my-data-pipeline/.env")
-                .load();
-
-        // Đọc các biến môi trường từ file .env
-        String sourceHost = dotenv.get("AEROSPIKE_PRODUCER_HOST");
-        int sourcePort = Integer.parseInt(dotenv.get("AEROSPIKE_PRODUCER_PORT"));
-        String sourceNamespace = dotenv.get("PRODUCER_NAMESPACE");
-        String destinationHost = dotenv.get("AEROSPIKE_CONSUMER_HOST");
-        int destinationPort = Integer.parseInt(dotenv.get("AEROSPIKE_CONSUMER_PORT"));
-        String producerSetName = dotenv.get("PRODUCER_SET_NAME");
-        String kafkaBrokerSource = dotenv.get("KAFKA_BROKER_SOURCE");
-        String kafkaBrokerTarget = dotenv.get("KAFKA_BROKER_TARGET");
-        String consumerGroup096 = dotenv.get("CONSUMER_GROUP_096");
-        int producerThreadPoolSize = 2; // Số thread cho Producer
-        int consumerThreadPoolSize = 4; // Số thread cho Consumer
-        int maxMessagesPerSecond = Integer.parseInt(dotenv.get("MAX_MESSAGES_PER_SECOND"));
-        int maxRetries = Integer.parseInt(dotenv.get("MAX_RETRIES"));
-
-        // Xóa và tạo lại topic trước khi bắt đầu
-        System.out.println("Dang xoa tat ca topic tu 2 kafka ...");
-        DeleteTopic.deleteAllTopics(kafkaBrokerSource);
-        DeleteTopic.deleteAllTopics(kafkaBrokerTarget);
-
-        // Tạo thread pool cho Producer và Consumer
-        ExecutorService executor = Executors.newFixedThreadPool(2);
-
-        // Tạo latch để chờ producer và consumer kết thúc
-        CountDownLatch producerDone = new CountDownLatch(1);
-        CountDownLatch consumerDone = new CountDownLatch(1);
-
-        // Chạy Consumer trước
-        executor.submit(() -> {
-            try {
-                System.out.println("Khoi dong Consumer...");
-                AConsumer.main(args, consumerThreadPoolSize, maxMessagesPerSecond,
-                        sourceHost, sourcePort, sourceNamespace,
-                        destinationHost, destinationPort, 
-                        kafkaBrokerTarget);
-                consumerReady.countDown(); // Bao hieu consumer da san sang
-            } catch (Exception e) {
-                System.err.println("Loi trong Consumer: " + e.getMessage());
-                e.printStackTrace();
-            } finally {
-                consumerDone.countDown(); // Đánh dấu consumer đã xong
-            }
-        });
-
-        // Đợi consumer khởi động và ổn định
         try {
-            Thread.sleep(1000);
-            System.out.println("Consumer da san sang, bat dau Producer...");
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            System.err.println("Bi gian doan khi doi Consumer khoi dong");
-            return;
-        }
-
-        // Chạy Producer sau khi consumer đã sẵn sàng
-        executor.submit(() -> {
-            try {
-                AProducer.main(args, producerThreadPoolSize, maxMessagesPerSecond,
-                        sourceHost, sourcePort, sourceNamespace, producerSetName,
-                        kafkaBrokerSource, maxRetries, consumerGroup096);
-            } catch (Exception e) {
-                System.err.println("Loi trong Producer: " + e.getMessage());
-                e.printStackTrace();
-            } finally {
-                producerDone.countDown(); // Đánh dấu producer đã xong
+            // Load configuration from config.yaml
+            Config config = ConfigLoader.getConfig();
+            if (config == null) {
+                throw new IllegalStateException("Failed to load configuration");
             }
-        });
 
-        // Them shutdown hook de xu ly khi chuong trinh bi tat
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            System.out.println("Dang tat chuong trinh...");
-            executor.shutdown();
-            try {
-                if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
-                    executor.shutdownNow();
+            // Lấy cấu hình Producer
+            String sourceHost = config.getProducers().get(0).getHost();
+            int sourcePort = config.getProducers().get(0).getPort();
+            String sourceNamespace = config.getProducers().get(0).getNamespace();
+            String producerSetName = config.getProducers().get(0).getSet();
+            String kafkaBrokerSource = config.getKafka().getBrokers().getSource();
+            String kafkaBrokerTarget = config.getKafka().getBrokers().getTarget();
+            
+            // Lấy cấu hình Consumer
+            Map<String, List<String>> prefixMapping = config.getPrefix_mapping();
+            String consumerName = prefixMapping.values().iterator().next().get(0);
+            Config.Consumer consumer = config.getConsumers().stream()
+                .filter(c -> c.getName().equals(consumerName))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("No consumer config found"));
+
+            // Cấu hình performance
+            int producerThreadPoolSize = 2; // Số thread cho Producer
+            int consumerThreadPoolSize = 4; // Số thread cho Consumer
+            int maxMessagesPerSecond = config.getPerformance().getMax_messages_per_second();
+            int maxRetries = config.getPerformance().getMax_retries();
+
+            // Xóa và tạo lại topic trước khi bắt đầu
+            System.out.println("Dang xoa tat ca topic tu 2 kafka ...");
+            DeleteTopic.deleteAllTopics(kafkaBrokerSource);
+            DeleteTopic.deleteAllTopics(kafkaBrokerTarget);
+
+            // Tạo thread pool cho Producer và Consumer
+            ExecutorService executor = Executors.newFixedThreadPool(2);
+
+            // Tạo latch để chờ producer và consumer kết thúc
+            CountDownLatch producerDone = new CountDownLatch(1);
+            CountDownLatch consumerDone = new CountDownLatch(1);
+
+            System.out.println("=== Starting Producer and Consumer ===");
+            System.out.println("Kafka Broker Source: " + kafkaBrokerSource);
+            System.out.println("Kafka Broker Target: " + kafkaBrokerTarget);
+            System.out.println("Source Host: " + sourceHost);
+            System.out.println("Source Port: " + sourcePort);
+            System.out.println("Source Namespace: " + sourceNamespace);
+            System.out.println("Producer Set Name: " + producerSetName);
+            System.out.println("Consumer Name: " + consumerName);
+            System.out.println("Producer Thread Pool Size: " + producerThreadPoolSize);
+            System.out.println("Consumer Thread Pool Size: " + consumerThreadPoolSize);
+            System.out.println("Max Messages Per Second: " + maxMessagesPerSecond);
+            System.out.println("Max Retries: " + maxRetries);
+            System.out.println("===========================");
+
+            // Chạy Producer
+            executor.submit(() -> {
+                try {
+                    System.out.println("Khoi dong Producer...");
+                    AProducer.main(args, producerThreadPoolSize, maxMessagesPerSecond,
+                            sourceHost, sourcePort, sourceNamespace, producerSetName,
+                            kafkaBrokerSource, maxRetries, consumerName + "-group");
+                } catch (Exception e) {
+                    System.err.println("Loi trong Producer: " + e.getMessage());
+                    e.printStackTrace();
+                } finally {
+                    producerDone.countDown();
                 }
-            } catch (InterruptedException e) {
-                executor.shutdownNow();
-                Thread.currentThread().interrupt();
-            }
-        }));
+            });
 
-        // Chờ cả producer và consumer kết thúc
-        try {
-            producerDone.await();
-            consumerDone.await();
-            executor.shutdown();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            // Chạy Consumer
+            executor.submit(() -> {
+                try {
+                    System.out.println("Khoi dong Consumer...");
+                    AConsumer.main(args, consumerThreadPoolSize, maxMessagesPerSecond,
+                            sourceHost, sourcePort, sourceNamespace,
+                            consumer.getHost(), consumer.getPort(), 
+                            kafkaBrokerTarget);
+                } catch (Exception e) {
+                    System.err.println("Loi trong Consumer: " + e.getMessage());
+                    e.printStackTrace();
+                } finally {
+                    consumerDone.countDown();
+                }
+            });
+
+            // Them shutdown hook de xu ly khi chuong trinh bi tat
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                System.out.println("Dang tat chuong trinh...");
+                executor.shutdown();
+                try {
+                    if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
+                        executor.shutdownNow();
+                    }
+                } catch (InterruptedException e) {
+                    executor.shutdownNow();
+                    Thread.currentThread().interrupt();
+                }
+            }));
+
+            // Chờ cả producer và consumer kết thúc
+            try {
+                producerDone.await();
+                consumerDone.await();
+                executor.shutdown();
+                System.out.println("Chuong trinh da ket thuc.");
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                System.err.println("Chuong trinh bi gian doan.");
+            }
+        } catch (Exception e) {
+            System.err.println("Loi nghiem trong: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 }

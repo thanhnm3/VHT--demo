@@ -3,7 +3,7 @@ package com.example.pipeline.service;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import com.example.pipeline.service.config.ConfigurationService;
-import com.example.pipeline.service.config.ConsumerConfig;
+import com.example.pipeline.service.config.Config;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -45,7 +45,7 @@ public class KafkaConsumerService {
             }
 
             String consumerName = consumerNames.get(0);
-            ConsumerConfig consumerConfig = configService.getConsumerConfig(consumerName);
+            Config.Consumer consumerConfig = configService.getConsumerConfig(consumerName);
             
             if (consumerConfig == null) {
                 System.err.println("Warning: No consumer config found for " + consumerName);
