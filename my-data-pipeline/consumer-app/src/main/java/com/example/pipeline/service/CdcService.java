@@ -6,6 +6,7 @@ import com.aerospike.client.Key;
 import com.aerospike.client.policy.WritePolicy;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 
 import java.util.Base64;
@@ -28,79 +29,60 @@ public class CdcService {
     }
 
     public void processRecord(ConsumerRecord<byte[], byte[]> record) {
-        final int MAX_RETRIES = 3;
-        int retryCount = 0;
-
-        while (retryCount <= MAX_RETRIES) {
-            try {
-                byte[] keyBytes = record.key();
-                byte[] value = record.value();
-
-                if (keyBytes == null) {
-                    System.err.println("Nhan duoc key null, bo qua record.");
-                    return;
-                }
-
-                // Tao key tu Kafka key
-                byte[] userId = record.key();
-                Key aerospikeKey = new Key(namespace, setName, userId);
-
-                // Giai ma JSON tu Kafka value
-                Map<String, Object> data = null;
-                if (value != null) {
-                    String jsonString = new String(value, StandardCharsets.UTF_8);
-                    data = objectMapper.readValue(jsonString, new TypeReference<Map<String, Object>>() {});
-                }
-
-                // Xu ly personData
-                String personDataBase64 = data != null ? (String) data.get("personData") : null;
-                byte[] personData = null;
-                if (personDataBase64 != null) {
-                    try {
-                        personData = Base64.getDecoder().decode(personDataBase64);
-                    } catch (IllegalArgumentException e) {
-                        personData = null;
-                    }
-                }
-
-                // Xu ly lastUpdate
-                long lastUpdate = 0;
-                if (data != null) {
-                    Object lastUpdateObj = data.get("lastUpdate");
-                    if (lastUpdateObj != null) {
-                        try {
-                            lastUpdate = ((Number) lastUpdateObj).longValue();
-                        } catch (Exception e) {
-                            // Sử dụng giá trị mặc định 0
-                        }
-                    }
-                }
-
-                // Tao va luu cac bin
-                Bin personBin = new Bin("personData", personData);
-                Bin lastUpdateBin = new Bin("lastUpdate", lastUpdate);
-
-                aerospikeClient.put(writePolicy, aerospikeKey, personBin, lastUpdateBin);
+        try {
+            byte[] keyBytes = record.key();
+            if (keyBytes == null) {
+                System.err.println("Nhan duoc key null, bo qua record.");
                 return;
+            }
 
-            } catch (Exception e) {
-                retryCount++;
-                System.err.println("Loi xu ly record (lan thu " + retryCount + "): " + e.getMessage());
+            // Tao key tu Kafka key
+            Key aerospikeKey = new Key(namespace, setName, keyBytes);
 
-                if (retryCount > MAX_RETRIES) {
-                    System.err.println("Da vuot qua so lan retry toi da. Bo qua record.");
-                    e.printStackTrace();
-                    return;
-                }
-
+            // Giai ma JSON tu Kafka value
+            Map<String, Object> data = null;
+            if (record.value() != null) {
+                String jsonString = new String(record.value(), StandardCharsets.UTF_8);
                 try {
-                    Thread.sleep(100 * retryCount);
-                } catch (InterruptedException ie) {
-                    System.err.println("Bi ngat khi cho retry: " + ie.getMessage());
-                    Thread.currentThread().interrupt();
-                    return;
+                    data = objectMapper.readValue(jsonString, new TypeReference<Map<String, Object>>() {});
+                } catch (JsonProcessingException e) {
+                    System.err.println("Loi giai ma JSON: " + e.getMessage());
+                    data = null;
                 }
             }
+
+            // Xu ly personData
+            String personDataBase64 = data != null ? (String) data.get("personData") : null;
+            byte[] personData = null;
+            if (personDataBase64 != null) {
+                try {
+                    personData = Base64.getDecoder().decode(personDataBase64);
+                } catch (IllegalArgumentException e) {
+                    personData = null;
+                }
+            }
+
+            // Xu ly lastUpdate
+            long lastUpdate = 0;
+            if (data != null) {
+                Object lastUpdateObj = data.get("lastUpdate");
+                if (lastUpdateObj != null) {
+                    try {
+                        lastUpdate = ((Number) lastUpdateObj).longValue();
+                    } catch (Exception e) {
+                        // Sử dụng giá trị mặc định 0
+                    }
+                }
+            }
+
+            // Tạo bins và ghi vào Aerospike
+            Bin personDataBin = new Bin("personData", personData);
+            Bin lastUpdateBin = new Bin("lastUpdate", lastUpdate);
+            aerospikeClient.put(writePolicy, aerospikeKey, personDataBin, lastUpdateBin);
+
+        } catch (Exception e) {
+            System.err.println("Loi xu ly record: " + e.getMessage());
+            throw e;
         }
     }
 } 

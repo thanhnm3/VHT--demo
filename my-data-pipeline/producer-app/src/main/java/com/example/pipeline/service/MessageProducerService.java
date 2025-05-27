@@ -35,18 +35,26 @@ public class MessageProducerService {
     }
 
     public boolean isValidRecord(Record record) {
-        return record != null && record.bins != null && 
-               record.bins.containsKey("personData") && 
-               record.bins.containsKey("lastUpdate");
+        return record != null && record.bins != null;
     }
 
     public ProducerRecord<byte[], byte[]> createKafkaRecord(Key key, Record record) {
-        byte[] personData = (byte[]) record.getValue("personData");
-        long lastUpdate = (long) record.getValue("lastUpdate");
         byte[] keyBytes = (byte[]) key.userKey.getObject();
+        String message;
 
-        String message = String.format("{\"personData\": \"%s\", \"lastUpdate\": %d}",
-                Base64.getEncoder().encodeToString(personData), lastUpdate);
+        if (record != null && record.bins != null) {
+            byte[] personData = (byte[]) record.getValue("personData");
+            long lastUpdate = record.getValue("lastUpdate") != null ? 
+                            (long) record.getValue("lastUpdate") : 
+                            System.currentTimeMillis();
+
+            message = String.format("{\"personData\": %s, \"lastUpdate\": %d}",
+                    personData != null ? "\"" + Base64.getEncoder().encodeToString(personData) + "\"" : "null",
+                    lastUpdate);
+        } else {
+            message = String.format("{\"personData\": null, \"lastUpdate\": %d}", 
+                    System.currentTimeMillis());
+        }
 
         String topic = determineTopic(keyBytes);
         return new ProducerRecord<>(
