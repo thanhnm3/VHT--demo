@@ -1,133 +1,151 @@
 package com.example.pipeline.service;
 
+import com.aerospike.client.Key;
+import com.aerospike.client.Record;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
+
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
+import java.util.*;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class MessageProducerService {
-    private final Queue<ProducerRecord<byte[], byte[]>> producerPendingMessages;
+    private final AtomicLong producedCount;
     private final AtomicLong failedMessages;
     private final AtomicLong skippedMessages;
-    private final AtomicLong timeoutMessages;
+    private final Map<String, String> prefixToTopicMap;
+    private String defaultTopic;
+    private final Queue<ProducerRecord<byte[], byte[]>> pendingMessages;
+    private final Object pendingMessagesLock;
 
     public MessageProducerService() {
-        this.producerPendingMessages = new ConcurrentLinkedQueue<>();
+        this.producedCount = new AtomicLong(0);
         this.failedMessages = new AtomicLong(0);
         this.skippedMessages = new AtomicLong(0);
-        this.timeoutMessages = new AtomicLong(0);
+        this.prefixToTopicMap = new ConcurrentHashMap<>();
+        this.defaultTopic = "";
+        this.pendingMessages = new ConcurrentLinkedQueue<>();
+        this.pendingMessagesLock = new Object();
     }
 
-    // ======================= Producer Methods =======================
+    public void initializeTopicMapping(Map<String, String> topicMapping, String defaultTopic) {
+        this.prefixToTopicMap.putAll(topicMapping);
+        this.defaultTopic = defaultTopic;
+    }
+
+    public boolean isValidRecord(Record record) {
+        return record != null && record.bins != null && 
+               record.bins.containsKey("personData") && 
+               record.bins.containsKey("lastUpdate");
+    }
+
+    public ProducerRecord<byte[], byte[]> createKafkaRecord(Key key, Record record) {
+        byte[] personData = (byte[]) record.getValue("personData");
+        long lastUpdate = (long) record.getValue("lastUpdate");
+        byte[] keyBytes = (byte[]) key.userKey.getObject();
+
+        String message = String.format("{\"personData\": \"%s\", \"lastUpdate\": %d}",
+                Base64.getEncoder().encodeToString(personData), lastUpdate);
+
+        String topic = determineTopic(keyBytes);
+        return new ProducerRecord<>(
+                topic,
+                keyBytes,
+                message.getBytes(StandardCharsets.UTF_8)
+        );
+    }
+
+    private String determineTopic(byte[] key) {
+        if (key == null || key.length < 3) {
+            return defaultTopic;
+        }
+        
+        String prefix = new String(key, 0, 3);
+        return prefixToTopicMap.getOrDefault(prefix, defaultTopic);
+    }
+
     public void sendBatch(KafkaProducer<byte[], byte[]> producer, 
-                         List<ProducerRecord<byte[], byte[]>> batch,
+                         List<ProducerRecord<byte[], byte[]>> batch, 
                          int maxRetries) {
-        CountDownLatch latch = new CountDownLatch(batch.size());
-
         for (ProducerRecord<byte[], byte[]> record : batch) {
-            producer.send(record, (metadata, exception) -> {
-                try {
+            try {
+                producer.send(record, (metadata, exception) -> {
                     if (exception != null) {
-                        handleSendError(producer, record, exception, maxRetries);
+                        logFailedMessage(record, "Failed to send message", exception);
+                    } else {
+                        producedCount.incrementAndGet();
                     }
-                } finally {
-                    latch.countDown();
-                }
-            });
-        }
-
-        try {
-            if (!latch.await(5, TimeUnit.SECONDS)) {
-                for (ProducerRecord<byte[], byte[]> record : batch) {
-                    logTimeoutMessage(record);
-                    timeoutMessages.incrementAndGet();
-                }
-                System.err.println("Timeout waiting for batch to complete");
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            System.err.println("Interrupted while waiting for batch completion");
-        }
-    }
-
-    public void processPendingProducerMessages(KafkaProducer<byte[], byte[]> producer, int maxRetries) {
-        List<ProducerRecord<byte[], byte[]>> batch = new ArrayList<>(100);
-        while (!producerPendingMessages.isEmpty() && batch.size() < 100) {
-            ProducerRecord<byte[], byte[]> record = producerPendingMessages.poll();
-            if (record != null) {
-                batch.add(record);
+                });
+            } catch (Exception e) {
+                logFailedMessage(record, "Error sending message", e);
             }
         }
-        if (!batch.isEmpty()) {
-            sendBatch(producer, batch, maxRetries);
-        }
-    }
-
-    public void offerProducerMessage(ProducerRecord<byte[], byte[]> record) {
-        producerPendingMessages.offer(record);
-    }
-
-        private void logTimeoutMessage(ProducerRecord<byte[], byte[]> record) {
-        String key = new String(record.key(), StandardCharsets.UTF_8);
-        System.err.printf("[TIMEOUT_MESSAGE] Key: %s, Reason: Batch send timeout%n", key);
-    }
-
-    public void logFailedMessage(ProducerRecord<byte[], byte[]> record, String reason, Exception e) {
-        String key = new String(record.key(), StandardCharsets.UTF_8);
-        System.err.printf("[FAILED_MESSAGE] Key: %s, Reason: %s, Error: %s%n", 
-                        key, reason, e != null ? e.getMessage() : "Unknown");
     }
 
     public void logSkippedMessage(String key, String reason) {
-        System.err.printf("[SKIPPED_MESSAGE] Key: %s, Reason: %s%n", key, reason);
+        System.out.printf("Skipped message with key %s: %s%n", key, reason);
+        skippedMessages.incrementAndGet();
     }
 
+    public void logFailedMessage(ProducerRecord<byte[], byte[]> record, String reason, Throwable e) {
+        System.err.printf("Failed to process message: %s. Reason: %s%n", 
+                         new String(record.key()), reason);
+        if (e != null) {
+            e.printStackTrace();
+        }
+        failedMessages.incrementAndGet();
+    }
 
-    private void handleSendError(KafkaProducer<byte[], byte[]> producer,
-                               ProducerRecord<byte[], byte[]> record,
-                               Exception exception,
-                               int maxRetries) {
-        int retryCount = 0;
-        while (retryCount < maxRetries) {
-            try {
-                producer.send(record).get(5, TimeUnit.SECONDS);
-                return;
-            } catch (Exception retryEx) {
-                retryCount++;
-                if (retryCount >= maxRetries) {
-                    logFailedMessage(record, "Max retries exceeded", exception);
-                    failedMessages.incrementAndGet();
-                    break;
-                }
-                try {
-                    Thread.sleep(100 * retryCount);
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
-            }
+    public void addPendingMessage(ProducerRecord<byte[], byte[]> record) {
+        synchronized (pendingMessagesLock) {
+            pendingMessages.offer(record);
         }
     }
 
     public boolean hasPendingProducerMessages() {
-        return !producerPendingMessages.isEmpty();
+        synchronized (pendingMessagesLock) {
+            return !pendingMessages.isEmpty();
+        }
+    }
+
+    public void processPendingProducerMessages(KafkaProducer<byte[], byte[]> producer, int maxRetries) {
+        synchronized (pendingMessagesLock) {
+            while (!pendingMessages.isEmpty()) {
+                ProducerRecord<byte[], byte[]> record = pendingMessages.poll();
+                if (record != null) {
+                    try {
+                        producer.send(record, (metadata, exception) -> {
+                            if (exception != null) {
+                                logFailedMessage(record, "Failed to send pending message", exception);
+                            } else {
+                                producedCount.incrementAndGet();
+                            }
+                        });
+                    } catch (Exception e) {
+                        logFailedMessage(record, "Error sending pending message", e);
+                    }
+                }
+            }
+        }
     }
 
     public void printMessageStats() {
-        System.out.printf("\nMessage Statistics:%n" +
-                         "Failed Messages: %d%n" +
-                         "Skipped Messages: %d%n" +
-                         "Timeout Messages: %d%n",
-                         failedMessages.get(),
-                         skippedMessages.get(),
-                         timeoutMessages.get());
+        System.out.println("\nMessage Processing Statistics:");
+        System.out.printf("Total messages produced: %d%n", producedCount.get());
+        System.out.printf("Failed messages: %d%n", failedMessages.get());
+        System.out.printf("Skipped messages: %d%n", skippedMessages.get());
     }
 
+    public long getProducedCount() {
+        return producedCount.get();
+    }
 
+    public long getFailedMessages() {
+        return failedMessages.get();
+    }
+
+    public long getSkippedMessages() {
+        return skippedMessages.get();
+    }
 }
