@@ -159,20 +159,38 @@ public class MessageService {
 
     private void processRecord(ConsumerRecord<byte[], byte[]> record) {
         try {
+            // Check if key is null
+            if (record.key() == null) {
+                System.err.printf("[%s] Error: Record key is null%n", prefix);
+                return;
+            }
+
             // Create Aerospike key using record key as PK
             Key key = new Key(namespace, setName, record.key());
             
-            // Parse message similar to AProducer
-            String message = new String(record.value(), StandardCharsets.UTF_8);
-            String[] parts = message.split("\"personData\": \"");
-            String personDataBase64 = parts[1].split("\"")[0];
-            String lastUpdateStr = message.split("\"lastUpdate\": ")[1].split("}")[0];
+            // Initialize default values
+            byte[] personData = null;
+            long lastUpdate = System.currentTimeMillis();
             
-            // Decode personData from base64
-            byte[] personData = Base64.getDecoder().decode(personDataBase64);
-            long lastUpdate = Long.parseLong(lastUpdateStr);
+            // Try to parse message if value is not null
+            if (record.value() != null) {
+                try {
+                    String message = new String(record.value(), StandardCharsets.UTF_8);
+                    if (message.contains("\"personData\": \"") && message.contains("\"lastUpdate\": ")) {
+                        String[] parts = message.split("\"personData\": \"");
+                        String personDataBase64 = parts[1].split("\"")[0];
+                        String lastUpdateStr = message.split("\"lastUpdate\": ")[1].split("}")[0];
+                        
+                        // Decode personData from base64
+                        personData = Base64.getDecoder().decode(personDataBase64);
+                        lastUpdate = Long.parseLong(lastUpdateStr);
+                    }
+                } catch (Exception e) {
+                    System.err.printf("[%s] Error parsing message: %s%n", prefix, e.getMessage());
+                }
+            }
             
-            // Create separate bins for personData and lastUpdate
+            // Create bins with available data
             Bin personDataBin = new Bin("personData", personData);
             Bin lastUpdateBin = new Bin("lastUpdate", lastUpdate);
             
