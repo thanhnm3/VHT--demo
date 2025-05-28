@@ -8,7 +8,6 @@ import com.example.pipeline.service.CdcService;
 import com.example.pipeline.service.TopicGenerator;
 import com.google.common.util.concurrent.RateLimiter;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
-import java.util.Collections;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.concurrent.CountDownLatch;
@@ -17,6 +16,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.List;
 
 public class CdcConsumer {
     private static volatile boolean isShuttingDown = false;
@@ -73,11 +73,11 @@ public class CdcConsumer {
             for (Map.Entry<String, String> entry : kafkaService.getPrefixToTopicMap().entrySet()) {
                 String prefix = entry.getKey();
                 String topic = entry.getValue();
-                String cdcTopic = "source-kafka." + TopicGenerator.generateCdcTopicName(topic);
+                String cdcTopic = TopicGenerator.generateCdcTopicName(topic);
                 String consumerGroup = TopicGenerator.generateCdcGroupName(cdcTopic);
                 System.out.printf("  Prefix: %s\n", prefix);
-                System.out.printf("    Original Topic: %s\n", topic);
-                System.out.printf("    CDC Topic: %s\n", cdcTopic);
+                System.out.printf("    Original Topic: %s\n", cdcTopic);
+                System.out.printf("    Target Topic: source-kafka.%s\n", cdcTopic);
                 System.out.printf("    Consumer Group: %s\n", consumerGroup);
             }
             System.out.println("===============================\n");
@@ -85,39 +85,58 @@ public class CdcConsumer {
             // Khởi tạo scheduler để theo dõi số lượng message
             ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
             scheduler.scheduleAtFixedRate(() -> {
+                StringBuilder stats = new StringBuilder("\n=== Consumer Stats ===\n");
                 for (Map.Entry<String, AtomicInteger> entry : messagesProcessed.entrySet()) {
-                    System.out.printf("[%s] So message da xu ly: %d%n", 
-                        entry.getKey(), entry.getValue().get());
-                    entry.getValue().set(0);
+                    if (entry.getValue().get() > 0) {  // Chỉ log khi có message được xử lý
+                        stats.append(String.format("  Prefix %s: %d messages/s\n", 
+                            entry.getKey(), entry.getValue().get()));
+                        entry.getValue().set(0);
+                    }
                 }
-            }, 0, 1, TimeUnit.SECONDS);
+                stats.append("====================\n");
+                System.out.print(stats);
+            }, 0, 5, TimeUnit.SECONDS);
 
-            for (Map.Entry<String, String> entry : kafkaService.getPrefixToTopicMap().entrySet()) {
+            Map<String, List<String>> prefixMapping = configService.getPrefixMappings();
+            Map<String, String> prefixToTopicMap = kafkaService.getPrefixToTopicMap();
+            
+            for (Map.Entry<String, List<String>> entry : prefixMapping.entrySet()) {
                 String prefix = entry.getKey();
-                String topic = entry.getValue();
+                List<String> consumerNames = entry.getValue();
                 
-                // Lấy cấu hình consumer từ ConfigurationService
-                String consumerName = "consumer-cdc-" + prefix;
-                Config.Consumer consumerConfig = configService.getConsumerConfig(consumerName);
-                if (consumerConfig == null) {
-                    System.err.println("Warning: Khong tim thay cau hinh cho consumer " + consumerName);
+                if (consumerNames.isEmpty()) {
+                    System.err.println("Warning: No consumers found for prefix " + prefix);
+                    continue;
+                }
+
+                // Get the first consumer for this prefix
+                String consumerName = consumerNames.get(0);
+                Config.Consumer consumer = configService.getConsumerConfig(consumerName);
+                if (consumer == null) {
+                    System.err.println("Warning: No consumer config found for " + consumerName);
+                    continue;
+                }
+
+                String topic = prefixToTopicMap.get(prefix);
+                if (topic == null) {
+                    System.err.println("Warning: No topic found for prefix " + prefix);
                     continue;
                 }
                 
                 // Tạo Kafka consumer thông qua KafkaConsumerService
-                String cdcTopic = "source-kafka." + TopicGenerator.generateCdcTopicName(topic);
+                String cdcTopic = TopicGenerator.generateCdcTopicName(topic);
                 String consumerGroup = TopicGenerator.generateCdcGroupName(cdcTopic);
-                KafkaConsumer<byte[], byte[]> consumer = kafkaService.createConsumer(topic, consumerGroup);
+                System.out.printf("[CDC Consumer] Starting consumer for prefix %s\n", prefix);
+                System.out.printf("[CDC Consumer] Subscribing to topic: source-kafka.%s\n", cdcTopic);
                 
-                // Đăng ký nhận message từ topic CDC với prefix source-kafka
-                consumer.subscribe(Collections.singletonList(cdcTopic));
+                KafkaConsumer<byte[], byte[]> kafkaConsumer = kafkaService.createConsumer("source-kafka." + cdcTopic, consumerGroup);
                 
                 // Khởi tạo các service cho prefix này
                 CdcService cdcService = new CdcService(
                     aerospikeService.getClient(),
                     aerospikeService.getWritePolicy(),
-                    consumerConfig.getNamespace(),
-                    consumerConfig.getSet()
+                    consumer.getNamespace(),
+                    consumer.getSet()
                 );
                 cdcServices.put(prefix, cdcService);
                 workerPools.put(prefix, Executors.newFixedThreadPool(workerPoolSize));
@@ -125,13 +144,13 @@ public class CdcConsumer {
                 messagesProcessed.put(prefix, new AtomicInteger(0));
                 
                 // Khởi chạy CDC service trong một thread riêng
+                final String currentPrefix = prefix;
                 new Thread(() -> {
                     try {
                         while (!isShuttingDown) {
-                            var records = consumer.poll(java.time.Duration.ofMillis(100));
+                            var records = kafkaConsumer.poll(java.time.Duration.ofMillis(100));
                             for (var record : records) {
-                                final String currentPrefix = prefix;
-                                workerPools.get(prefix).submit(() -> {
+                                workerPools.get(currentPrefix).submit(() -> {
                                     try {
                                         // Sử dụng RateLimiter để kiểm soát tốc độ
                                         rateLimiters.get(currentPrefix).acquire();
@@ -147,10 +166,10 @@ public class CdcConsumer {
                         }
                     } catch (Exception e) {
                         System.err.printf("[%s] Loi trong CDC service: %s%n", 
-                                        prefix, e.getMessage());
+                                        currentPrefix, e.getMessage());
                         e.printStackTrace();
                     }
-                }, prefix + "-cdc-service").start();
+                }, currentPrefix + "-cdc-service").start();
             }
 
             // Đợi tín hiệu tắt

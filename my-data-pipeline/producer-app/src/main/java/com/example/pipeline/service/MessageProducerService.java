@@ -8,21 +8,14 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicLong;
 
 public class MessageProducerService {
-    private final AtomicLong producedCount;
-    private final AtomicLong failedMessages;
-    private final AtomicLong skippedMessages;
     private final Map<String, String> prefixToTopicMap;
     private String defaultTopic;
     private final Queue<ProducerRecord<byte[], byte[]>> pendingMessages;
     private final Object pendingMessagesLock;
 
     public MessageProducerService() {
-        this.producedCount = new AtomicLong(0);
-        this.failedMessages = new AtomicLong(0);
-        this.skippedMessages = new AtomicLong(0);
         this.prefixToTopicMap = new ConcurrentHashMap<>();
         this.defaultTopic = "";
         this.pendingMessages = new ConcurrentLinkedQueue<>();
@@ -81,8 +74,6 @@ public class MessageProducerService {
                 producer.send(record, (metadata, exception) -> {
                     if (exception != null) {
                         logFailedMessage(record, "Failed to send message", exception);
-                    } else {
-                        producedCount.incrementAndGet();
                     }
                 });
             } catch (Exception e) {
@@ -93,7 +84,6 @@ public class MessageProducerService {
 
     public void logSkippedMessage(String key, String reason) {
         System.out.printf("Skipped message with key %s: %s%n", key, reason);
-        skippedMessages.incrementAndGet();
     }
 
     public void logFailedMessage(ProducerRecord<byte[], byte[]> record, String reason, Throwable e) {
@@ -102,7 +92,6 @@ public class MessageProducerService {
         if (e != null) {
             e.printStackTrace();
         }
-        failedMessages.incrementAndGet();
     }
 
     public void addPendingMessage(ProducerRecord<byte[], byte[]> record) {
@@ -126,8 +115,6 @@ public class MessageProducerService {
                         producer.send(record, (metadata, exception) -> {
                             if (exception != null) {
                                 logFailedMessage(record, "Failed to send pending message", exception);
-                            } else {
-                                producedCount.incrementAndGet();
                             }
                         });
                     } catch (Exception e) {
@@ -136,24 +123,5 @@ public class MessageProducerService {
                 }
             }
         }
-    }
-
-    public void printMessageStats() {
-        System.out.println("\nMessage Processing Statistics:");
-        System.out.printf("Total messages produced: %d%n", producedCount.get());
-        System.out.printf("Failed messages: %d%n", failedMessages.get());
-        System.out.printf("Skipped messages: %d%n", skippedMessages.get());
-    }
-
-    public long getProducedCount() {
-        return producedCount.get();
-    }
-
-    public long getFailedMessages() {
-        return failedMessages.get();
-    }
-
-    public long getSkippedMessages() {
-        return skippedMessages.get();
     }
 }

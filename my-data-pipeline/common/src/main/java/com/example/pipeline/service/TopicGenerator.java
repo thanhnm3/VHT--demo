@@ -44,7 +44,10 @@ public class TopicGenerator {
 
     // Tạo tên consumer group cho CDC
     public static String generateCdcGroupName(String baseTopic) {
-        return baseTopic + "-cdc-group";
+        // Lấy tên consumer group từ base topic
+        String consumerGroup = baseTopic + "-group";
+        // Thêm hậu tố -cdc vào consumer group
+        return consumerGroup ;
     }
 
     // Tạo tên topic cho A consumer

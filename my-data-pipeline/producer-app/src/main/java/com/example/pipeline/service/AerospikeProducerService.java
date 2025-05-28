@@ -94,22 +94,9 @@ public class AerospikeProducerService {
             }
 
             System.out.println("Finished scanning data from Aerospike namespace: " + sourceNamespace);
-            messageService.printMessageStats();
         } catch (Exception e) {
             System.err.println("Error scanning data from Aerospike: " + e.getMessage());
             e.printStackTrace();
         }
-    }
-
-    public long getProducedCount() {
-        return messageService.getProducedCount();
-    }
-
-    public long getFailedMessages() {
-        return messageService.getFailedMessages();
-    }
-
-    public long getSkippedMessages() {
-        return messageService.getSkippedMessages();
     }
 } 

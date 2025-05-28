@@ -36,12 +36,6 @@ public class CdcProducerService {
         
         // Khởi tạo message service với topic mapping
         messageService.initializeTopicMapping(prefixToTopicMap, defaultTopic);
-        
-        // Khởi tạo scheduler để theo dõi số lượng message
-        scheduler.scheduleAtFixedRate(() -> {
-            System.out.println("[CDC Producer] Messages sent this second: " + messagesSentThisSecond.get());
-            messagesSentThisSecond.set(0);
-        }, 0, 1, TimeUnit.SECONDS);
     }
 
     public void readDataFromAerospike(AerospikeClient aerospikeClient, KafkaProducer<byte[], byte[]> producer,
@@ -51,7 +45,7 @@ public class CdcProducerService {
                 long windowStart = lastPolledTime;
                 long windowEnd = System.currentTimeMillis();
                 
-                System.out.printf("[CDC Producer] Scanning window [%d ? %d]%n", windowStart, windowEnd);
+                System.out.printf("[CDC Producer] Scanning window [%d ==> %d]%n", windowStart, windowEnd);
                 
                 Statement stmt = new Statement();
                 stmt.setNamespace(sourceNamespace);

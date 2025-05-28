@@ -4,6 +4,7 @@ import com.example.pipeline.CdcConsumer;
 import com.example.pipeline.CdcProducer;
 import com.example.pipeline.service.config.Config;
 import com.example.pipeline.service.ConfigLoader;
+import com.example.pipeline.full.DeleteTopic;
 
 import java.util.List;
 import java.util.Map;
@@ -23,12 +24,12 @@ public class Maincdc {
             int producerPort = config.getProducers().get(0).getPort();
             String producerNamespace = config.getProducers().get(0).getNamespace();
             String producerSetName = config.getProducers().get(0).getSet();
-            String kafkaBroker = config.getKafka().getBrokers().getSource();
+            String kafkaBrokerSource = config.getKafka().getBrokers().getSource();
+            String kafkaBrokerTarget = config.getKafka().getBrokers().getTarget();
 
             // Lấy cấu hình Consumer cho CDC từ prefix mapping
             Map<String, List<String>> prefixMapping = config.getPrefix_mapping();
             List<Config.Consumer> cdcConsumers = new ArrayList<>();
-            List<Thread> consumerThreads = new ArrayList<>();
 
             // Tạo consumer cho mỗi prefix
             for (Map.Entry<String, List<String>> entry : prefixMapping.entrySet()) {
@@ -53,8 +54,14 @@ public class Maincdc {
             int operationsPerSecond = 500; // Số lượng thao tác mỗi giây cho RandomOperations
             int maxRetries = config.getPerformance().getMax_retries();
 
+            // Xóa và tạo lại topic trước khi bắt đầu
+            System.out.println("Dang xoa tat ca topic tu 2 kafka...");
+            DeleteTopic.deleteAllTopics(kafkaBrokerSource);
+            DeleteTopic.deleteAllTopics(kafkaBrokerTarget);
+
             System.out.println("=== Starting CDC Pipeline ===");
-            System.out.println("Kafka Broker: " + kafkaBroker);
+            System.out.println("Kafka Broker Source: " + kafkaBrokerSource);
+            System.out.println("Kafka Broker Target: " + kafkaBrokerTarget);
             System.out.println("Producer Host: " + producerHost);
             System.out.println("Producer Port: " + producerPort);
             System.out.println("Producer Namespace: " + producerNamespace);
@@ -86,33 +93,26 @@ public class Maincdc {
             Thread cdcProducerThread = new Thread(() -> {
                 System.out.println("Starting CdcProducer...");
                 CdcProducer.start(producerHost, producerPort, producerNamespace, producerSetName, 
-                    kafkaBroker, maxRetries, producerThreadPoolSize);
+                    kafkaBrokerSource, maxRetries, producerThreadPoolSize);
             });
 
-            // Tạo luồng cho mỗi consumer
-            for (Config.Consumer consumer : cdcConsumers) {
-                Thread consumerThread = new Thread(() -> {
-                    System.out.println("Starting CdcConsumer for " + consumer.getName() + "...");
-                    CdcConsumer.main(new String[]{}, consumerThreadPoolSize, maxMessagesPerSecond,
-                        producerHost, producerPort, producerNamespace,
-                        consumer.getHost(), consumer.getPort(), kafkaBroker);
-                });
-                consumerThreads.add(consumerThread);
-            }
+            // Tạo một luồng duy nhất cho tất cả consumers
+            Thread consumerThread = new Thread(() -> {
+                System.out.println("Starting CdcConsumer...");
+                CdcConsumer.main(new String[]{}, consumerThreadPoolSize, maxMessagesPerSecond,
+                    producerHost, producerPort, producerNamespace,
+                    cdcConsumers.get(0).getHost(), cdcConsumers.get(0).getPort(), kafkaBrokerTarget);
+            });
 
             // Bắt đầu các luồng
             randomOperationsThread.start();
             cdcProducerThread.start();
-            for (Thread thread : consumerThreads) {
-                thread.start();
-            }
+            consumerThread.start();
 
             // Đợi tất cả các luồng hoàn thành
             try {
                 randomOperationsThread.join();
-                for (Thread thread : consumerThreads) {
-                    thread.join();
-                }
+                consumerThread.join();
                 cdcProducerThread.join();
             } catch (InterruptedException e) {
                 System.err.println("Main thread interrupted: " + e.getMessage());

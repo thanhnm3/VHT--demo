@@ -71,7 +71,9 @@ public class KafkaConsumerService {
         props.put("max.poll.records", "5000");
 
         KafkaConsumer<byte[], byte[]> consumer = new KafkaConsumer<>(props);
+        
         consumer.subscribe(Collections.singletonList(topic));
+        
         return consumer;
     }
 

@@ -23,7 +23,7 @@ public class CdcProducer {
     private static final int LAG_THRESHOLD = 1000;
     private static AdminClient adminClient;
     private static String consumerGroup;
-    private static final int MONITORING_INTERVAL_SECONDS = 10;
+    private static final int MONITORING_INTERVAL_SECONDS = 5;
     private static final ScheduledExecutorService rateAdjustmentExecutor = Executors.newSingleThreadScheduledExecutor();
     private static RateControlService rateControlService;
     private static KafkaProducerService kafkaService;
@@ -91,7 +91,7 @@ public class CdcProducer {
                             double oldRate = currentRate;
                             monitorAndAdjustLag();
                             if (oldRate != currentRate) {
-                                System.out.printf("[Producer-cdc] Rate adjusted from %.2f to %.2f messages/second%n", 
+                                System.out.printf("[CDC Producer] Rate adjusted from %.2f to %.2f messages/second%n", 
                                                 oldRate, currentRate);
                             }
                         }

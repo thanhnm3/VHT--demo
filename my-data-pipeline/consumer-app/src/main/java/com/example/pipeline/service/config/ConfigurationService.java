@@ -79,7 +79,11 @@ public class ConfigurationService {
     }
     
     public String getConsumerGroup(String consumerName) {
-        return consumerName + "-group";
+        String baseGroup = consumerName + "-group";
+        if (consumerName.endsWith("-cdc")) {
+            return baseGroup + "-cdc";
+        }
+        return baseGroup;
     }
     
     // Consumer-specific configuration getters and setters
