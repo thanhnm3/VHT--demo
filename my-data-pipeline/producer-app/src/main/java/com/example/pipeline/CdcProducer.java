@@ -88,12 +88,7 @@ public class CdcProducer {
                 while (!Thread.currentThread().isInterrupted()) {
                     try {
                         if (rateControlService.shouldCheckRateAdjustment()) {
-                            double oldRate = currentRate;
                             monitorAndAdjustLag();
-                            if (oldRate != currentRate) {
-                                System.out.printf("[CDC Producer] Rate adjusted from %.2f to %.2f messages/second%n", 
-                                                oldRate, currentRate);
-                            }
                         }
                         Thread.sleep(1000);
                     } catch (InterruptedException e) {

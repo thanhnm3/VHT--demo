@@ -12,8 +12,12 @@ import com.example.pipeline.service.config.Config;
 import com.example.pipeline.service.ConfigLoader;
 
 import java.util.concurrent.CountDownLatch;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class Main {
+    private static final Logger logger = LoggerFactory.getLogger(Main.class);
+
     public static void main(String[] args) {
         try {
             // Load configuration from config.yaml
@@ -45,7 +49,7 @@ public class Main {
             int maxRetries = config.getPerformance().getMax_retries();
 
             // Xóa và tạo lại topic trước khi bắt đầu
-            System.out.println("Dang xoa tat ca topic tu 2 kafka ...");
+            logger.info("Dang xoa tat ca topic tu 2 kafka ...");
             DeleteTopic.deleteAllTopics(kafkaBrokerSource);
             DeleteTopic.deleteAllTopics(kafkaBrokerTarget);
 
@@ -56,30 +60,29 @@ public class Main {
             CountDownLatch producerDone = new CountDownLatch(1);
             CountDownLatch consumerDone = new CountDownLatch(1);
 
-            System.out.println("=== Starting Producer and Consumer ===");
-            System.out.println("Kafka Broker Source: " + kafkaBrokerSource);
-            System.out.println("Kafka Broker Target: " + kafkaBrokerTarget);
-            System.out.println("Source Host: " + sourceHost);
-            System.out.println("Source Port: " + sourcePort);
-            System.out.println("Source Namespace: " + sourceNamespace);
-            System.out.println("Producer Set Name: " + producerSetName);
-            System.out.println("Consumer Name: " + consumerName);
-            System.out.println("Producer Thread Pool Size: " + producerThreadPoolSize);
-            System.out.println("Consumer Thread Pool Size: " + consumerThreadPoolSize);
-            System.out.println("Max Messages Per Second: " + maxMessagesPerSecond);
-            System.out.println("Max Retries: " + maxRetries);
-            System.out.println("===========================");
+            logger.info("=== Starting Producer and Consumer ===");
+            logger.info("Kafka Broker Source: {}", kafkaBrokerSource);
+            logger.info("Kafka Broker Target: {}", kafkaBrokerTarget);
+            logger.info("Source Host: {}", sourceHost);
+            logger.info("Source Port: {}", sourcePort);
+            logger.info("Source Namespace: {}", sourceNamespace);
+            logger.info("Producer Set Name: {}", producerSetName);
+            logger.info("Consumer Name: {}", consumerName);
+            logger.info("Producer Thread Pool Size: {}", producerThreadPoolSize);
+            logger.info("Consumer Thread Pool Size: {}", consumerThreadPoolSize);
+            logger.info("Max Messages Per Second: {}", maxMessagesPerSecond);
+            logger.info("Max Retries: {}", maxRetries);
+            logger.info("===========================");
 
             // Chạy Producer
             executor.submit(() -> {
                 try {
-                    System.out.println("Khoi dong Producer...");
+                    logger.info("Khoi dong Producer...");
                     AProducer.main(args, producerThreadPoolSize, maxMessagesPerSecond,
                             sourceHost, sourcePort, sourceNamespace, producerSetName,
                             kafkaBrokerSource, maxRetries, consumerName + "-group");
                 } catch (Exception e) {
-                    System.err.println("Loi trong Producer: " + e.getMessage());
-                    e.printStackTrace();
+                    logger.error("Loi trong Producer: {}", e.getMessage(), e);
                 } finally {
                     producerDone.countDown();
                 }
@@ -88,14 +91,13 @@ public class Main {
             // Chạy Consumer
             executor.submit(() -> {
                 try {
-                    System.out.println("Khoi dong Consumer...");
+                    logger.info("Khoi dong Consumer...");
                     AConsumer.main(args, consumerThreadPoolSize, maxMessagesPerSecond,
                             sourceHost, sourcePort, sourceNamespace,
                             consumer.getHost(), consumer.getPort(), 
                             kafkaBrokerTarget);
                 } catch (Exception e) {
-                    System.err.println("Loi trong Consumer: " + e.getMessage());
-                    e.printStackTrace();
+                    logger.error("Loi trong Consumer: {}", e.getMessage(), e);
                 } finally {
                     consumerDone.countDown();
                 }
@@ -103,7 +105,7 @@ public class Main {
 
             // Them shutdown hook de xu ly khi chuong trinh bi tat
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                System.out.println("Dang tat chuong trinh...");
+                logger.info("Dang tat chuong trinh...");
                 executor.shutdown();
                 try {
                     if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
@@ -120,14 +122,13 @@ public class Main {
                 producerDone.await();
                 consumerDone.await();
                 executor.shutdown();
-                System.out.println("Chuong trinh da ket thuc.");
+                logger.info("Chuong trinh da ket thuc.");
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                System.err.println("Chuong trinh bi gian doan.");
+                logger.error("Chuong trinh bi gian doan.");
             }
         } catch (Exception e) {
-            System.err.println("Loi nghiem trong: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Loi nghiem trong: {}", e.getMessage(), e);
         }
     }
 }

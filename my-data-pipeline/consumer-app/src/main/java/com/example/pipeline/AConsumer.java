@@ -6,6 +6,8 @@ import com.example.pipeline.service.AerospikeService;
 import com.example.pipeline.service.KafkaConsumerService;
 import com.example.pipeline.service.MessageService;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.util.Collections;
 import java.util.Map;
 import java.util.HashMap;
@@ -13,6 +15,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
 public class AConsumer {
+    private static final Logger logger = LoggerFactory.getLogger(AConsumer.class);
     private static volatile boolean isShuttingDown = false;
     private static final CountDownLatch shutdownLatch = new CountDownLatch(1);
     private static ConfigurationService configService;
@@ -26,7 +29,7 @@ public class AConsumer {
                           String kafkaBroker) {
         try {
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                System.out.println("Nhan tin hieu tat. Bat dau qua trinh tat an toan...");
+                logger.info("Nhan tin hieu tat. Bat dau qua trinh tat an toan...");
                 isShuttingDown = true;
                 shutdownLatch.countDown();
             }));
@@ -54,7 +57,7 @@ public class AConsumer {
                 List<String> consumerNames = entry.getValue();
                 
                 if (consumerNames.isEmpty()) {
-                    System.err.println("Warning: No consumers found for prefix " + prefix);
+                    logger.warn("No consumers found for prefix {}", prefix);
                     continue;
                 }
 
@@ -62,13 +65,13 @@ public class AConsumer {
                 String consumerName = consumerNames.get(0);
                 Config.Consumer consumer = configService.getConsumerConfig(consumerName);
                 if (consumer == null) {
-                    System.err.println("Warning: No consumer config found for " + consumerName);
+                    logger.warn("No consumer config found for {}", consumerName);
                     continue;
                 }
 
                 String topic = prefixToTopicMap.get(prefix);
                 if (topic == null) {
-                    System.err.println("Warning: No topic found for prefix " + prefix);
+                    logger.warn("No topic found for prefix {}", prefix);
                     continue;
                 }
                 
@@ -96,9 +99,7 @@ public class AConsumer {
                     try {
                         messageService.start();
                     } catch (Exception e) {
-                        System.err.printf("[%s] Loi trong message service: %s%n", 
-                                        prefix, e.getMessage());
-                        e.printStackTrace();
+                        logger.error("[{}] Loi trong message service: {}", prefix, e.getMessage(), e);
                     }
                 }, prefix + "-message-service").start();
             }
@@ -108,7 +109,7 @@ public class AConsumer {
             
             // Thực hiện tắt an toàn
             if (isShuttingDown) {
-                System.out.println("Bat dau qua trinh tat an toan...");
+                logger.info("Bat dau qua trinh tat an toan...");
                 for (MessageService service : messageServices.values()) {
                     service.shutdown();
                 }
@@ -116,10 +117,9 @@ public class AConsumer {
                 aerospikeService.shutdown();
             }
             
-            System.out.println("Da tat thanh cong.");
+            logger.info("Da tat thanh cong.");
         } catch (Exception e) {
-            System.err.println("Loi nghiem trong: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Loi nghiem trong: {}", e.getMessage(), e);
         }
     }
 }

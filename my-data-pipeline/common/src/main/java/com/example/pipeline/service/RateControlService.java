@@ -1,21 +1,38 @@
 package com.example.pipeline.service;
 
+import com.example.pipeline.service.config.Config;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class RateControlService {
-    private volatile double currentRate;
-    private volatile double targetRate;
-    private final double maxRate;
-    private final double minRate;
-    private final int lagThreshold;
-    private final int monitoringIntervalSeconds;
-    private final AtomicLong lastRateAdjustmentTime;
-    private final ScheduledExecutorService rateAdjustmentExecutor;
-    private final int rateAdjustmentSteps;
-    private final double maxRateChangePercent;
+    private volatile double currentRate;        // Tốc độ hiện tại
+    private volatile double targetRate;         // Tốc độ mục tiêu
+    private final double maxRate;               // Tốc độ tối đa
+    private final double minRate;               // Tốc độ tối thiểu
+    private final int lagThreshold;             // Ngưỡng lag
+    private final int monitoringIntervalSeconds; // Khoảng thời gian giám sát (giây)
+    private final AtomicLong lastRateAdjustmentTime; // Thời điểm điều chỉnh tốc độ cuối cùng
+    private final ScheduledExecutorService rateAdjustmentExecutor; // Executor để điều chỉnh tốc độ
+    private final int rateAdjustmentSteps;      // Số bước điều chỉnh
+    private final double maxRateChangePercent;  // Phần trăm thay đổi tốc độ tối đa mỗi bước
+
+    public RateControlService() {
+        Config config = ConfigLoader.getConfig();
+        var rateControl = config.getPerformance().getRate_control();
+        
+        this.currentRate = rateControl.getInitial_rate();
+        this.targetRate = rateControl.getInitial_rate();
+        this.maxRate = rateControl.getMax_rate();
+        this.minRate = rateControl.getMin_rate();
+        this.lagThreshold = rateControl.getLag_threshold();
+        this.monitoringIntervalSeconds = rateControl.getMonitoring_interval_seconds();
+        this.lastRateAdjustmentTime = new AtomicLong(System.currentTimeMillis());
+        this.rateAdjustmentExecutor = Executors.newSingleThreadScheduledExecutor();
+        this.rateAdjustmentSteps = rateControl.getRate_adjustment_steps();
+        this.maxRateChangePercent = rateControl.getMax_rate_change_percent();
+    }
 
     public RateControlService(double initialRate, double maxRate, double minRate, 
                             int lagThreshold, int monitoringIntervalSeconds) {
@@ -51,7 +68,7 @@ public class RateControlService {
         final double finalStepSize = Math.abs(stepSize) > maxStepChange ? 
             Math.signum(stepSize) * maxStepChange : stepSize;
 
-        // Lên lịch điều chỉnh rate từng bước
+        // Lên lịch điều chỉnh tốc độ từng bước
         for (int i = 0; i < rateAdjustmentSteps; i++) {
             final int step = i;
             rateAdjustmentExecutor.schedule(() -> {
@@ -61,27 +78,19 @@ public class RateControlService {
                 } else {
                     currentRate = Math.max(newRate, targetRate);
                 }
-                // System.out.printf("Rate adjusted to %.2f messages/second%n", currentRate);
             }, step * 1000, TimeUnit.MILLISECONDS);
         }
 
         targetRate = newTargetRate;
     }
 
-    public double calculateNewRateForConsumer(long currentOffset, long lastProcessedOffset) {
-        long lag = currentOffset - lastProcessedOffset;
-        if (lag > lagThreshold) {
-            return Math.min(maxRate, currentRate * 1.2);
-        } else if (lag < lagThreshold / 2) {
-            return Math.max(minRate, currentRate * 0.9);
-        }
-        return currentRate;
-    }
 
     public double calculateNewRateForProducer(long totalLag) {
         if (totalLag > lagThreshold) {
+            // Nếu lag cao, giảm tốc độ xuống 10%
             return Math.max(minRate, currentRate * 0.9);
         } else if (totalLag < lagThreshold / 2) {
+            // Nếu lag thấp, tăng tốc độ lên 10%
             return Math.min(maxRate, currentRate * 1.1);
         }
         return currentRate;
@@ -110,5 +119,10 @@ public class RateControlService {
             rateAdjustmentExecutor.shutdownNow();
             Thread.currentThread().interrupt();
         }
+    }
+
+    public void updateRateForLag(long totalLag) {
+        double newRate = calculateNewRateForProducer(totalLag);
+        adjustRateSmoothly(newRate);
     }
 } 

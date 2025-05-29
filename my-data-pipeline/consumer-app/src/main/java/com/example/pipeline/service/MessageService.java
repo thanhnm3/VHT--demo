@@ -4,7 +4,6 @@ import com.aerospike.client.AerospikeClient;
 import com.aerospike.client.policy.WritePolicy;
 import com.aerospike.client.Key;
 import com.aerospike.client.Bin;
-import com.google.common.util.concurrent.RateLimiter;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -29,9 +28,6 @@ public class MessageService {
     private final String setName;
     private final String prefix;
     private final KafkaConsumer<byte[], byte[]> consumer;
-    private final RateLimiter rateLimiter;
-    private final RateControlService rateControlService;
-    private volatile double currentRate;
     private volatile boolean isRunning = true;
     private final AtomicLong lastProcessedOffset = new AtomicLong(0);
     private final AtomicLong currentOffset = new AtomicLong(0);
@@ -46,9 +42,6 @@ public class MessageService {
         this.setName = setName;
         this.prefix = prefix;
         this.consumer = consumer;
-        this.currentRate = 8000.0;
-        this.rateLimiter = RateLimiter.create(currentRate);
-        this.rateControlService = new RateControlService(currentRate, 10000.0, 2000.0, 1000, 10);
         
         // Create worker pool with CallerRunsPolicy
         this.workerPool = new ThreadPoolExecutor(
@@ -67,36 +60,6 @@ public class MessageService {
             },
             new ThreadPoolExecutor.CallerRunsPolicy()
         );
-
-        // Start rate monitor thread
-        startRateMonitor();
-    }
-
-    private void startRateMonitor() {
-        Thread monitorThread = new Thread(() -> {
-            while (!Thread.currentThread().isInterrupted() && isRunning) {
-                try {
-                    if (rateControlService.shouldCheckRateAdjustment()) {
-                        double oldRate = currentRate;
-                        double newRate = rateControlService.calculateNewRateForConsumer(
-                            currentOffset.get(), lastProcessedOffset.get());
-                        
-                        if (newRate != oldRate) {
-                            rateControlService.updateRate(newRate);
-                            currentRate = rateControlService.getCurrentRate();
-                            rateLimiter.setRate(currentRate);
-                            System.out.printf("[%s] Rate adjusted from %.2f to %.2f messages/second%n", 
-                                            prefix, oldRate, currentRate);
-                        }
-                    }
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
-            }
-        }, prefix + "-rate-monitor");
-        monitorThread.start();
     }
 
     public void start() {
@@ -137,11 +100,6 @@ public class MessageService {
     private void processBatch(List<ConsumerRecord<byte[], byte[]>> records) {
         for (ConsumerRecord<byte[], byte[]> record : records) {
             if (!isRunning) break;
-
-            // Apply rate limiting
-            if (rateControlService.getCurrentRate() > 0) {
-                rateLimiter.acquire();
-            }
 
             workerPool.submit(() -> {
                 try {
@@ -205,9 +163,6 @@ public class MessageService {
 
     public void shutdown() {
         isRunning = false;
-        if (rateControlService != null) {
-            rateControlService.shutdown();
-        }
         if (consumer != null) {
             consumer.wakeup();
             consumer.close();

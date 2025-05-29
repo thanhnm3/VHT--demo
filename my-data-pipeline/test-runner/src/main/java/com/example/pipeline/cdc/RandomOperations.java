@@ -68,29 +68,6 @@ public class RandomOperations {
         // Tạo thread pool
         ExecutorService executor = Executors.newFixedThreadPool(threadPoolSize);
 
-        // Scheduler để in log mỗi giây
-        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-        scheduler.scheduleAtFixedRate(() -> {
-            System.out.println("Them moi: " + insertCountThisSecond.get() +
-                    ", Cap nhat: " + updateCountThisSecond.get() +
-                    ", Xoa: " + deleteCountThisSecond.get());
-            System.out.println("So luong thay doi theo prefix va loai thao tac:");
-            for (Map.Entry<String, Map<String, AtomicInteger>> prefixEntry : OPERATION_COUNTERS.entrySet()) {
-                String prefix = prefixEntry.getKey();
-                Map<String, AtomicInteger> operations = prefixEntry.getValue();
-                System.out.printf("  %s:\n", prefix);
-                System.out.printf("    Insert: %d/%d\n", 
-                    operations.get("insert").get(), PREFIX_LIMITS.get(prefix));
-                System.out.printf("    Update: %d/%d\n", 
-                    operations.get("update").get(), PREFIX_LIMITS.get(prefix));
-                System.out.printf("    Delete: %d/%d\n", 
-                    operations.get("delete").get(), PREFIX_LIMITS.get(prefix));
-            }
-            insertCountThisSecond.set(0);
-            updateCountThisSecond.set(0);
-            deleteCountThisSecond.set(0);
-        }, 0, 1, TimeUnit.SECONDS);
-
         // Kiểm tra xem tất cả prefix và loại thao tác đã đạt giới hạn chưa
         boolean allOperationsReachedLimit = false;
         while (!allOperationsReachedLimit) {
@@ -160,12 +137,12 @@ public class RandomOperations {
             System.err.println("Luong bi ngat: " + e.getMessage());
         }
 
-        scheduler.shutdown();
-        System.out.println("\nTong so thao tac:");
+        System.out.println("\n=== Ket qua thuc hien thao tac ===");
+        System.out.println("Tong so thao tac:");
         System.out.println("Them moi: " + totalInsertCount.get());
         System.out.println("Cap nhat: " + totalUpdateCount.get());
         System.out.println("Xoa: " + totalDeleteCount.get());
-        System.out.println("\nDa hoan thanh so luong thay doi cho tat ca prefix:");
+        System.out.println("\nSo luong thay doi theo prefix:");
         for (Map.Entry<String, Map<String, AtomicInteger>> prefixEntry : OPERATION_COUNTERS.entrySet()) {
             String prefix = prefixEntry.getKey();
             Map<String, AtomicInteger> operations = prefixEntry.getValue();
@@ -177,6 +154,7 @@ public class RandomOperations {
             System.out.printf("    Delete: %d/%d\n", 
                 operations.get("delete").get(), PREFIX_LIMITS.get(prefix));
         }
+        System.out.println("================================");
 
         client.close();
     }

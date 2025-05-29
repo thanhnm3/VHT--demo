@@ -51,6 +51,9 @@ public class Config {
     public static class KafkaConfig {
         private Brokers brokers;
 
+        public Brokers getBrokers() { return brokers; }
+        public void setBrokers(Brokers brokers) { this.brokers = brokers; }
+
         public static class Brokers {
             private String source;
             private String target;
@@ -60,14 +63,12 @@ public class Config {
             public String getTarget() { return target; }
             public void setTarget(String target) { this.target = target; }
         }
-
-        public Brokers getBrokers() { return brokers; }
-        public void setBrokers(Brokers brokers) { this.brokers = brokers; }
     }
 
     public static class PerformanceConfig {
         private int max_messages_per_second;
         private int max_retries;
+        private RateControlConfig rate_control;
 
         public int getMax_messages_per_second() { return max_messages_per_second; }
         public void setMax_messages_per_second(int max_messages_per_second) { 
@@ -75,6 +76,41 @@ public class Config {
         }
         public int getMax_retries() { return max_retries; }
         public void setMax_retries(int max_retries) { this.max_retries = max_retries; }
+        public RateControlConfig getRate_control() { return rate_control; }
+        public void setRate_control(RateControlConfig rate_control) { 
+            this.rate_control = rate_control; 
+        }
+    }
+
+    public static class RateControlConfig {
+        private double initial_rate;
+        private double max_rate;
+        private double min_rate;
+        private int lag_threshold;
+        private int monitoring_interval_seconds;
+        private int rate_adjustment_steps;
+        private double max_rate_change_percent;
+
+        public double getInitial_rate() { return initial_rate; }
+        public void setInitial_rate(double initial_rate) { this.initial_rate = initial_rate; }
+        public double getMax_rate() { return max_rate; }
+        public void setMax_rate(double max_rate) { this.max_rate = max_rate; }
+        public double getMin_rate() { return min_rate; }
+        public void setMin_rate(double min_rate) { this.min_rate = min_rate; }
+        public int getLag_threshold() { return lag_threshold; }
+        public void setLag_threshold(int lag_threshold) { this.lag_threshold = lag_threshold; }
+        public int getMonitoring_interval_seconds() { return monitoring_interval_seconds; }
+        public void setMonitoring_interval_seconds(int monitoring_interval_seconds) { 
+            this.monitoring_interval_seconds = monitoring_interval_seconds; 
+        }
+        public int getRate_adjustment_steps() { return rate_adjustment_steps; }
+        public void setRate_adjustment_steps(int rate_adjustment_steps) { 
+            this.rate_adjustment_steps = rate_adjustment_steps; 
+        }
+        public double getMax_rate_change_percent() { return max_rate_change_percent; }
+        public void setMax_rate_change_percent(double max_rate_change_percent) { 
+            this.max_rate_change_percent = max_rate_change_percent; 
+        }
     }
 
     // Getters và Setters
@@ -89,5 +125,7 @@ public class Config {
     public KafkaConfig getKafka() { return kafka; }
     public void setKafka(KafkaConfig kafka) { this.kafka = kafka; }
     public PerformanceConfig getPerformance() { return performance; }
-    public void setPerformance(PerformanceConfig performance) { this.performance = performance; }
+    public void setPerformance(PerformanceConfig performance) { 
+        this.performance = performance; 
+    }
 }

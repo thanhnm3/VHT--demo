@@ -10,12 +10,16 @@ import com.example.pipeline.service.TopicGenerator;
 import com.example.pipeline.service.KafkaProducerService;
 import com.example.pipeline.service.MessageProducerService;
 import com.example.pipeline.service.AerospikeProducerService;
+import com.example.pipeline.service.KafkaLagMonitor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
 
 public class AProducer {
+    private static final Logger logger = LoggerFactory.getLogger(AProducer.class);
     private static ExecutorService executor;
     private static volatile double currentRate = 5000.0;
     private static final double MAX_RATE = 100000.0;
@@ -70,12 +74,7 @@ public class AProducer {
                 while (!Thread.currentThread().isInterrupted()) {
                     try {
                         if (rateControlService.shouldCheckRateAdjustment()) {
-                            double oldRate = currentRate;
                             monitorAndAdjustLag();
-                            if (oldRate != currentRate) {
-                                System.out.printf("[Producer] Rate adjusted from %.2f to %.2f messages/second%n", 
-                                                oldRate, currentRate);
-                            }
                         }
                         Thread.sleep(1000);
                     } catch (InterruptedException e) {
@@ -114,7 +113,7 @@ public class AProducer {
             monitorThread.interrupt();
 
         } catch (Exception e) {
-            System.err.println("Critical error: " + e.getMessage());
+            logger.error("Critical error: {}", e.getMessage());
             e.printStackTrace();
         } finally {
             shutdownGracefully(aerospikeClient, kafkaProducer);
@@ -125,8 +124,8 @@ public class AProducer {
         Map<String, String> generatedTopics = TopicGenerator.generateTopics();
         prefixToTopicMap.putAll(generatedTopics);
         defaultTopic = String.format("%s.profile.default.produce", sourceNamespace);
-        System.out.println("Initialized topic mapping: " + prefixToTopicMap);
-        System.out.println("Default topic: " + defaultTopic);
+        logger.info("Initialized topic mapping: {}", prefixToTopicMap);
+        logger.info("Default topic: {}", defaultTopic);
     }
 
     private static void createTopics() {
@@ -137,25 +136,76 @@ public class AProducer {
             for (String topic : topics) {
                 try {
                     kafkaService.createTopic(topic);
-                    System.out.println("Created/Verified topic: " + topic);
+                    logger.info("Created/Verified topic: {}", topic);
                 } catch (Exception e) {
-                    System.err.println("Error creating topic " + topic + ": " + e.getMessage());
+                    logger.error("Error creating topic {}: {}", topic, e.getMessage());
                 }
             }
         } catch (Exception e) {
-            System.err.println("Error creating topics: " + e.getMessage());
+            logger.error("Error creating topics: {}", e.getMessage());
         }
     }
 
     private static void monitorAndAdjustLag() {
         try {
-            long totalLag = kafkaService.calculateTotalLag();
-            double newRate = rateControlService.calculateNewRateForProducer(totalLag);
-            rateControlService.updateRate(newRate);
-            currentRate = rateControlService.getCurrentRate();
-            System.out.printf("[Producer] Adjusted rate to %.2f messages/second based on lag: %d%n", currentRate, totalLag);
+            // Khởi tạo KafkaLagMonitor với target broker
+            KafkaLagMonitor lagMonitor = new KafkaLagMonitor();
+            
+            // Chỉ tính lag cho topic của producer này
+            long producerLag = 0;
+            boolean hasValidLag = false;
+            
+            // Lấy topic của producer này từ prefix mapping
+            String producerTopic = null;
+            for (Map.Entry<String, String> entry : prefixToTopicMap.entrySet()) {
+                if (entry.getValue().contains(sourceNamespace)) {
+                    producerTopic = entry.getValue();
+                    break;
+                }
+            }
+            
+            if (producerTopic == null) {
+                logger.warn("No matching topic found for producer namespace: {}", sourceNamespace);
+                return;
+            }
+            
+            try {
+                // Thử tính lag cho topic đã mirror trước
+                String mirroredTopic = "source-kafka." + producerTopic;
+                long topicLag = lagMonitor.calculateTopicLag(mirroredTopic, consumerGroup);
+                
+                if (topicLag >= 0) {
+                    producerLag = topicLag;
+                    hasValidLag = true;
+                    logger.info("Producer topic {} (mirrored as {}) has lag: {}", 
+                              producerTopic, mirroredTopic, topicLag);
+                } else {
+                    // Nếu không tìm thấy topic đã mirror, thử với topic gốc
+                    topicLag = lagMonitor.calculateTopicLag(producerTopic, consumerGroup);
+                    if (topicLag >= 0) {
+                        producerLag = topicLag;
+                        hasValidLag = true;
+                        logger.info("Producer topic {} has lag: {}", producerTopic, topicLag);
+                    }
+                }
+            } catch (Exception e) {
+                logger.warn("Error calculating lag for producer topic {}: {}", producerTopic, e.getMessage());
+            }
+
+            // Chỉ điều chỉnh rate nếu có lag hợp lệ
+            if (hasValidLag) {
+                double newRate = rateControlService.calculateNewRateForProducer(producerLag);
+                rateControlService.updateRate(newRate);
+                currentRate = rateControlService.getCurrentRate();
+                logger.info("[Producer] Adjusted rate to {} messages/second based on producer lag: {}", 
+                          String.format("%.2f", currentRate), producerLag);
+            } else {
+                logger.warn("No valid lag found for producer topic. Keeping current rate: {}", currentRate);
+            }
+                       
+            lagMonitor.shutdown();
         } catch (Exception e) {
-            System.err.println("Error monitoring lag: " + e.getMessage());
+            logger.error("Error monitoring lag: {}", e.getMessage());
         }
     }
 
@@ -165,7 +215,7 @@ public class AProducer {
             executor.shutdown();
             try {
                 if (!executor.awaitTermination(5, TimeUnit.MINUTES)) {
-                    System.err.println("Executor did not terminate in time. Forcing shutdown...");
+                    logger.error("Executor did not terminate in time. Forcing shutdown...");
                     executor.shutdownNow();
                 }
             } catch (InterruptedException e) {
@@ -186,18 +236,18 @@ public class AProducer {
             try {
                 kafkaProducer.flush();
                 kafkaProducer.close(Duration.ofSeconds(30));
-                System.out.println("Kafka Producer closed successfully.");
+                logger.info("Kafka Producer closed successfully.");
             } catch (Exception e) {
-                System.err.println("Error closing Kafka producer: " + e.getMessage());
+                logger.error("Error closing Kafka producer: {}", e.getMessage());
             }
         }
 
         if (aerospikeClient != null) {
             try {
                 aerospikeClient.close();
-                System.out.println("Aerospike Client closed successfully.");
+                logger.info("Aerospike Client closed successfully.");
             } catch (Exception e) {
-                System.err.println("Error closing Aerospike client: " + e.getMessage());
+                logger.error("Error closing Aerospike client: {}", e.getMessage());
             }
         }
 
