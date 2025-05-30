@@ -60,6 +60,11 @@ public class TopicGenerator {
         return baseTopic + "-a-group";
     }
 
+    // Tạo tên topic cho mirrored topic
+    public static String generateMirroredTopicName(String topic) {
+        return "source-kafka." + topic;
+    }
+
     public static class TopicNameGenerator {
 
         public static String generateTopicName(String producerName, String prefix) {

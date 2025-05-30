@@ -28,8 +28,11 @@ kafka:
     target: localhost:9093
 
 performance:
-  max_messages_per_second: 6000
+  max_messages_per_second: 4000
   max_retries: 5
+  worker_pool:
+    producer: 2
+    consumer: 4
   rate_control:
     initial_rate: 5000.0
     max_rate: 10000.0

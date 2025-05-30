@@ -58,7 +58,9 @@ public class CdcProducerService {
                         Record record = records.getRecord();
                         
                         if (key != null && key.userKey != null) {
-                            long updateTime = record != null ? record.getLong("lastUpdate") : System.currentTimeMillis();
+                            long updateTime = record != null && record.getValue("lastUpdate") != null ? 
+                                (long) record.getValue("lastUpdate") : 
+                                System.currentTimeMillis();
                             
                             if (updateTime > windowStart) {
                                 ProducerRecord<byte[], byte[]> kafkaRecord = messageService.createKafkaRecord(key, record);

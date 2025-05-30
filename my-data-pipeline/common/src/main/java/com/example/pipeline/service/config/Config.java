@@ -68,17 +68,60 @@ public class Config {
     public static class PerformanceConfig {
         private int max_messages_per_second;
         private int max_retries;
+        private WorkerPoolConfig worker_pool;
         private RateControlConfig rate_control;
 
-        public int getMax_messages_per_second() { return max_messages_per_second; }
-        public void setMax_messages_per_second(int max_messages_per_second) { 
-            this.max_messages_per_second = max_messages_per_second; 
+        public int getMax_messages_per_second() {
+            return max_messages_per_second;
         }
-        public int getMax_retries() { return max_retries; }
-        public void setMax_retries(int max_retries) { this.max_retries = max_retries; }
-        public RateControlConfig getRate_control() { return rate_control; }
-        public void setRate_control(RateControlConfig rate_control) { 
-            this.rate_control = rate_control; 
+
+        public void setMax_messages_per_second(int max_messages_per_second) {
+            this.max_messages_per_second = max_messages_per_second;
+        }
+
+        public int getMax_retries() {
+            return max_retries;
+        }
+
+        public void setMax_retries(int max_retries) {
+            this.max_retries = max_retries;
+        }
+
+        public WorkerPoolConfig getWorker_pool() {
+            return worker_pool;
+        }
+
+        public void setWorker_pool(WorkerPoolConfig worker_pool) {
+            this.worker_pool = worker_pool;
+        }
+
+        public RateControlConfig getRate_control() {
+            return rate_control;
+        }
+
+        public void setRate_control(RateControlConfig rate_control) {
+            this.rate_control = rate_control;
+        }
+    }
+
+    public static class WorkerPoolConfig {
+        private int producer;
+        private int consumer;
+
+        public int getProducer() {
+            return producer;
+        }
+
+        public void setProducer(int producer) {
+            this.producer = producer;
+        }
+
+        public int getConsumer() {
+            return consumer;
+        }
+
+        public void setConsumer(int consumer) {
+            this.consumer = consumer;
         }
     }
 

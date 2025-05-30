@@ -5,6 +5,8 @@ import org.apache.kafka.clients.admin.DeleteTopicsResult;
 import org.apache.kafka.clients.admin.KafkaAdminClient;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.ListTopicsResult;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Properties;
 import java.util.Collections;
@@ -12,6 +14,8 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 public class DeleteTopic {
+    private static final Logger logger = LoggerFactory.getLogger(DeleteTopic.class);
+
     public static void deleteAllTopics(String bootstrapServers) {
         Properties props = new Properties();
         props.put("bootstrap.servers", bootstrapServers);
@@ -20,7 +24,7 @@ public class DeleteTopic {
             Set<String> allTopics = adminClient.listTopics().names().get(5, TimeUnit.SECONDS);
 
             if (allTopics.isEmpty()) {
-                System.out.println("Khong co topic nao de xoa.");
+                logger.info("Khong co topic nao de xoa.");
                 return;
             }
 
@@ -35,15 +39,14 @@ public class DeleteTopic {
                 }
                 try {
                     adminClient.deleteTopics(Collections.singletonList(topic)).all().get(30, TimeUnit.SECONDS);
-                    System.out.println("Da xoa topic: " + topic);
+                    logger.info("Da xoa topic: {}", topic);
                 } catch (Exception e) {
-                    System.err.println("Loi khi xoa topic " + topic + ": " + e.getMessage());
+                    logger.error("Loi khi xoa topic {}: {}", topic, e.getMessage());
                 }
             }
-            System.out.println("Da xoa xong cac topic khong can thiet.");
+            logger.info("Da xoa xong cac topic khong can thiet.");
         } catch (Exception e) {
-            System.err.println("Loi khi xoa topic: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Loi khi xoa topic: {}", e.getMessage(), e);
         }
     }
 
@@ -56,7 +59,7 @@ public class DeleteTopic {
             // Xóa topic
             DeleteTopicsResult deleteTopicsResult = adminClient.deleteTopics(Collections.singletonList(topicName));
             deleteTopicsResult.all().get(30, TimeUnit.SECONDS);
-            System.out.println("Topic " + topicName + " da duoc danh dau de xoa.");
+            logger.info("Topic {} da duoc danh dau de xoa.", topicName);
 
             // Đợi topic được xóa hoàn toàn
             boolean topicExists = true;
@@ -70,20 +73,19 @@ public class DeleteTopic {
             }
 
             if (topicExists) {
-                System.err.println("Khong the xoa topic " + topicName + " sau " + retries + " lan thu.");
+                logger.error("Khong the xoa topic {} sau {} lan thu.", topicName, retries);
                 return;
             }
 
-            System.out.println("Topic " + topicName + " da duoc xoa thanh cong.");
+            logger.info("Topic {} da duoc xoa thanh cong.", topicName);
             
             // Tạo lại topic mới
             NewTopic newTopic = new NewTopic(topicName, 1, (short) 1);
             adminClient.createTopics(Collections.singletonList(newTopic)).all().get(30, TimeUnit.SECONDS);
-            System.out.println("Topic " + topicName + " da duoc tao lai thanh cong.");
+            logger.info("Topic {} da duoc tao lai thanh cong.", topicName);
             
         } catch (Exception e) {
-            System.err.println("Loi khi xoa/tao topic: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Loi khi xoa/tao topic: {}", e.getMessage(), e);
         }
     }
 }

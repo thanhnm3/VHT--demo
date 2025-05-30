@@ -58,19 +58,21 @@ public class CdcService {
                 try {
                     personData = Base64.getDecoder().decode(personDataBase64);
                 } catch (IllegalArgumentException e) {
+                    System.err.println("Loi giai ma personData: " + e.getMessage());
                     personData = null;
                 }
             }
 
             // Xu ly lastUpdate
-            long lastUpdate = 0;
+            long lastUpdate = System.currentTimeMillis(); // Default to current time
             if (data != null) {
                 Object lastUpdateObj = data.get("lastUpdate");
                 if (lastUpdateObj != null) {
                     try {
                         lastUpdate = ((Number) lastUpdateObj).longValue();
                     } catch (Exception e) {
-                        // Sử dụng giá trị mặc định 0
+                        System.err.println("Loi xu ly lastUpdate: " + e.getMessage());
+                        // Giữ nguyên giá trị mặc định là thời gian hiện tại
                     }
                 }
             }

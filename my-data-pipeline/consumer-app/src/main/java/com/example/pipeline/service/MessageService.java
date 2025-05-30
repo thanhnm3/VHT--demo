@@ -6,12 +6,10 @@ import com.aerospike.client.Key;
 import com.aerospike.client.Bin;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.time.Duration;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ThreadFactory;
@@ -19,29 +17,35 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.util.concurrent.CountDownLatch;
 
 public class MessageService {
+    private static final Logger logger = LoggerFactory.getLogger(MessageService.class);
     private final AerospikeClient destinationClient;
     private final WritePolicy writePolicy;
     private final ExecutorService workerPool;
     private final String namespace;
     private final String setName;
     private final String prefix;
-    private final KafkaConsumer<byte[], byte[]> consumer;
     private volatile boolean isRunning = true;
     private final AtomicLong lastProcessedOffset = new AtomicLong(0);
     private final AtomicLong currentOffset = new AtomicLong(0);
     private final AtomicLong processedRecords = new AtomicLong(0);
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public MessageService(AerospikeClient destinationClient, WritePolicy writePolicy, 
                          String namespace, String setName, String prefix,
-                         KafkaConsumer<byte[], byte[]> consumer, int workerPoolSize) {
+                         int workerPoolSize) {
         this.destinationClient = destinationClient;
         this.writePolicy = writePolicy;
         this.namespace = namespace;
         this.setName = setName;
         this.prefix = prefix;
-        this.consumer = consumer;
         
         // Create worker pool with CallerRunsPolicy
         this.workerPool = new ThreadPoolExecutor(
@@ -62,36 +66,13 @@ public class MessageService {
         );
     }
 
-    public void start() {
-        while (isRunning) {
-            try {
-                // Poll for records
-                ConsumerRecords<byte[], byte[]> records = consumer.poll(Duration.ofMillis(100));
-                
-                // Update current offset
-                if (!records.isEmpty()) {
-                    records.forEach(record -> {
-                        currentOffset.set(record.offset());
-                    });
-                }
-                
-                // Process records
-                processRecords(records);
-                
-            } catch (Exception e) {
-                System.err.printf("[%s] Error in message service: %s%n", 
-                                prefix, e.getMessage());
-                e.printStackTrace();
-            }
-        }
-    }
-
     public void processRecords(ConsumerRecords<byte[], byte[]> records) {
         if (!isRunning || records.isEmpty()) return;
 
         List<ConsumerRecord<byte[], byte[]>> recordList = new ArrayList<>();
         for (ConsumerRecord<byte[], byte[]> record : records) {
             recordList.add(record);
+            currentOffset.set(record.offset());
         }
 
         processBatch(recordList);
@@ -108,8 +89,7 @@ public class MessageService {
                     lastProcessedOffset.set(record.offset());
                     processedRecords.incrementAndGet();
                 } catch (Exception e) {
-                    System.err.printf("[%s] Error processing record: %s%n", 
-                                    prefix, e.getMessage());
+                    logger.error("[{}] Error processing record: {}", prefix, e.getMessage());
                 }
             });
         }
@@ -119,7 +99,7 @@ public class MessageService {
         try {
             // Check if key is null
             if (record.key() == null) {
-                System.err.printf("[%s] Error: Record key is null%n", prefix);
+                logger.error("[{}] Error: Record key is null", prefix);
                 return;
             }
 
@@ -134,17 +114,29 @@ public class MessageService {
             if (record.value() != null) {
                 try {
                     String message = new String(record.value(), StandardCharsets.UTF_8);
-                    if (message.contains("\"personData\": \"") && message.contains("\"lastUpdate\": ")) {
-                        String[] parts = message.split("\"personData\": \"");
-                        String personDataBase64 = parts[1].split("\"")[0];
-                        String lastUpdateStr = message.split("\"lastUpdate\": ")[1].split("}")[0];
-                        
-                        // Decode personData from base64
-                        personData = Base64.getDecoder().decode(personDataBase64);
-                        lastUpdate = Long.parseLong(lastUpdateStr);
+                    Map<String, Object> data = objectMapper.readValue(message, new TypeReference<Map<String, Object>>() {});
+                    
+                    // Parse personData
+                    String personDataBase64 = (String) data.get("personData");
+                    if (personDataBase64 != null) {
+                        try {
+                            personData = Base64.getDecoder().decode(personDataBase64);
+                        } catch (IllegalArgumentException e) {
+                            logger.error("[{}] Error decoding personData: {}", prefix, e.getMessage());
+                        }
+                    }
+                    
+                    // Parse lastUpdate
+                    Object lastUpdateObj = data.get("lastUpdate");
+                    if (lastUpdateObj != null) {
+                        try {
+                            lastUpdate = ((Number) lastUpdateObj).longValue();
+                        } catch (Exception e) {
+                            logger.error("[{}] Error parsing lastUpdate: {}", prefix, e.getMessage());
+                        }
                     }
                 } catch (Exception e) {
-                    System.err.printf("[%s] Error parsing message: %s%n", prefix, e.getMessage());
+                    logger.error("[{}] Error parsing message: {}", prefix, e.getMessage());
                 }
             }
             
@@ -155,18 +147,21 @@ public class MessageService {
             // Write to Aerospike with both bins
             destinationClient.put(writePolicy, key, personDataBin, lastUpdateBin);
         } catch (Exception e) {
-            System.err.printf("[%s] Error writing to Aerospike: %s%n", 
-                            prefix, e.getMessage());
+            logger.error("[{}] Error writing to Aerospike: {}", prefix, e.getMessage());
             throw e;
         }
     }
 
+    public long getCurrentOffset() {
+        return currentOffset.get();
+    }
+
+    public long getLastProcessedOffset() {
+        return lastProcessedOffset.get();
+    }
+
     public void shutdown() {
         isRunning = false;
-        if (consumer != null) {
-            consumer.wakeup();
-            consumer.close();
-        }
         workerPool.shutdown();
         try {
             if (!workerPool.awaitTermination(30, TimeUnit.SECONDS)) {
@@ -174,6 +169,38 @@ public class MessageService {
             }
         } catch (InterruptedException e) {
             workerPool.shutdownNow();
+        }
+    }
+
+    public void processRecordsAndWait(ConsumerRecords<byte[], byte[]> records) {
+        if (!isRunning || records.isEmpty()) return;
+        List<ConsumerRecord<byte[], byte[]>> recordList = new ArrayList<>();
+        for (ConsumerRecord<byte[], byte[]> record : records) {
+            recordList.add(record);
+            currentOffset.set(record.offset());
+        }
+        CountDownLatch latch = new CountDownLatch(recordList.size());
+        for (ConsumerRecord<byte[], byte[]> record : recordList) {
+            if (!isRunning) {
+                latch.countDown();
+                continue;
+            }
+            workerPool.submit(() -> {
+                try {
+                    processRecord(record);
+                    lastProcessedOffset.set(record.offset());
+                    processedRecords.incrementAndGet();
+                } catch (Exception e) {
+                    logger.error("[{}] Error processing record: {}", prefix, e.getMessage());
+                } finally {
+                    latch.countDown();
+                }
+            });
+        }
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 } 

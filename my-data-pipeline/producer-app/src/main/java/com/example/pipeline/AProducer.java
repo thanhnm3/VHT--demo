@@ -6,7 +6,6 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.admin.AdminClient;
 import com.example.pipeline.service.RateControlService;
-import com.example.pipeline.service.TopicGenerator;
 import com.example.pipeline.service.KafkaProducerService;
 import com.example.pipeline.service.MessageProducerService;
 import com.example.pipeline.service.AerospikeProducerService;
@@ -25,9 +24,7 @@ public class AProducer {
     private static final double MAX_RATE = 100000.0;
     private static final double MIN_RATE = 1000.0;
     private static final int LAG_THRESHOLD = 1000;
-    @SuppressWarnings("unused")
     private static AdminClient adminClient;
-    @SuppressWarnings("unused")
     private static String consumerGroup;
     private static final int MONITORING_INTERVAL_SECONDS = 10;
     private static final ScheduledExecutorService rateAdjustmentExecutor = Executors.newSingleThreadScheduledExecutor();
@@ -37,101 +34,125 @@ public class AProducer {
     private static AerospikeProducerService aerospikeService;
 
     private static final Map<String, String> prefixToTopicMap = new ConcurrentHashMap<>();
-    private static String defaultTopic;
     private static String sourceNamespace;
 
-    public static void main(String[] args, int workerPoolSize, int maxMessagesPerSecond,
-                          String aerospikeHost, int aerospikePort, String namespace, String setName,
-                          String kafkaBroker, int maxRetries, String consumerGroup) {
-        AProducer.consumerGroup = consumerGroup;
-        AProducer.sourceNamespace = namespace;
-        
-        initializeTopicMapping();
-        
-        AerospikeClient aerospikeClient = null;
-        KafkaProducer<byte[], byte[]> kafkaProducer = null;
-
+    public static void main(String[] args) {
         try {
-            rateControlService = new RateControlService(5000.0, MAX_RATE, MIN_RATE, 
-                                                      LAG_THRESHOLD, MONITORING_INTERVAL_SECONDS);
-            kafkaService = new KafkaProducerService(kafkaBroker, defaultTopic, consumerGroup);
-            messageService = new MessageProducerService();
+            // Lấy thông tin cấu hình từ args
+            String kafkaBroker = args[0];
+            String aerospikeHost = args[1];
+            int aerospikePort = Integer.parseInt(args[2]);
+            String namespace = args[3];
+            String setName = args[4];
+            int maxRetries = Integer.parseInt(args[5]);
+            String consumerGroup = args[6];
+            int workerPoolSize = Integer.parseInt(args[7]);
+            String topicList = args[8]; // Danh sách topic được phân tách bằng dấu phẩy
 
-            ClientPolicy clientPolicy = new ClientPolicy();
-            clientPolicy.timeout = 5000;
-            clientPolicy.maxConnsPerNode = 300;
-            aerospikeClient = new AerospikeClient(clientPolicy, aerospikeHost, aerospikePort);
+            AProducer.consumerGroup = consumerGroup;
+            AProducer.sourceNamespace = namespace;
+            
+            // Khởi tạo topic mapping từ danh sách topic được truyền vào
+            initializeTopicMapping(topicList);
+            
+            AerospikeClient aerospikeClient = null;
+            KafkaProducer<byte[], byte[]> kafkaProducer = null;
 
-            kafkaProducer = kafkaService.createProducer(maxRetries);
+            try {
+                rateControlService = new RateControlService(5000.0, MAX_RATE, MIN_RATE, 
+                                                          LAG_THRESHOLD, MONITORING_INTERVAL_SECONDS);
+                kafkaService = new KafkaProducerService(kafkaBroker, null, consumerGroup);
+                messageService = new MessageProducerService();
+                messageService.initializeTopicMapping(prefixToTopicMap, null);
 
-            Properties adminProps = new Properties();
-            adminProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBroker);
-            adminClient = AdminClient.create(adminProps);
+                ClientPolicy clientPolicy = new ClientPolicy();
+                clientPolicy.timeout = 5000;
+                clientPolicy.maxConnsPerNode = 300;
+                aerospikeClient = new AerospikeClient(clientPolicy, aerospikeHost, aerospikePort);
 
-            createTopics();
+                kafkaProducer = kafkaService.createProducer(maxRetries);
 
-            Thread monitorThread = new Thread(() -> {
-                while (!Thread.currentThread().isInterrupted()) {
-                    try {
-                        if (rateControlService.shouldCheckRateAdjustment()) {
-                            monitorAndAdjustLag();
+                Properties adminProps = new Properties();
+                adminProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBroker);
+                adminClient = AdminClient.create(adminProps);
+
+                createTopics();
+
+                Thread monitorThread = new Thread(() -> {
+                    while (!Thread.currentThread().isInterrupted()) {
+                        try {
+                            if (rateControlService.shouldCheckRateAdjustment()) {
+                                monitorAndAdjustLag();
+                            }
+                            Thread.sleep(1000);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            break;
                         }
-                        Thread.sleep(1000);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        break;
                     }
-                }
-            });
-            monitorThread.start();
+                });
+                monitorThread.start();
 
-            ThreadPoolExecutor customExecutor = new ThreadPoolExecutor(
-                workerPoolSize,
-                workerPoolSize,
-                60L, TimeUnit.SECONDS,
-                new LinkedBlockingQueue<>(100000),
-                new ThreadPoolExecutor.CallerRunsPolicy()
-            );
-            executor = customExecutor;
+                ThreadPoolExecutor customExecutor = new ThreadPoolExecutor(
+                    workerPoolSize,
+                    workerPoolSize,
+                    60L, TimeUnit.SECONDS,
+                    new LinkedBlockingQueue<>(100000),
+                    new ThreadPoolExecutor.CallerRunsPolicy()
+                );
+                executor = customExecutor;
 
-            aerospikeService = new AerospikeProducerService(
-                executor,
-                messageService,
-                prefixToTopicMap,
-                defaultTopic,
-                sourceNamespace
-            );
+                aerospikeService = new AerospikeProducerService(
+                    executor,
+                    messageService,
+                    prefixToTopicMap,
+                    null, // Không sử dụng default topic
+                    sourceNamespace
+                );
 
-            aerospikeService.readDataFromAerospike(
-                aerospikeClient,
-                kafkaProducer,
-                currentRate,
-                setName,
-                maxRetries
-            );
+                logger.info("Starting producer with configuration:");
+                logger.info("  Namespace: {}", namespace);
+                logger.info("  Set: {}", setName);
+                logger.info("  Topics: {}", prefixToTopicMap);
+                logger.info("  Consumer group: {}", consumerGroup);
+                logger.info("  Worker pool size: {}", workerPoolSize);
 
-            monitorThread.interrupt();
+                aerospikeService.readDataFromAerospike(
+                    aerospikeClient,
+                    kafkaProducer,
+                    currentRate,
+                    setName,
+                    maxRetries
+                );
 
+                monitorThread.interrupt();
+
+            } catch (Exception e) {
+                logger.error("Critical error: {}", e.getMessage());
+                e.printStackTrace();
+            } finally {
+                shutdownGracefully(aerospikeClient, kafkaProducer);
+            }
         } catch (Exception e) {
-            logger.error("Critical error: {}", e.getMessage());
-            e.printStackTrace();
-        } finally {
-            shutdownGracefully(aerospikeClient, kafkaProducer);
+            logger.error("Error in main: {}", e.getMessage(), e);
         }
     }
 
-    private static void initializeTopicMapping() {
-        Map<String, String> generatedTopics = TopicGenerator.generateTopics();
-        prefixToTopicMap.putAll(generatedTopics);
-        defaultTopic = String.format("%s.profile.default.produce", sourceNamespace);
-        logger.info("Initialized topic mapping: {}", prefixToTopicMap);
-        logger.info("Default topic: {}", defaultTopic);
+    private static void initializeTopicMapping(String topicList) {
+        // Phân tách danh sách topic và tạo mapping từ prefix sang topic
+        String[] topicArray = topicList.split(",");
+        for (String topic : topicArray) {
+            String trimmedTopic = topic.trim();
+            // Lấy prefix từ topic name (ví dụ: từ "producer1_096-a" lấy "096")
+            String prefix = trimmedTopic.split("_")[1].split("-")[0];
+            prefixToTopicMap.put(prefix, trimmedTopic);
+        }
+        logger.info("Initialized topic mapping from prefix to topic: {}", prefixToTopicMap);
     }
 
     private static void createTopics() {
         try {
             Set<String> topics = new HashSet<>(prefixToTopicMap.values());
-            topics.add(defaultTopic);
             
             for (String topic : topics) {
                 try {
@@ -148,59 +169,62 @@ public class AProducer {
 
     private static void monitorAndAdjustLag() {
         try {
-            // Khởi tạo KafkaLagMonitor với target broker
-            KafkaLagMonitor lagMonitor = new KafkaLagMonitor();
-            
-            // Chỉ tính lag cho topic của producer này
-            long producerLag = 0;
-            boolean hasValidLag = false;
-            
-            // Lấy topic của producer này từ prefix mapping
-            String producerTopic = null;
-            for (Map.Entry<String, String> entry : prefixToTopicMap.entrySet()) {
-                if (entry.getValue().contains(sourceNamespace)) {
-                    producerTopic = entry.getValue();
-                    break;
-                }
-            }
-            
-            if (producerTopic == null) {
-                logger.warn("No matching topic found for producer namespace: {}", sourceNamespace);
+            if (consumerGroup == null) {
+                logger.warn("Consumer group is not set, skipping lag monitoring");
                 return;
             }
+
+            KafkaLagMonitor lagMonitor = new KafkaLagMonitor();
+            long totalLag = 0;
+            boolean hasValidLag = false;
             
-            try {
-                // Thử tính lag cho topic đã mirror trước
-                String mirroredTopic = "source-kafka." + producerTopic;
-                long topicLag = lagMonitor.calculateTopicLag(mirroredTopic, consumerGroup);
+            // Tách consumer groups thành mảng
+            String[] consumerGroups = consumerGroup.split(",");
+            
+            // Tạo map từ prefix sang topic và consumer group
+            Map<String, String> prefixToTopicMap = new HashMap<>();
+            Map<String, String> prefixToGroupMap = new HashMap<>();
+            
+            for (String group : consumerGroups) {
+                group = group.trim();
+                // Lấy prefix từ consumer group (ví dụ: từ "producer1_096-a-group" lấy "096")
+                String prefix = group.split("_")[1].split("-")[0];
+                String topic = "producer1_" + prefix + "-a";
+                prefixToTopicMap.put(prefix, topic);
+                prefixToGroupMap.put(prefix, group);
+            }
+            
+            // Tính tổng lag cho mỗi cặp topic-group tương ứng
+            for (Map.Entry<String, String> entry : prefixToTopicMap.entrySet()) {
+                String prefix = entry.getKey();
+                String topic = entry.getValue();
+                String group = prefixToGroupMap.get(prefix);
                 
-                if (topicLag >= 0) {
-                    producerLag = topicLag;
-                    hasValidLag = true;
-                    logger.info("Producer topic {} (mirrored as {}) has lag: {}", 
-                              producerTopic, mirroredTopic, topicLag);
-                } else {
-                    // Nếu không tìm thấy topic đã mirror, thử với topic gốc
-                    topicLag = lagMonitor.calculateTopicLag(producerTopic, consumerGroup);
+                try {
+                    String mirroredTopic = "source-kafka." + topic;
+                    long topicLag = lagMonitor.calculateTopicLag(mirroredTopic, group);
+                    
                     if (topicLag >= 0) {
-                        producerLag = topicLag;
+                        totalLag += topicLag;
                         hasValidLag = true;
-                        logger.info("Producer topic {} has lag: {}", producerTopic, topicLag);
+                        logger.info("Topic {} (mirrored as {}) has lag: {} for consumer group: {}", 
+                                  topic, mirroredTopic, topicLag, group);
                     }
+                } catch (Exception e) {
+                    logger.warn("Error calculating lag for topic {} with consumer group {}: {}", 
+                              topic, group, e.getMessage());
                 }
-            } catch (Exception e) {
-                logger.warn("Error calculating lag for producer topic {}: {}", producerTopic, e.getMessage());
             }
 
-            // Chỉ điều chỉnh rate nếu có lag hợp lệ
             if (hasValidLag) {
-                double newRate = rateControlService.calculateNewRateForProducer(producerLag);
+                double newRate = rateControlService.calculateNewRateForProducer(totalLag);
                 rateControlService.updateRate(newRate);
                 currentRate = rateControlService.getCurrentRate();
-                logger.info("[Producer] Adjusted rate to {} messages/second based on producer lag: {}", 
-                          String.format("%.2f", currentRate), producerLag);
+                logger.info("[Producer] Adjusted rate to {} messages/second based on total lag: {} for consumer groups: {}", 
+                          String.format("%.2f", currentRate), totalLag, consumerGroup);
             } else {
-                logger.warn("No valid lag found for producer topic. Keeping current rate: {}", currentRate);
+                logger.warn("No valid lag found for any topic with consumer groups: {}. Keeping current rate: {}", 
+                          consumerGroup, currentRate);
             }
                        
             lagMonitor.shutdown();
