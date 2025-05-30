@@ -27,14 +27,12 @@ public class KafkaLagMonitor {
         Properties props = new Properties();
         props.put("bootstrap.servers", targetBroker);
         this.adminClient = AdminClient.create(props);
-        logger.info("Initialized KafkaLagMonitor with target broker: {}", targetBroker);
     }
 
     public KafkaLagMonitor(String bootstrapServers) {
         Properties props = new Properties();
         props.put("bootstrap.servers", bootstrapServers);
         this.adminClient = AdminClient.create(props);
-        logger.info("Initialized KafkaLagMonitor with custom broker: {}", bootstrapServers);
     }
 
     /**
@@ -45,10 +43,14 @@ public class KafkaLagMonitor {
      */
     public long calculateTopicLag(String topic, String consumerGroup) {
         try {
-            // Lấy consumer group offsets
             ListConsumerGroupOffsetsResult consumerOffsets = adminClient.listConsumerGroupOffsets(consumerGroup);
             Map<TopicPartition, org.apache.kafka.clients.consumer.OffsetAndMetadata> consumerOffsetMap = 
                 consumerOffsets.partitionsToOffsetAndMetadata().get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+
+            if (consumerOffsetMap == null || consumerOffsetMap.isEmpty()) {
+                logger.warn("No consumer offsets found for group: {}", consumerGroup);
+                return 0;
+            }
 
             // Lọc các partition của topic cần tính
             Set<TopicPartition> topicPartitions = new HashSet<>();
@@ -59,7 +61,6 @@ public class KafkaLagMonitor {
             }
 
             if (topicPartitions.isEmpty()) {
-                logger.warn("No partitions found for topic: {}", topic);
                 return 0;
             }
 
@@ -78,19 +79,17 @@ public class KafkaLagMonitor {
             for (TopicPartition tp : topicPartitions) {
                 long consumerOffset = consumerOffsetMap.get(tp).offset();
                 long endOffset = endOffsetMap.get(tp).offset();
-                long partitionLag = endOffset - consumerOffset;
-                totalLag += partitionLag;
-                
-                logger.debug("Partition {}: consumer offset = {}, end offset = {}, lag = {}", 
-                           tp.partition(), consumerOffset, endOffset, partitionLag);
+                totalLag += (endOffset - consumerOffset);
             }
 
-            logger.info("Total lag for topic {} in consumer group {}: {}", 
-                       topic, consumerGroup, totalLag);
+            if (totalLag > 0) {
+                logger.info("Topic: {}, Consumer Group: {}, Current Lag: {}", topic, consumerGroup, totalLag);
+            }
             return totalLag;
 
         } catch (InterruptedException | ExecutionException | TimeoutException e) {
-            logger.error("Error calculating lag for topic {}: {}", topic, e.getMessage());
+            logger.error("Error calculating lag for topic {} in group {}: {}", 
+                        topic, consumerGroup, e.getMessage());
             return 0;
         }
     }

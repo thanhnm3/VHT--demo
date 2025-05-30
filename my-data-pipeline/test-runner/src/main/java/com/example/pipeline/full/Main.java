@@ -88,6 +88,10 @@ public class Main {
                 }
             });
 
+            // Đợi một khoảng thời gian để đảm bảo topic đã được tạo và sẵn sàng
+            logger.info("Dang doi 1 giay de topic duoc tao va san sang...");
+            Thread.sleep(1000);
+
             // Chạy Consumer
             executor.submit(() -> {
                 try {

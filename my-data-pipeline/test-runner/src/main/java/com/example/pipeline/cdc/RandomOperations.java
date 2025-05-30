@@ -13,7 +13,6 @@ import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.Map;
@@ -57,10 +56,6 @@ public class RandomOperations {
         AtomicInteger totalUpdateCount = new AtomicInteger(0);
         AtomicInteger totalDeleteCount = new AtomicInteger(0);
 
-        AtomicInteger insertCountThisSecond = new AtomicInteger(0);
-        AtomicInteger updateCountThisSecond = new AtomicInteger(0);
-        AtomicInteger deleteCountThisSecond = new AtomicInteger(0);
-
         // Lấy danh sách key từ database
         ConcurrentLinkedQueue<Key> randomKeys = getRandomKeysFromDatabase(client, namespace, setName, KEY_LIMIT);
         System.out.println("Da lay " + randomKeys.size() + " keys tu database");
@@ -92,7 +87,6 @@ public class RandomOperations {
                         operationPerformed = performInsert(client, writePolicy, namespace, setName, random, prefix);
                         if (operationPerformed) {
                             totalInsertCount.incrementAndGet();
-                            insertCountThisSecond.incrementAndGet();
                             OPERATION_COUNTERS.get(prefix).get("insert").incrementAndGet();
                         }
                         break;
@@ -100,7 +94,6 @@ public class RandomOperations {
                         operationPerformed = performUpdate(client, writePolicy, readPolicy, namespace, setName, randomKeys, random, prefix);
                         if (operationPerformed) {
                             totalUpdateCount.incrementAndGet();
-                            updateCountThisSecond.incrementAndGet();
                             OPERATION_COUNTERS.get(prefix).get("update").incrementAndGet();
                         }
                         break;
@@ -108,7 +101,6 @@ public class RandomOperations {
                         operationPerformed = performDelete(client, namespace, setName, randomKeys, prefix);
                         if (operationPerformed) {
                             totalDeleteCount.incrementAndGet();
-                            deleteCountThisSecond.incrementAndGet();
                             OPERATION_COUNTERS.get(prefix).get("delete").incrementAndGet();
                         }
                         break;

@@ -5,6 +5,7 @@ import com.example.pipeline.CdcProducer;
 import com.example.pipeline.service.config.Config;
 import com.example.pipeline.service.ConfigLoader;
 import com.example.pipeline.full.DeleteTopic;
+import com.example.pipeline.service.TopicGenerator;
 
 import java.util.List;
 import java.util.Map;
@@ -92,16 +93,31 @@ public class Maincdc {
             // Tạo luồng để chạy AerospikePoller
             Thread cdcProducerThread = new Thread(() -> {
                 System.out.println("Starting CdcProducer...");
+                // Tạo consumer group name từ topic
+                String prefix = config.getPrefix_mapping().keySet().iterator().next();
+                String topic = config.getPrefix_mapping().get(prefix).get(0);
+                String cdcTopic = TopicGenerator.generateCdcTopicName(topic);
+                String consumerGroup = TopicGenerator.generateCdcGroupName(cdcTopic);
                 CdcProducer.start(producerHost, producerPort, producerNamespace, producerSetName, 
-                    kafkaBrokerSource, maxRetries, producerThreadPoolSize);
+                    kafkaBrokerSource, maxRetries, producerThreadPoolSize, consumerGroup);
             });
+
+            // Đợi một khoảng thời gian để đảm bảo topic đã được tạo và sẵn sàng
+            System.out.println("Dang doi 1 giay de topic duoc tao va san sang...");
+            Thread.sleep(1000);
 
             // Tạo một luồng duy nhất cho tất cả consumers
             Thread consumerThread = new Thread(() -> {
                 System.out.println("Starting CdcConsumer...");
+                // Sử dụng cùng consumer group name với producer
+                String prefix = config.getPrefix_mapping().keySet().iterator().next();
+                String topic = config.getPrefix_mapping().get(prefix).get(0);
+                String cdcTopic = TopicGenerator.generateCdcTopicName(topic);
+                String consumerGroup = TopicGenerator.generateCdcGroupName(cdcTopic);
                 CdcConsumer.main(new String[]{}, consumerThreadPoolSize, maxMessagesPerSecond,
                     producerHost, producerPort, producerNamespace,
-                    cdcConsumers.get(0).getHost(), cdcConsumers.get(0).getPort(), kafkaBrokerTarget);
+                    cdcConsumers.get(0).getHost(), cdcConsumers.get(0).getPort(), 
+                    kafkaBrokerTarget, consumerGroup);
             });
 
             // Bắt đầu các luồng

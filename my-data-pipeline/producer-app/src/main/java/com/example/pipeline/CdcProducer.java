@@ -10,6 +10,7 @@ import com.example.pipeline.service.TopicGenerator;
 import com.example.pipeline.service.KafkaProducerService;
 import com.example.pipeline.service.MessageProducerService;
 import com.example.pipeline.service.CdcProducerService;
+import com.example.pipeline.service.KafkaLagMonitor;
 
 import java.time.Duration;
 import java.util.*;
@@ -35,8 +36,9 @@ public class CdcProducer {
     private static String sourceNamespace;
 
     public static void start(String aeroHost, int aeroPort, String namespace, String setName,
-            String kafkaBroker, int maxRetries, int threadPoolSize) {
+            String kafkaBroker, int maxRetries, int threadPoolSize, String consumerGroup) {
         sourceNamespace = namespace;
+        CdcProducer.consumerGroup = consumerGroup;
         initializeTopicMapping();
         
         AerospikeClient aerospikeClient = null;
@@ -166,11 +168,63 @@ public class CdcProducer {
 
     private static void monitorAndAdjustLag() {
         try {
-            long totalLag = kafkaService.calculateTotalLag();
-            double newRate = rateControlService.calculateNewRateForProducer(totalLag);
-            rateControlService.updateRate(newRate);
-            currentRate = rateControlService.getCurrentRate();
-            System.out.printf("[CDC Producer] Adjusted rate to %.2f messages/second based on lag: %d%n", currentRate, totalLag);
+            // Khởi tạo KafkaLagMonitor với target broker
+            KafkaLagMonitor lagMonitor = new KafkaLagMonitor();
+            
+            // Chỉ tính lag cho topic của producer này
+            long producerLag = 0;
+            boolean hasValidLag = false;
+            
+            // Lấy topic của producer này từ prefix mapping
+            String producerTopic = null;
+            for (Map.Entry<String, String> entry : prefixToTopicMap.entrySet()) {
+                if (entry.getValue().contains(sourceNamespace)) {
+                    producerTopic = entry.getValue();
+                    break;
+                }
+            }
+            
+            if (producerTopic == null) {
+                System.err.println("No matching topic found for producer namespace: " + sourceNamespace);
+                return;
+            }
+            
+            try {
+                // Thử tính lag cho topic đã mirror trước
+                String mirroredTopic = "source-kafka." + producerTopic;
+                long topicLag = lagMonitor.calculateTopicLag(mirroredTopic, consumerGroup);
+                
+                if (topicLag >= 0) {
+                    producerLag = topicLag;
+                    hasValidLag = true;
+                    System.out.printf("Producer topic %s (mirrored as %s) has lag: %d%n", 
+                              producerTopic, mirroredTopic, topicLag);
+                } else {
+                    // Nếu không tìm thấy topic đã mirror, thử với topic gốc
+                    topicLag = lagMonitor.calculateTopicLag(producerTopic, consumerGroup);
+                    if (topicLag >= 0) {
+                        producerLag = topicLag;
+                        hasValidLag = true;
+                        System.out.printf("Producer topic %s has lag: %d%n", producerTopic, topicLag);
+                    }
+                }
+            } catch (Exception e) {
+                System.err.printf("Error calculating lag for producer topic %s: %s%n", 
+                                producerTopic, e.getMessage());
+            }
+
+            // Chỉ điều chỉnh rate nếu có lag hợp lệ
+            if (hasValidLag) {
+                double newRate = rateControlService.calculateNewRateForProducer(producerLag);
+                rateControlService.updateRate(newRate);
+                currentRate = rateControlService.getCurrentRate();
+                System.out.printf("[CDC Producer] Adjusted rate to %.2f messages/second based on producer lag: %d%n", 
+                              currentRate, producerLag);
+            } else {
+                System.out.printf("No valid lag found for producer topic. Keeping current rate: %.2f%n", currentRate);
+            }
+                       
+            lagMonitor.shutdown();
         } catch (Exception e) {
             System.err.println("Error monitoring lag: " + e.getMessage());
         }

@@ -6,7 +6,6 @@ import com.example.pipeline.service.AerospikeService;
 import com.example.pipeline.service.KafkaConsumerService;
 import com.example.pipeline.service.CdcService;
 import com.example.pipeline.service.TopicGenerator;
-import com.google.common.util.concurrent.RateLimiter;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import java.util.Map;
 import java.util.HashMap;
@@ -26,13 +25,12 @@ public class CdcConsumer {
     private static KafkaConsumerService kafkaService;
     private static Map<String, CdcService> cdcServices;
     private static Map<String, ExecutorService> workerPools;
-    private static Map<String, RateLimiter> rateLimiters;
     private static Map<String, AtomicInteger> messagesProcessed;
 
     public static void main(String[] args, int workerPoolSize, int maxMessagesPerSecond,
                           String sourceHost, int sourcePort, String sourceNamespace,
                           String destinationHost, int destinationPort, 
-                          String kafkaBroker) {
+                          String kafkaBroker, String consumerGroup) {
         try {
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 System.out.println("Nhan tin hieu tat. Bat dau qua trinh tat an toan...");
@@ -56,7 +54,6 @@ public class CdcConsumer {
             // Khởi tạo các service và pool
             cdcServices = new HashMap<>();
             workerPools = new HashMap<>();
-            rateLimiters = new HashMap<>();
             messagesProcessed = new HashMap<>();
 
             // Hiển thị thông tin cấu hình tĩnh
@@ -69,16 +66,15 @@ public class CdcConsumer {
             System.out.println("Destination Port: " + destinationPort);
             System.out.println("Worker Pool Size: " + workerPoolSize);
             System.out.println("Max Messages Per Second: " + maxMessagesPerSecond);
+            System.out.println("Consumer Group: " + consumerGroup);
             System.out.println("\nTopic Mapping:");
             for (Map.Entry<String, String> entry : kafkaService.getPrefixToTopicMap().entrySet()) {
                 String prefix = entry.getKey();
                 String topic = entry.getValue();
                 String cdcTopic = TopicGenerator.generateCdcTopicName(topic);
-                String consumerGroup = TopicGenerator.generateCdcGroupName(cdcTopic);
                 System.out.printf("  Prefix: %s\n", prefix);
                 System.out.printf("    Original Topic: %s\n", cdcTopic);
                 System.out.printf("    Target Topic: source-kafka.%s\n", cdcTopic);
-                System.out.printf("    Consumer Group: %s\n", consumerGroup);
             }
             System.out.println("===============================\n");
 
@@ -125,7 +121,6 @@ public class CdcConsumer {
                 
                 // Tạo Kafka consumer thông qua KafkaConsumerService
                 String cdcTopic = TopicGenerator.generateCdcTopicName(topic);
-                String consumerGroup = TopicGenerator.generateCdcGroupName(cdcTopic);
                 System.out.printf("[CDC Consumer] Starting consumer for prefix %s\n", prefix);
                 System.out.printf("[CDC Consumer] Subscribing to topic: source-kafka.%s\n", cdcTopic);
                 
@@ -140,7 +135,6 @@ public class CdcConsumer {
                 );
                 cdcServices.put(prefix, cdcService);
                 workerPools.put(prefix, Executors.newFixedThreadPool(workerPoolSize));
-                rateLimiters.put(prefix, RateLimiter.create(maxMessagesPerSecond));
                 messagesProcessed.put(prefix, new AtomicInteger(0));
                 
                 // Khởi chạy CDC service trong một thread riêng
@@ -152,8 +146,6 @@ public class CdcConsumer {
                             for (var record : records) {
                                 workerPools.get(currentPrefix).submit(() -> {
                                     try {
-                                        // Sử dụng RateLimiter để kiểm soát tốc độ
-                                        rateLimiters.get(currentPrefix).acquire();
                                         cdcService.processRecord(record);
                                         messagesProcessed.get(currentPrefix).incrementAndGet();
                                     } catch (Exception e) {
