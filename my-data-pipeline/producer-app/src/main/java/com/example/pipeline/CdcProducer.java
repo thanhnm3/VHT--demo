@@ -6,7 +6,6 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.admin.AdminClient;
 import com.example.pipeline.service.RateControlService;
-import com.example.pipeline.service.TopicGenerator;
 import com.example.pipeline.service.KafkaProducerService;
 import com.example.pipeline.service.MessageProducerService;
 import com.example.pipeline.service.CdcProducerService;
@@ -21,7 +20,7 @@ import java.util.concurrent.*;
 public class CdcProducer {
     private static final Logger logger = LoggerFactory.getLogger(CdcProducer.class);
     private static ExecutorService executor;
-    private static volatile double currentRate = 5000.0;
+    private static volatile double currentRate;
     private static final double MAX_RATE = 100000.0;
     private static final double MIN_RATE = 1000.0;
     private static final int LAG_THRESHOLD = 1000;
@@ -33,6 +32,7 @@ public class CdcProducer {
     private static KafkaProducerService kafkaService;
     private static MessageProducerService messageService;
     private static CdcProducerService cdcProducerService;
+    private static int maxMessagesPerSecond;
 
     private static final Map<String, String> prefixToTopicMap = new ConcurrentHashMap<>();
     private static String sourceNamespace;
@@ -49,9 +49,11 @@ public class CdcProducer {
             String consumerGroup = args[6];
             int workerPoolSize = Integer.parseInt(args[7]);
             String topicList = args[8]; // Danh sách topic được phân tách bằng dấu phẩy
+            int maxMessagesPerSecond = Integer.parseInt(args[9]); // Thêm maxMessagesPerSecond
 
             CdcProducer.consumerGroup = consumerGroup;
             CdcProducer.sourceNamespace = namespace;
+            CdcProducer.currentRate = maxMessagesPerSecond; // Khởi tạo currentRate với maxMessagesPerSecond
             
             // Khởi tạo topic mapping từ danh sách topic được truyền vào
             initializeTopicMapping(topicList);
@@ -60,7 +62,7 @@ public class CdcProducer {
             KafkaProducer<byte[], byte[]> kafkaProducer = null;
 
             try {
-                rateControlService = new RateControlService(5000.0, MAX_RATE, MIN_RATE, 
+                rateControlService = new RateControlService(maxMessagesPerSecond, MAX_RATE, MIN_RATE, 
                                                           LAG_THRESHOLD, MONITORING_INTERVAL_SECONDS);
                 kafkaService = new KafkaProducerService(kafkaBroker, null, consumerGroup);
                 messageService = new MessageProducerService();
@@ -85,7 +87,7 @@ public class CdcProducer {
                             if (rateControlService.shouldCheckRateAdjustment()) {
                                 monitorAndAdjustLag();
                             }
-                            Thread.sleep(1000);
+                            Thread.sleep(MONITORING_INTERVAL_SECONDS * 1000); // Sleep for 5 seconds
                         } catch (InterruptedException e) {
                             Thread.currentThread().interrupt();
                             break;
@@ -129,7 +131,8 @@ public class CdcProducer {
                 monitorThread.interrupt();
 
             } catch (Exception e) {
-                logger.error("Critical error: {}", e.getMessage(), e);
+                logger.error("Critical error: {}", e.getMessage());
+                e.printStackTrace();
             } finally {
                 shutdownGracefully(aerospikeClient, kafkaProducer);
             }
@@ -139,16 +142,15 @@ public class CdcProducer {
     }
 
     private static void initializeTopicMapping(String topicList) {
-        // Phân tách danh sách topic và tạo mapping từ prefix sang topic CDC
+        // Phân tách danh sách topic và tạo mapping từ prefix sang topic
         String[] topicArray = topicList.split(",");
         for (String topic : topicArray) {
             String trimmedTopic = topic.trim();
             // Lấy prefix từ topic name (ví dụ: từ "producer1_096-cdc" lấy "096")
             String prefix = trimmedTopic.split("_")[1].split("-")[0];
-            // Sử dụng trực tiếp trimmedTopic thay vì thêm -cdc lần nữa
             prefixToTopicMap.put(prefix, trimmedTopic);
         }
-        logger.info("Initialized CDC topic mapping: {}", prefixToTopicMap);
+        logger.info("Initialized topic mapping from prefix to topic: {}", prefixToTopicMap);
     }
 
     private static void createTopics() {
@@ -158,13 +160,13 @@ public class CdcProducer {
             for (String topic : topics) {
                 try {
                     kafkaService.createTopic(topic);
-                    logger.info("Created/Verified CDC topic: {}", topic);
+                    logger.info("Created/Verified topic: {}", topic);
                 } catch (Exception e) {
-                    logger.error("Error creating CDC topic {}: {}", topic, e.getMessage());
+                    logger.error("Error creating topic {}: {}", topic, e.getMessage());
                 }
             }
         } catch (Exception e) {
-            logger.error("Error creating CDC topics: {}", e.getMessage());
+            logger.error("Error creating topics: {}", e.getMessage());
         }
     }
 
@@ -218,11 +220,19 @@ public class CdcProducer {
             }
 
             if (hasValidLag) {
-                double newRate = rateControlService.calculateNewRateForProducer(totalLag);
-                rateControlService.updateRate(newRate);
-                currentRate = rateControlService.getCurrentRate();
-                logger.info("[CDC Producer] Adjusted rate to {} messages/second based on total lag: {} for consumer groups: {}", 
-                          String.format("%.2f", currentRate), totalLag, consumerGroup);
+                if (totalLag <= LAG_THRESHOLD) {
+                    // Nếu lag nhỏ hơn hoặc bằng ngưỡng, giữ nguyên maxMessagesPerSecond
+                    currentRate = maxMessagesPerSecond;
+                    logger.info("[Producer] Lag is within threshold ({}), maintaining max rate: {} messages/second", 
+                              LAG_THRESHOLD, currentRate);
+                } else {
+                    // Nếu lag vượt ngưỡng, điều chỉnh rate
+                    double newRate = rateControlService.calculateNewRateForProducer(totalLag);
+                    rateControlService.updateRate(newRate);
+                    currentRate = rateControlService.getCurrentRate();
+                    logger.info("[Producer] Adjusted rate to {} messages/second based on total lag: {} for consumer groups: {}", 
+                              String.format("%.2f", currentRate), totalLag, consumerGroup);
+                }
             } else {
                 logger.warn("No valid lag found for any topic with consumer groups: {}. Keeping current rate: {}", 
                           consumerGroup, currentRate);

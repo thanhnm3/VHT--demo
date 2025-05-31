@@ -1,5 +1,13 @@
 package com.example.pipeline.cdc;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.List;
+import java.util.Map;
+import java.util.ArrayList;
+import java.util.concurrent.CountDownLatch;
+
 import com.example.pipeline.CdcConsumer;
 import com.example.pipeline.CdcProducer;
 import com.example.pipeline.service.config.Config;
@@ -7,11 +15,12 @@ import com.example.pipeline.service.ConfigLoader;
 import com.example.pipeline.full.DeleteTopic;
 import com.example.pipeline.service.TopicGenerator;
 
-import java.util.List;
-import java.util.Map;
-import java.util.ArrayList;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class Maincdc {
+    private static final Logger logger = LoggerFactory.getLogger(Maincdc.class);
+
     public static void main(String[] args) {
         try {
             // Load configuration from config.yaml
@@ -20,32 +29,16 @@ public class Maincdc {
                 throw new IllegalStateException("Failed to load configuration");
             }
 
-            // Lấy cấu hình Producer
-            String producerHost = config.getProducers().get(0).getHost();
-            int producerPort = config.getProducers().get(0).getPort();
-            String producerNamespace = config.getProducers().get(0).getNamespace();
-            String producerSetName = config.getProducers().get(0).getSet();
+            // Lấy cấu hình Kafka
             String kafkaBrokerSource = config.getKafka().getBrokers().getSource();
             String kafkaBrokerTarget = config.getKafka().getBrokers().getTarget();
 
-            // Lấy cấu hình Consumer cho CDC từ prefix mapping
-            Map<String, List<String>> prefixMapping = config.getPrefix_mapping();
-            List<Config.Consumer> cdcConsumers = new ArrayList<>();
-
-            // Tạo consumer cho mỗi prefix
-            for (Map.Entry<String, List<String>> entry : prefixMapping.entrySet()) {
-                String prefix = entry.getKey();
-                String consumerName = entry.getValue().get(0);
-                
-                Config.Consumer consumer = config.getConsumers().stream()
-                    .filter(c -> c.getName().equals(consumerName))
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalStateException(
-                        String.format("No consumer config found for prefix %s (consumer: %s)", 
-                        prefix, consumerName)));
-                
-                cdcConsumers.add(consumer);
-            }
+            // Xóa và tạo lại topic trước khi bắt đầu
+            logger.info("Deleting all topics from source Kafka broker: {}", kafkaBrokerSource);
+            DeleteTopic.deleteAllTopics(kafkaBrokerSource);
+            logger.info("Deleting all topics from target Kafka broker: {}", kafkaBrokerTarget);
+            DeleteTopic.deleteAllTopics(kafkaBrokerTarget);
+            logger.info("All topics have been deleted successfully");
 
             // Cấu hình performance
             int producerThreadPoolSize = config.getPerformance().getWorker_pool().getProducer();
@@ -55,141 +48,178 @@ public class Maincdc {
             int operationsPerSecond = 500; // Số lượng thao tác mỗi giây cho RandomOperations
             int maxRetries = config.getPerformance().getMax_retries();
 
-            // Xóa và tạo lại topic trước khi bắt đầu
-            System.out.println("Dang xoa tat ca topic tu 2 kafka...");
-            DeleteTopic.deleteAllTopics(kafkaBrokerSource);
-            DeleteTopic.deleteAllTopics(kafkaBrokerTarget);
+            // Tạo thread pool cho Producer, Consumer và RandomOperations
+            ExecutorService executor = Executors.newCachedThreadPool();
+            List<CountDownLatch> producerLatches = new ArrayList<>();
+            List<CountDownLatch> consumerLatches = new ArrayList<>();
+            CountDownLatch randomOpsDone = new CountDownLatch(1);
 
-            System.out.println("=== Starting CDC Pipeline ===");
-            System.out.println("Kafka Broker Source: " + kafkaBrokerSource);
-            System.out.println("Kafka Broker Target: " + kafkaBrokerTarget);
-            System.out.println("Producer Host: " + producerHost);
-            System.out.println("Producer Port: " + producerPort);
-            System.out.println("Producer Namespace: " + producerNamespace);
-            System.out.println("Producer Set Name: " + producerSetName);
+            // Khởi tạo producer một lần duy nhất
+            Config.Producer producer = config.getProducers().get(0);
+            CountDownLatch producerDone = new CountDownLatch(1);
+            producerLatches.add(producerDone);
+
+            // Tạo danh sách topic và consumer groups cho CDC
+            StringBuilder topicList = new StringBuilder();
+            StringBuilder consumerGroupList = new StringBuilder();
             
-            // In thông tin cấu hình cho mỗi consumer
-            for (Config.Consumer consumer : cdcConsumers) {
-                System.out.println("Consumer " + consumer.getName() + " Host: " + consumer.getHost());
-                System.out.println("Consumer " + consumer.getName() + " Port: " + consumer.getPort());
-                System.out.println("Consumer " + consumer.getName() + " Namespace: " + consumer.getNamespace());
+            for (Map.Entry<String, List<String>> entry : config.getPrefix_mapping().entrySet()) {
+                String prefix = entry.getKey();
+                String baseTopic = TopicGenerator.TopicNameGenerator.generateTopicName(producer.getName(), prefix);
+                String cdcTopic = TopicGenerator.generateCdcTopicName(baseTopic);
+                
+                if (topicList.length() > 0) {
+                    topicList.append(",");
+                    consumerGroupList.append(",");
+                }
+                topicList.append(cdcTopic);
+                consumerGroupList.append(TopicGenerator.generateCdcGroupName(cdcTopic));
             }
-            
-            System.out.println("Producer Thread Pool Size: " + producerThreadPoolSize);
-            System.out.println("Consumer Thread Pool Size: " + consumerThreadPoolSize);
-            System.out.println("Random Operations Thread Pool Size: " + randomOperationsThreadPoolSize);
-            System.out.println("Max Messages Per Second: " + maxMessagesPerSecond);
-            System.out.println("Operations Per Second: " + operationsPerSecond);
-            System.out.println("Max Retries: " + maxRetries);
-            System.out.println("===========================");
 
-            // Tạo luồng để chạy AerospikeRandomOperations
-            Thread randomOperationsThread = new Thread(() -> {
-                System.out.println("Starting AerospikeRandomOperations...");
-                RandomOperations.main(producerHost, producerPort, producerNamespace, producerSetName, 
-                    operationsPerSecond, randomOperationsThreadPoolSize);
+            // Khởi động RandomOperations
+            executor.submit(() -> {
+                try {
+                    logger.info("[RANDOM OPS] Starting with configuration:");
+                    logger.info("[RANDOM OPS] - Host: {}", producer.getHost());
+                    logger.info("[RANDOM OPS] - Port: {}", producer.getPort());
+                    logger.info("[RANDOM OPS] - Namespace: {}", producer.getNamespace());
+                    logger.info("[RANDOM OPS] - Set: {}", producer.getSet());
+                    
+                    RandomOperations.main(
+                        producer.getHost(),
+                        producer.getPort(),
+                        producer.getNamespace(),
+                        producer.getSet(),
+                        operationsPerSecond,
+                        randomOperationsThreadPoolSize
+                    );
+                } catch (Exception e) {
+                    logger.error("[RANDOM OPS] Failed: {}", e.getMessage(), e);
+                } finally {
+                    randomOpsDone.countDown();
+                }
             });
 
-            // Tạo luồng để chạy AerospikePoller
-            Thread cdcProducerThread = new Thread(() -> {
-                System.out.println("Starting CdcProducer...");
-                
-                // Tạo danh sách topic và consumer group từ prefix mapping
-                StringBuilder topicList = new StringBuilder();
-                StringBuilder consumerGroupList = new StringBuilder();
-                
-                for (Map.Entry<String, List<String>> entry : prefixMapping.entrySet()) {
-                    String prefix = entry.getKey();
-                    String producerName = config.getProducers().get(0).getName();
+            // Khởi động Producer với tất cả các prefix
+            executor.submit(() -> {
+                try {
+                    String[] producerArgs = new String[] {
+                        kafkaBrokerSource,           // kafkaBroker
+                        producer.getHost(),          // aerospikeHost
+                        String.valueOf(producer.getPort()), // aerospikePort
+                        producer.getNamespace(),     // namespace
+                        producer.getSet(),           // setName
+                        String.valueOf(maxRetries),  // maxRetries
+                        consumerGroupList.toString(), // consumerGroup
+                        String.valueOf(producerThreadPoolSize), // workerPoolSize
+                        topicList.toString(),        // topics
+                        String.valueOf(maxMessagesPerSecond) // maxMessagesPerSecond for rate control
+                    };
                     
-                    // Tạo tên topic từ TopicGenerator
-                    String baseTopic = TopicGenerator.TopicNameGenerator.generateTopicName(producerName, prefix);
-                    String cdcTopic = TopicGenerator.generateCdcTopicName(baseTopic);
+                    logger.info("[CDC PRODUCER] Starting with configuration:");
+                    logger.info("[CDC PRODUCER] - Topics: {}", topicList);
+                    logger.info("[CDC PRODUCER] - Consumer Groups: {}", consumerGroupList);
+                    logger.info("[CDC PRODUCER] - Namespace: {}", producer.getNamespace());
+                    logger.info("[CDC PRODUCER] - Set: {}", producer.getSet());
+                    logger.info("[CDC PRODUCER] - Max Messages Per Second: {}", maxMessagesPerSecond);
                     
-                    if (topicList.length() > 0) {
-                        topicList.append(",");
-                        consumerGroupList.append(",");
-                    }
-                    topicList.append(cdcTopic);
-                    consumerGroupList.append(TopicGenerator.generateCdcGroupName(cdcTopic));
+                    CdcProducer.main(producerArgs);
+                } catch (Exception e) {
+                    logger.error("[CDC PRODUCER] Failed: {}", e.getMessage(), e);
+                } finally {
+                    producerDone.countDown();
                 }
-
-                // Gọi CdcProducer với cấu trúc mới
-                CdcProducer.main(new String[]{
-                    kafkaBrokerSource,
-                    producerHost,
-                    String.valueOf(producerPort),
-                    producerNamespace,
-                    producerSetName,
-                    String.valueOf(maxRetries),
-                    consumerGroupList.toString(),
-                    String.valueOf(producerThreadPoolSize),
-                    topicList.toString()
-                });
             });
 
             // Đợi một khoảng thời gian để đảm bảo topic đã được tạo và sẵn sàng
-            System.out.println("Dang doi 1 giay de topic duoc tao va san sang...");
+            logger.info("Waiting for topics to be created and ready...");
             Thread.sleep(1000);
 
-            // Tạo một luồng duy nhất cho tất cả consumers
-            Thread consumerThread = new Thread(() -> {
-                System.out.println("Starting CdcConsumer...");
-                
-                // Tạo danh sách topic và consumer group từ prefix mapping
-                StringBuilder topicList = new StringBuilder();
-                StringBuilder consumerGroupList = new StringBuilder();
-                
-                for (Map.Entry<String, List<String>> entry : prefixMapping.entrySet()) {
-                    String prefix = entry.getKey();
-                    String producerName = config.getProducers().get(0).getName();
-                    
-                    // Tạo tên topic từ TopicGenerator
-                    String baseTopic = TopicGenerator.TopicNameGenerator.generateTopicName(producerName, prefix);
-                    String cdcTopic = TopicGenerator.generateCdcTopicName(baseTopic);
-                    
-                    if (topicList.length() > 0) {
-                        topicList.append(",");
-                        consumerGroupList.append(",");
-                    }
-                    topicList.append(cdcTopic);
-                    consumerGroupList.append(TopicGenerator.generateCdcGroupName(cdcTopic));
+            // Khởi động Consumer cho CDC
+            for (Map.Entry<String, List<String>> entry : config.getPrefix_mapping().entrySet()) {
+                String prefix = entry.getKey();
+                List<String> consumerNames = entry.getValue();
+                String consumerName = consumerNames.get(0);
+
+                Config.Consumer consumer = config.getConsumers().stream()
+                    .filter(c -> c.getName().equals(consumerName))
+                    .findFirst()
+                    .orElse(null);
+
+                if (consumer == null) {
+                    logger.warn("[CDC CONSUMER] Config not found for: {}", consumerName);
+                    continue;
                 }
 
-                // Gọi CdcConsumer với cấu trúc mới
-                CdcConsumer.main(new String[]{
-                    kafkaBrokerTarget,
-                    topicList.toString(),
-                    consumerGroupList.toString(),
-                    producerHost,
-                    String.valueOf(producerPort),
-                    producerNamespace,
-                    cdcConsumers.get(0).getHost(),
-                    String.valueOf(cdcConsumers.get(0).getPort()),
-                    String.valueOf(consumerThreadPoolSize),
-                    String.valueOf(maxMessagesPerSecond),
-                    cdcConsumers.get(0).getSet()  // Lấy set name từ config
+                CountDownLatch consumerDone = new CountDownLatch(1);
+                consumerLatches.add(consumerDone);
+
+                // Tạo topic và consumer group cho prefix này
+                String baseTopic = TopicGenerator.TopicNameGenerator.generateTopicName(producer.getName(), prefix);
+                String cdcTopic = TopicGenerator.generateCdcTopicName(baseTopic);
+                String cdcGroup = TopicGenerator.generateCdcGroupName(cdcTopic);
+
+                // Tạo mirrored topic name cho consumer
+                String mirroredTopic = "source-kafka." + cdcTopic;
+
+                executor.submit(() -> {
+                    try {
+                        String[] consumerArgs = new String[] {
+                            kafkaBrokerTarget,           // kafkaBroker
+                            mirroredTopic,              // consumerTopic (mirrored topic)
+                            cdcGroup,                    // consumerGroup
+                            consumer.getHost(),          // destinationHost
+                            String.valueOf(consumer.getPort()), // destinationPort
+                            consumer.getNamespace(),     // destinationNamespace
+                            String.valueOf(consumerThreadPoolSize) // workerPoolSize
+                        };
+                        
+                        logger.info("[CDC CONSUMER] Starting {} for prefix {}:", consumerName, prefix);
+                        logger.info("[CDC CONSUMER] - Topic: {}", mirroredTopic);
+                        logger.info("[CDC CONSUMER] - Group: {}", cdcGroup);
+                        logger.info("[CDC CONSUMER] - Destination Namespace: {}", consumer.getNamespace());
+                        logger.info("[CDC CONSUMER] - Set: {}", consumer.getSet());
+                        
+                        CdcConsumer.main(consumerArgs);
+                    } catch (Exception e) {
+                        logger.error("[CDC CONSUMER] {} failed for prefix {}: {}", consumerName, prefix, e.getMessage(), e);
+                    } finally {
+                        consumerDone.countDown();
+                    }
                 });
-            });
-
-            // Bắt đầu các luồng
-            randomOperationsThread.start();
-            cdcProducerThread.start();
-            consumerThread.start();
-
-            // Đợi tất cả các luồng hoàn thành
-            try {
-                randomOperationsThread.join();
-                consumerThread.join();
-                cdcProducerThread.join();
-            } catch (InterruptedException e) {
-                System.err.println("Main thread interrupted: " + e.getMessage());
             }
 
-            System.out.println("All applications have finished execution.");
+            // Thêm shutdown hook để xử lý khi chương trình bị tắt
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                logger.info("[MAIN] Shutting down CDC pipeline...");
+                executor.shutdown();
+                try {
+                    if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
+                        executor.shutdownNow();
+                    }
+                } catch (InterruptedException e) {
+                    executor.shutdownNow();
+                    Thread.currentThread().interrupt();
+                }
+            }));
+
+            // Chờ tất cả producer, consumer và random operations kết thúc
+            try {
+                randomOpsDone.await();
+                for (CountDownLatch latch : producerLatches) {
+                    latch.await();
+                }
+                for (CountDownLatch latch : consumerLatches) {
+                    latch.await();
+                }
+                executor.shutdown();
+                logger.info("[MAIN] CDC Pipeline completed successfully.");
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                logger.error("[MAIN] CDC Pipeline interrupted.");
+            }
         } catch (Exception e) {
-            System.err.println("Critical error: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Critical error: {}", e.getMessage(), e);
         }
     }
 }

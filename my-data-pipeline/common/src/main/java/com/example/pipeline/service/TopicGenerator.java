@@ -44,10 +44,12 @@ public class TopicGenerator {
 
     // Tạo tên consumer group cho CDC
     public static String generateCdcGroupName(String baseTopic) {
-        // Lấy tên consumer group từ base topic
-        String consumerGroup = baseTopic + "-group";
-        // Thêm hậu tố -cdc vào consumer group
-        return consumerGroup ;
+        // Nếu baseTopic đã có hậu tố -cdc thì chỉ thêm -group
+        if (baseTopic.endsWith("-cdc")) {
+            return baseTopic + "-group";
+        }
+        // Nếu chưa có hậu tố -cdc thì thêm vào trước -group
+        return baseTopic + "-cdc-group";
     }
 
     // Tạo tên topic cho A consumer
