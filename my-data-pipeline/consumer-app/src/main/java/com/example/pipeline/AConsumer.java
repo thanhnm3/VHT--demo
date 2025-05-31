@@ -3,7 +3,6 @@ package com.example.pipeline;
 import com.example.pipeline.service.KafkaConsumerService;
 import com.example.pipeline.service.MessageService;
 import com.example.pipeline.service.config.ConfigurationService;
-import com.example.pipeline.service.config.Config;
 import com.example.pipeline.service.TopicGenerator;
 import com.aerospike.client.AerospikeClient;
 import com.aerospike.client.policy.ClientPolicy;
@@ -17,52 +16,74 @@ import java.util.concurrent.TimeUnit;
 
 public class AConsumer {
     private static final Logger logger = LoggerFactory.getLogger(AConsumer.class);
-    private final String kafkaBroker;
-    private final String consumerTopic;
-    private final String consumerGroup;
-    private final String aerospikeHost;
-    private final int aerospikePort;
-    private final String aerospikeNamespace;
-    private final int workerPoolSize;
-    private final ConfigurationService configService;
-    private final KafkaConsumerService kafkaConsumerService;
-    private final MessageService messageService;
-    private final ExecutorService executorService;
-    private final AerospikeClient aerospikeClient;
-    private volatile boolean isRunning = true;
+    
+    // Static configuration parameters
+    private static String kafkaBroker;
+    private static String consumerTopic;
+    private static String consumerGroup;
+    private static String aerospikeHost;
+    private static int aerospikePort;
+    private static String aerospikeNamespace;
+    private static String aerospikeSetName;
+    private static int workerPoolSize;
+    
+    // Static services
+    private static ConfigurationService configService;
+    private static KafkaConsumerService kafkaConsumerService;
+    private static MessageService messageService;
+    private static ExecutorService executorService;
+    private static AerospikeClient aerospikeClient;
 
-    public AConsumer(String kafkaBroker, String consumerTopic, String consumerGroup,
-                    String aerospikeHost, int aerospikePort, String aerospikeNamespace,
-                    int workerPoolSize) {
-        this.kafkaBroker = kafkaBroker;
-        this.consumerTopic = consumerTopic;
-        this.consumerGroup = consumerGroup;
-        this.aerospikeHost = aerospikeHost;
-        this.aerospikePort = aerospikePort;
-        this.aerospikeNamespace = aerospikeNamespace;
-        this.workerPoolSize = workerPoolSize;
-        
-        // Initialize services
-        this.configService = ConfigurationService.getInstance();
-        this.kafkaConsumerService = new KafkaConsumerService(kafkaBroker, configService);
-        
-        // Initialize Aerospike client
-        ClientPolicy clientPolicy = new ClientPolicy();
-        clientPolicy.maxConnsPerNode = 300;
-        this.aerospikeClient = new AerospikeClient(clientPolicy, aerospikeHost, aerospikePort);
-        
-        // Initialize WritePolicy
-        WritePolicy writePolicy = new WritePolicy();
-        writePolicy.totalTimeout = 5000;
-        
-        // Initialize MessageService with Aerospike client and policy
-        this.messageService = new MessageService(aerospikeClient, writePolicy, 
-                                               aerospikeNamespace, "default", consumerTopic,
+    public static void main(String[] args) {
+        try {
+            if (args.length < 8) {
+                System.err.println("Usage: java AConsumer <kafkaBroker> <consumerTopic> <consumerGroup> " +
+                                 "<aerospikeHost> <aerospikePort> <aerospikeNamespace> <aerospikeSetName> <workerPoolSize>");
+                System.exit(1);
+            }
+
+            // Initialize static configuration
+            kafkaBroker = args[0];
+            consumerTopic = args[1];
+            consumerGroup = args[2];
+            aerospikeHost = args[3];
+            aerospikePort = Integer.parseInt(args[4]);
+            aerospikeNamespace = args[5];
+            aerospikeSetName = args[6];
+            workerPoolSize = Integer.parseInt(args[7]);
+            
+            // Initialize services
+            configService = ConfigurationService.getInstance();
+            kafkaConsumerService = new KafkaConsumerService(kafkaBroker, configService);
+            
+            // Initialize Aerospike client
+            ClientPolicy clientPolicy = new ClientPolicy();
+            clientPolicy.maxConnsPerNode = 300;
+            aerospikeClient = new AerospikeClient(clientPolicy, aerospikeHost, aerospikePort);
+            
+            // Initialize WritePolicy
+            WritePolicy writePolicy = new WritePolicy();
+            writePolicy.sendKey = true;  // Đảm bảo lưu key
+            writePolicy.totalTimeout = 5000;
+            
+            // Initialize MessageService with Aerospike client and policy
+            messageService = new MessageService(aerospikeClient, writePolicy, 
+                                               aerospikeNamespace, aerospikeSetName, consumerTopic,
                                                workerPoolSize);
-        this.executorService = Executors.newFixedThreadPool(workerPoolSize);
+            executorService = Executors.newFixedThreadPool(workerPoolSize);
+
+            // Start the consumer
+            start();
+
+            // Add shutdown hook
+            Runtime.getRuntime().addShutdownHook(new Thread(AConsumer::shutdown));
+
+        } catch (Exception e) {
+            logger.error("Error in main: {}", e.getMessage(), e);
+        }
     }
 
-    public void start() {
+    private static void start() {
         try {
             // Generate mirrored topic name
             String mirroredTopic = TopicGenerator.generateMirroredTopicName(consumerTopic);
@@ -73,11 +94,13 @@ public class AConsumer {
             logger.info("Mirrored topic: {}", mirroredTopic);
             logger.info("Consumer group: {}", consumerGroup);
             logger.info("Worker pool size: {}", workerPoolSize);
+            logger.info("Aerospike namespace: {}", aerospikeNamespace);
+            logger.info("Aerospike set name: {}", aerospikeSetName);
 
             // Initialize consumers
             kafkaConsumerService.initializeConsumers(aerospikeNamespace, workerPoolSize);
 
-            // Start consuming messages
+            // Start consuming messages from the mirrored topic
             kafkaConsumerService.startConsuming(mirroredTopic, consumerGroup, messageService);
 
         } catch (Exception e) {
@@ -86,8 +109,7 @@ public class AConsumer {
         }
     }
 
-    public void shutdown() {
-        isRunning = false;
+    public static void shutdown() {
         kafkaConsumerService.shutdown();
         messageService.shutdown();
         executorService.shutdown();
@@ -102,31 +124,5 @@ public class AConsumer {
             executorService.shutdownNow();
             Thread.currentThread().interrupt();
         }
-    }
-
-    public static void main(String[] args) {
-        if (args.length < 7) {
-            System.err.println("Usage: java AConsumer <kafkaBroker> <consumerTopic> <consumerGroup> " +
-                             "<aerospikeHost> <aerospikePort> <aerospikeNamespace> <workerPoolSize>");
-            System.exit(1);
-        }
-
-        String kafkaBroker = args[0];
-        String consumerTopic = args[1];
-        String consumerGroup = args[2];
-        String aerospikeHost = args[3];
-        int aerospikePort = Integer.parseInt(args[4]);
-        String aerospikeNamespace = args[5];
-        int workerPoolSize = Integer.parseInt(args[6]);
-
-        AConsumer consumer = new AConsumer(kafkaBroker, consumerTopic, consumerGroup,
-                                         aerospikeHost, aerospikePort, aerospikeNamespace,
-                                         workerPoolSize);
-
-        // Add shutdown hook
-        Runtime.getRuntime().addShutdownHook(new Thread(consumer::shutdown));
-
-        // Start consumer
-        consumer.start();
     }
 }

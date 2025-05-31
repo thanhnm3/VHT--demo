@@ -98,24 +98,18 @@ public class MainConsumer {
                         try {
                             String[] consumerArgs = new String[] {
                                 kafkaBrokerTarget,           // kafkaBroker
-                                mirroredTopic,              // topic (sử dụng mirrored topic)
-                                consumerGroup,              // consumerGroup (sử dụng group tương ứng với prefix)
-                                consumer.getHost(),         // sourceHost
-                                String.valueOf(consumer.getPort()), // sourcePort
-                                consumer.getNamespace(),    // sourceNamespace
-                                consumer.getHost(),         // destinationHost
-                                String.valueOf(consumer.getPort()), // destinationPort
-                                String.valueOf(consumerThreadPoolSize), // workerPoolSize
-                                consumer.getSet()           // set
+                                consumerTopic,              // consumerTopic
+                                consumerGroup,              // consumerGroup
+                                consumer.getHost(),         // aerospikeHost
+                                String.valueOf(consumer.getPort()), // aerospikePort
+                                consumer.getNamespace(),    // aerospikeNamespace
+                                consumer.getSet(),          // aerospikeSetName
+                                String.valueOf(consumerThreadPoolSize) // workerPoolSize
                             };
-                            
-                            logger.info("Starting consumer with args:");
-                            logger.info("  Topic: {}", consumerArgs[1]);
-                            logger.info("  Consumer Group: {}", consumerArgs[2]);
                             
                             AConsumer.main(consumerArgs);
                         } catch (Exception e) {
-                            logger.error("Loi trong Consumer {}: {}", consumerName, e.getMessage(), e);
+                            logger.error("Error in Consumer {}: {}", consumerName, e.getMessage(), e);
                         } finally {
                             consumerDone.countDown();
                         }

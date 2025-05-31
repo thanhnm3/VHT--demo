@@ -48,8 +48,8 @@ public class Maincdc {
             }
 
             // Cấu hình performance
-            int producerThreadPoolSize = 2; // Số thread cho Producer
-            int consumerThreadPoolSize = 2; // Số thread cho Consumer
+            int producerThreadPoolSize = config.getPerformance().getWorker_pool().getProducer();
+            int consumerThreadPoolSize = config.getPerformance().getWorker_pool().getConsumer();
             int randomOperationsThreadPoolSize = 4; // Số thread cho RandomOperations
             int maxMessagesPerSecond = config.getPerformance().getMax_messages_per_second();
             int operationsPerSecond = 500; // Số lượng thao tác mỗi giây cho RandomOperations
@@ -93,13 +93,39 @@ public class Maincdc {
             // Tạo luồng để chạy AerospikePoller
             Thread cdcProducerThread = new Thread(() -> {
                 System.out.println("Starting CdcProducer...");
-                // Tạo consumer group name từ topic
-                String prefix = config.getPrefix_mapping().keySet().iterator().next();
-                String topic = config.getPrefix_mapping().get(prefix).get(0);
-                String cdcTopic = TopicGenerator.generateCdcTopicName(topic);
-                String consumerGroup = TopicGenerator.generateCdcGroupName(cdcTopic);
-                CdcProducer.start(producerHost, producerPort, producerNamespace, producerSetName, 
-                    kafkaBrokerSource, maxRetries, producerThreadPoolSize, consumerGroup);
+                
+                // Tạo danh sách topic và consumer group từ prefix mapping
+                StringBuilder topicList = new StringBuilder();
+                StringBuilder consumerGroupList = new StringBuilder();
+                
+                for (Map.Entry<String, List<String>> entry : prefixMapping.entrySet()) {
+                    String prefix = entry.getKey();
+                    String producerName = config.getProducers().get(0).getName();
+                    
+                    // Tạo tên topic từ TopicGenerator
+                    String baseTopic = TopicGenerator.TopicNameGenerator.generateTopicName(producerName, prefix);
+                    String cdcTopic = TopicGenerator.generateCdcTopicName(baseTopic);
+                    
+                    if (topicList.length() > 0) {
+                        topicList.append(",");
+                        consumerGroupList.append(",");
+                    }
+                    topicList.append(cdcTopic);
+                    consumerGroupList.append(TopicGenerator.generateCdcGroupName(cdcTopic));
+                }
+
+                // Gọi CdcProducer với cấu trúc mới
+                CdcProducer.main(new String[]{
+                    kafkaBrokerSource,
+                    producerHost,
+                    String.valueOf(producerPort),
+                    producerNamespace,
+                    producerSetName,
+                    String.valueOf(maxRetries),
+                    consumerGroupList.toString(),
+                    String.valueOf(producerThreadPoolSize),
+                    topicList.toString()
+                });
             });
 
             // Đợi một khoảng thời gian để đảm bảo topic đã được tạo và sẵn sàng
@@ -109,15 +135,41 @@ public class Maincdc {
             // Tạo một luồng duy nhất cho tất cả consumers
             Thread consumerThread = new Thread(() -> {
                 System.out.println("Starting CdcConsumer...");
-                // Sử dụng cùng consumer group name với producer
-                String prefix = config.getPrefix_mapping().keySet().iterator().next();
-                String topic = config.getPrefix_mapping().get(prefix).get(0);
-                String cdcTopic = TopicGenerator.generateCdcTopicName(topic);
-                String consumerGroup = TopicGenerator.generateCdcGroupName(cdcTopic);
-                CdcConsumer.main(new String[]{}, consumerThreadPoolSize, maxMessagesPerSecond,
-                    producerHost, producerPort, producerNamespace,
-                    cdcConsumers.get(0).getHost(), cdcConsumers.get(0).getPort(), 
-                    kafkaBrokerTarget, consumerGroup);
+                
+                // Tạo danh sách topic và consumer group từ prefix mapping
+                StringBuilder topicList = new StringBuilder();
+                StringBuilder consumerGroupList = new StringBuilder();
+                
+                for (Map.Entry<String, List<String>> entry : prefixMapping.entrySet()) {
+                    String prefix = entry.getKey();
+                    String producerName = config.getProducers().get(0).getName();
+                    
+                    // Tạo tên topic từ TopicGenerator
+                    String baseTopic = TopicGenerator.TopicNameGenerator.generateTopicName(producerName, prefix);
+                    String cdcTopic = TopicGenerator.generateCdcTopicName(baseTopic);
+                    
+                    if (topicList.length() > 0) {
+                        topicList.append(",");
+                        consumerGroupList.append(",");
+                    }
+                    topicList.append(cdcTopic);
+                    consumerGroupList.append(TopicGenerator.generateCdcGroupName(cdcTopic));
+                }
+
+                // Gọi CdcConsumer với cấu trúc mới
+                CdcConsumer.main(new String[]{
+                    kafkaBrokerTarget,
+                    topicList.toString(),
+                    consumerGroupList.toString(),
+                    producerHost,
+                    String.valueOf(producerPort),
+                    producerNamespace,
+                    cdcConsumers.get(0).getHost(),
+                    String.valueOf(cdcConsumers.get(0).getPort()),
+                    String.valueOf(consumerThreadPoolSize),
+                    String.valueOf(maxMessagesPerSecond),
+                    cdcConsumers.get(0).getSet()  // Lấy set name từ config
+                });
             });
 
             // Bắt đầu các luồng

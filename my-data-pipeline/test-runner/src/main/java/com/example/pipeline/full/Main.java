@@ -148,6 +148,7 @@ public class Main {
                                 consumer.getHost(),         // aerospikeHost
                                 String.valueOf(consumer.getPort()), // aerospikePort
                                 consumer.getNamespace(),    // aerospikeNamespace
+                                consumer.getSet(),          // aerospikeSetName
                                 String.valueOf(consumerThreadPoolSize) // workerPoolSize
                             };
                             

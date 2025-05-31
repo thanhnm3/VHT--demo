@@ -146,8 +146,9 @@ public class MessageService {
             
             // Write to Aerospike with both bins
             destinationClient.put(writePolicy, key, personDataBin, lastUpdateBin);
+            
         } catch (Exception e) {
-            logger.error("[{}] Error writing to Aerospike: {}", prefix, e.getMessage());
+            logger.error("[{}] Error writing to Aerospike: {}", prefix, e.getMessage(), e);
             throw e;
         }
     }
