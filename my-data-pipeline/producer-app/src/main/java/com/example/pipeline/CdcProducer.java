@@ -145,8 +145,8 @@ public class CdcProducer {
             String trimmedTopic = topic.trim();
             // Lấy prefix từ topic name (ví dụ: từ "producer1_096-cdc" lấy "096")
             String prefix = trimmedTopic.split("_")[1].split("-")[0];
-            String cdcTopic = TopicGenerator.generateCdcTopicName(trimmedTopic);
-            prefixToTopicMap.put(prefix, cdcTopic);
+            // Sử dụng trực tiếp trimmedTopic thay vì thêm -cdc lần nữa
+            prefixToTopicMap.put(prefix, trimmedTopic);
         }
         logger.info("Initialized CDC topic mapping: {}", prefixToTopicMap);
     }
