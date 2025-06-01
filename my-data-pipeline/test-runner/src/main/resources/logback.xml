@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Console Appender with async -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level - %msg%n</pattern>
+        </encoder>
+        <immediateFlush>false</immediateFlush>
+    </appender>
+
+    <!-- Async Appender for better performance -->
+    <appender name="ASYNC" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="CONSOLE" />
+        <queueSize>512</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <includeCallerData>false</includeCallerData>
+    </appender>
+
+    <!-- Root Logger -->
+    <root level="WARN">
+        <appender-ref ref="ASYNC" />
+    </root>
+
+    <!-- Application Logger -->
+    <logger name="com.example.pipeline" level="INFO" additivity="false">
+        <appender-ref ref="ASYNC" />
+    </logger>
+
+    <!-- Kafka Loggers -->
+    <logger name="org.apache.kafka" level="WARN" additivity="false">
+        <appender-ref ref="ASYNC" />
+    </logger>
+
+    <!-- Aerospike Loggers -->
+    <logger name="com.aerospike" level="WARN" additivity="false">
+        <appender-ref ref="ASYNC" />
+    </logger>
+</configuration> 

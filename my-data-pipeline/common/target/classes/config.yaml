@@ -1,0 +1,43 @@
+---
+producers:
+  - name: producer1
+    host: 127.0.0.1
+    port: 3000
+    namespace: producer
+    set: users
+
+consumers:
+  - name: consumer1
+    host: 127.0.0.1
+    port: 4000
+    namespace: consumer_033
+    set: users
+  - name: consumer2
+    host: 127.0.0.1
+    port: 4000
+    namespace: consumer_096
+    set: users
+
+prefix_mapping:
+  "096": ["consumer2"]
+  "033": ["consumer1"]
+
+kafka:
+  brokers:
+    source: localhost:9092
+    target: localhost:9093
+
+performance:
+  max_messages_per_second: 4000
+  max_retries: 5
+  worker_pool:
+    producer: 2
+    consumer: 4
+  rate_control:
+    initial_rate: 5000.0
+    max_rate: 10000.0
+    min_rate: 1000.0
+    lag_threshold: 1000
+    monitoring_interval_seconds: 10
+    rate_adjustment_steps: 5
+    max_rate_change_percent: 0.2
