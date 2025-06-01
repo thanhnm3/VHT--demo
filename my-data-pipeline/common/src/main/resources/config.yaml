@@ -22,6 +22,103 @@ prefix_mapping:
   "096": ["consumer2"]
   "033": ["consumer1"]
 
+region_groups:
+  north:
+    unchanged:
+      - Ha Noi
+      - Lai Chau
+      - Dien Bien
+      - Son La
+      - Lang Son
+      - Quang Ninh
+      - Cao Bang
+      - Tuyen Quang
+      - Lao Cai
+      - Thai Nguyen
+      - Phu Tho
+      - Bac Ninh
+      - Hung Yen
+      - Hai Phong
+      - Ninh Binh
+    changed:
+      Tuyen Quang:
+        - Ha Giang
+      Lao Cai:
+        - Yen Bai
+      Thai Nguyen:
+        - Bac Kan
+      Phu Tho:
+        - Vinh Phuc
+        - Hoa Binh
+      Bac Ninh:
+        - Bac Giang
+      Hung Yen:
+        - Thai Binh
+      Hai Phong:
+        - Hai Duong
+      Ninh Binh:
+        - Ha Nam
+        - Nam Dinh
+  central:
+    unchanged:
+      - Thanh Hoa
+      - Nghe An
+      - Ha Tinh
+      - Quang Tri
+      - Thua Thien Hue
+      - Da Nang
+      - Quang Ngai
+      - Gia Lai
+      - Khanh Hoa
+      - Lam Dong
+      - Dak Lak
+    changed:
+      Quang Tri:
+        - Quang Binh
+      Da Nang:
+        - Quang Nam
+      Quang Ngai:
+        - Kon Tum
+      Gia Lai:
+        - Binh Dinh
+      Khanh Hoa:
+        - Ninh Thuan
+      Lam Dong:
+        - Dak Nong
+        - Binh Thuan
+      Dak Lak:
+        - Phu Yen
+  south:
+    unchanged:
+      - TP. Ho Chi Minh
+      - Dong Nai
+      - Tay Ninh
+      - Can Tho
+      - Vinh Long
+      - Dong Thap
+      - Ca Mau
+      - An Giang
+    changed:
+      TP. Ho Chi Minh:
+        - Binh Duong
+        - Ba Ria Vung Tau
+      Dong Nai:
+        - Binh Phuoc
+      Tay Ninh:
+        - Long An
+      Can Tho:
+        - Soc Trang
+        - Hau Giang
+      Vinh Long:
+        - Ben Tre
+        - Tra Vinh
+      Dong Thap:
+        - Tien Giang
+      Ca Mau:
+        - Bac Lieu
+      An Giang:
+        - Kien Giang
+
 kafka:
   broker: localhost:9092
 

@@ -1,14 +1,32 @@
 package com.example.pipeline.service.config;
 
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.LoaderOptions;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.io.FileInputStream;
+import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 
 public class Config {
+    private static final String CONFIG_PATH = "my-data-pipeline/common/src/main/resources/config.yaml";
     private List<Producer> producers;
     private List<Consumer> consumers;
     private Map<String, List<String>> prefix_mapping;
+    private Map<String, RegionConfig> region_groups;
     private KafkaConfig kafka;
     private PerformanceConfig performance;
+
+    public static Config load() throws Exception {
+        LoaderOptions options = new LoaderOptions();
+        Yaml yaml = new Yaml(options);
+        try (InputStream input = new FileInputStream(CONFIG_PATH)) {
+            Map<String, Object> data = yaml.load(input);
+            ObjectMapper mapper = new ObjectMapper();
+            return mapper.convertValue(data, Config.class);
+        }
+    }
 
     public static class Producer {
         private String name;
@@ -154,6 +172,10 @@ public class Config {
     public Map<String, List<String>> getPrefix_mapping() { return prefix_mapping; }
     public void setPrefix_mapping(Map<String, List<String>> prefix_mapping) { 
         this.prefix_mapping = prefix_mapping; 
+    }
+    public Map<String, RegionConfig> getRegion_groups() { return region_groups; }
+    public void setRegion_groups(Map<String, RegionConfig> region_groups) { 
+        this.region_groups = region_groups; 
     }
     public KafkaConfig getKafka() { return kafka; }
     public void setKafka(KafkaConfig kafka) { this.kafka = kafka; }
