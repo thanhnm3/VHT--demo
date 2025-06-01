@@ -13,22 +13,19 @@ import java.util.Base64;
 
 public class MessageProducerService {
     private final Map<String, String> prefixToTopicMap;
-    private String defaultTopic;
     private final Queue<ProducerRecord<byte[], byte[]>> pendingMessages;
     private final Object pendingMessagesLock;
     private final ObjectMapper objectMapper;
 
     public MessageProducerService() {
         this.prefixToTopicMap = new ConcurrentHashMap<>();
-        this.defaultTopic = "";
         this.pendingMessages = new ConcurrentLinkedQueue<>();
         this.pendingMessagesLock = new Object();
         this.objectMapper = new ObjectMapper();
     }
 
-    public void initializeTopicMapping(Map<String, String> topicMapping, String defaultTopic) {
+    public void initializeTopicMapping(Map<String, String> topicMapping) {
         this.prefixToTopicMap.putAll(topicMapping);
-        this.defaultTopic = defaultTopic;
     }
 
     public boolean isValidRecord(Record record) {

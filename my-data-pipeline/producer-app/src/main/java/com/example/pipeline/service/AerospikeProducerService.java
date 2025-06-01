@@ -23,7 +23,6 @@ public class AerospikeProducerService {
     public AerospikeProducerService(ExecutorService executor, 
                                   MessageProducerService messageService,
                                   Map<String, String> prefixToTopicMap,
-                                  String defaultTopic,
                                   String sourceNamespace) {
         this.executor = executor;
         this.messageService = messageService;
@@ -31,7 +30,7 @@ public class AerospikeProducerService {
         this.prefixToTopicMap = prefixToTopicMap;
         
         // Initialize message service with topic mapping
-        messageService.initializeTopicMapping(prefixToTopicMap, defaultTopic);
+        messageService.initializeTopicMapping(prefixToTopicMap);
     }
 
     private String extractPrefix(byte[] key) {
