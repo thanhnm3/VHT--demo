@@ -28,7 +28,6 @@ public class CdcProducerService {
     public CdcProducerService(ExecutorService executor,
                             MessageProducerService messageService,
                             Map<String, String> prefixToTopicMap,
-                            String defaultTopic,
                             String sourceNamespace) {
         this.executor = executor;
         this.messageService = messageService;
@@ -39,7 +38,7 @@ public class CdcProducerService {
         this.scheduler = Executors.newSingleThreadScheduledExecutor();
         
         // Khởi tạo message service với topic mapping
-        messageService.initializeTopicMapping(prefixToTopicMap, defaultTopic);
+        messageService.initializeTopicMapping(prefixToTopicMap);
     }
 
     public void readDataFromAerospike(AerospikeClient client,

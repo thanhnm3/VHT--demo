@@ -66,7 +66,7 @@ public class CdcProducer {
                                                           LAG_THRESHOLD, MONITORING_INTERVAL_SECONDS);
                 kafkaService = new KafkaProducerService(kafkaBroker, null, consumerGroup);
                 messageService = new MessageProducerService();
-                messageService.initializeTopicMapping(prefixToTopicMap, null);
+                messageService.initializeTopicMapping(prefixToTopicMap);
 
                 ClientPolicy clientPolicy = new ClientPolicy();
                 clientPolicy.timeout = 5000;
@@ -109,7 +109,6 @@ public class CdcProducer {
                     executor,
                     messageService,
                     prefixToTopicMap,
-                    null,
                     sourceNamespace
                 );
 
