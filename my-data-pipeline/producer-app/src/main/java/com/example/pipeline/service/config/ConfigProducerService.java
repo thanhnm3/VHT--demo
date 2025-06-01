@@ -52,8 +52,8 @@ public class ConfigProducerService {
         
         // Lấy cấu hình Kafka
         Config.KafkaConfig kafkaConfig = config.getKafka();
-        if (kafkaConfig != null && kafkaConfig.getBrokers() != null) {
-            this.kafkaBroker = kafkaConfig.getBrokers().getSource();
+        if (kafkaConfig != null) {
+            this.kafkaBroker = kafkaConfig.getBroker();
         }
         
         // Lấy cấu hình Performance

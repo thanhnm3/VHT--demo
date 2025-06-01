@@ -49,20 +49,10 @@ public class Config {
     }
 
     public static class KafkaConfig {
-        private Brokers brokers;
+        private String broker;
 
-        public Brokers getBrokers() { return brokers; }
-        public void setBrokers(Brokers brokers) { this.brokers = brokers; }
-
-        public static class Brokers {
-            private String source;
-            private String target;
-
-            public String getSource() { return source; }
-            public void setSource(String source) { this.source = source; }
-            public String getTarget() { return target; }
-            public void setTarget(String target) { this.target = target; }
-        }
+        public String getBroker() { return broker; }
+        public void setBroker(String broker) { this.broker = broker; }
     }
 
     public static class PerformanceConfig {

@@ -28,7 +28,7 @@ public class MainConsumer {
             }
 
             // Lấy cấu hình Kafka
-            String kafkaBrokerTarget = config.getKafka().getBrokers().getTarget();
+            String kafkaBroker = config.getKafka().getBroker();
 
             // Cấu hình performance
             int consumerThreadPoolSize = config.getPerformance().getWorker_pool().getConsumer();
@@ -39,7 +39,7 @@ public class MainConsumer {
             List<CountDownLatch> consumerLatches = new ArrayList<>();
 
             logger.info("=== Starting A Consumers Only ===");
-            logger.info("Kafka Broker Target: {}", kafkaBrokerTarget);
+            logger.info("Kafka Broker: {}", kafkaBroker);
             logger.info("Consumer Thread Pool Size: {}", consumerThreadPoolSize);
             logger.info("Max Retries: {}", maxRetries);
             logger.info("===========================");
@@ -59,13 +59,11 @@ public class MainConsumer {
                 String producerName = config.getProducers().get(0).getName();
                 String baseTopic = TopicGenerator.TopicNameGenerator.generateTopicName(producerName, prefix);
                 String consumerTopic = TopicGenerator.generateATopicName(baseTopic);
-                String mirroredTopic = TopicGenerator.generateMirroredTopicName(consumerTopic);
                 final String consumerGroup = TopicGenerator.generateAGroupName(producerName + "_" + prefix);
 
                 logger.info("Starting Consumers for prefix {}: {}", prefix, consumerNames);
                 logger.info("  Base Topic: {}", baseTopic);
                 logger.info("  Consumer Topic: {}", consumerTopic);
-                logger.info("  Mirrored Topic: {}", mirroredTopic);
                 logger.info("  Consumer Group: {}", consumerGroup);
 
                 // Khởi động các Consumer cho prefix này
@@ -90,20 +88,19 @@ public class MainConsumer {
                     logger.info("  Set: {}", consumer.getSet());
                     logger.info("  Base Topic: {}", baseTopic);
                     logger.info("  Consumer Topic: {}", consumerTopic);
-                    logger.info("  Mirrored Topic: {}", mirroredTopic);
                     logger.info("  Consumer Group: {}", consumerGroup);
 
-                    // Khởi động Consumer với mirrored topic
+                    // Khởi động Consumer với topic trực tiếp
                     executor.submit(() -> {
                         try {
                             String[] consumerArgs = new String[] {
-                                kafkaBrokerTarget,           // kafkaBroker
-                                consumerTopic,              // consumerTopic
-                                consumerGroup,              // consumerGroup
-                                consumer.getHost(),         // aerospikeHost
+                                kafkaBroker,           // kafkaBroker
+                                consumerTopic,         // consumerTopic
+                                consumerGroup,         // consumerGroup
+                                consumer.getHost(),    // aerospikeHost
                                 String.valueOf(consumer.getPort()), // aerospikePort
-                                consumer.getNamespace(),    // aerospikeNamespace
-                                consumer.getSet(),          // aerospikeSetName
+                                consumer.getNamespace(), // aerospikeNamespace
+                                consumer.getSet(),     // aerospikeSetName
                                 String.valueOf(consumerThreadPoolSize) // workerPoolSize
                             };
                             

@@ -20,12 +20,12 @@ public class KafkaLagMonitor {
     private static final int TIMEOUT_SECONDS = 5;
 
     public KafkaLagMonitor() {
-        // Lấy target Kafka broker từ config
+        // Lấy Kafka broker từ config
         Config config = ConfigLoader.getConfig();
-        String targetBroker = config.getKafka().getBrokers().getTarget();
+        String broker = config.getKafka().getBroker();
         
         Properties props = new Properties();
-        props.put("bootstrap.servers", targetBroker);
+        props.put("bootstrap.servers", broker);
         this.adminClient = AdminClient.create(props);
     }
 

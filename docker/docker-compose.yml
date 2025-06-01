@@ -27,37 +27,21 @@ services:
     networks:
       - kafka-platform
 
-  kafka-exporter-source:
+  kafka-exporter:
     image: danielqsj/kafka-exporter:v1.7.0
     ports:
       - "9308:9308"
     environment:
       - SCRAPE_INTERVAL=1s
     command:
-      - '--kafka.server=source-kafka:29092'
-    container_name: kafka-exporter-source
+      - '--kafka.server=kafka:29092'
+    container_name: kafka-exporter
     depends_on:
-      source-kafka:
+      kafka:
         condition: service_healthy
     networks:
       - kafka-platform
 
-  kafka-exporter-target:
-    image: danielqsj/kafka-exporter:v1.7.0
-    ports:
-      - "9309:9308"
-    environment:
-      - SCRAPE_INTERVAL=1s
-    command:
-      - '--kafka.server=target-kafka:39092'
-    container_name: kafka-exporter-target
-    depends_on:
-      target-kafka:
-        condition: service_healthy
-    networks:
-      - kafka-platform
-
-  # Source Zookeeper and Kafka
   zk1:
     image: confluentinc/cp-zookeeper:7.5.0
     environment:
@@ -67,31 +51,31 @@ services:
       ZOOKEEPER_SYNC_LIMIT: 2
     ports:
      - "2181:2181"
-    container_name: source-zookeeper
+    container_name: zookeeper
     networks:
       - kafka-platform
 
-  source-kafka:
+  kafka:
     image: confluentinc/cp-kafka:7.5.0
     depends_on:
       - zk1
     ports:
       - "9092:9092"
       - "9991:9991"
-    container_name: source-kafka
+    container_name: kafka
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_JMX_PORT: 9991
-      KAFKA_ZOOKEEPER_CONNECT: source-zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://source-kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_LOG_RETENTION_MS: 600000
-      CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: source-kafka:29092
-      CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: source-zookeeper:2181
+      CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: kafka:29092
+      CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: zookeeper:2181
       CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
       CONFLUENT_METRICS_ENABLE: 'false'
     healthcheck:
@@ -103,130 +87,51 @@ services:
     networks:
       - kafka-platform
 
-
-  zk2:
-    image: confluentinc/cp-zookeeper:7.5.0
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2182
-      ZOOKEEPER_TICK_TIME: 2000
-      ZOOKEEPER_INIT_LIMIT: 5
-      ZOOKEEPER_SYNC_LIMIT: 2
-    ports:
-     - "2182:2182"
-    container_name: target-zookeeper
-    healthcheck:
-      test: ["CMD-SHELL", "echo srvr | nc localhost 2182 || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - kafka-platform
-
-  target-kafka:
-    image: confluentinc/cp-kafka:7.5.0
-    depends_on:
-      zk2:
-        condition: service_healthy
-    ports:
-      - "9093:9093"
-      - "9992:9992"
-    container_name: target-kafka
-    environment:
-      KAFKA_BROKER_ID: 2
-      KAFKA_JMX_PORT: 9991
-      KAFKA_ZOOKEEPER_CONNECT: target-zookeeper:2182
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://target-kafka:39092,PLAINTEXT_HOST://localhost:9093
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_LOG_RETENTION_MS: 600000
-      CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: target-kafka:39092
-      CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: target-zookeeper:2182
-      CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
-      CONFLUENT_METRICS_ENABLE: 'false'
-    healthcheck:
-      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:39092 --list || exit 1"]
-      interval: 10s
-      timeout: 30s
-      retries: 10
-      start_period: 120s
-    networks:
-      - kafka-platform
-
-  mm2:
-    image: confluentinc/cp-kafka-connect:7.5.0
-    container_name: mm2
-    ports:
-      - "8083:8083"
-    volumes:
-      - ./mm2/mm2.properties:/etc/kafka/mm2.properties
-      - ./mm2/connect-log4j.properties:/usr/bin/../config/connect-log4j.properties
-    command: >
-      bash -c "sleep 10 && connect-mirror-maker /etc/kafka/mm2.properties"
-    depends_on:
-      - source-kafka
-      - target-kafka
-    networks:
-      - kafka-platform
-
-
-  # # =============================== AEROSPIKE ===============================
+  # =============================== AEROSPIKE ===============================
 
   aerospike:
-    image: aerospike/aerospike-server
+    build:
+      context: .
+      dockerfile: Dockerfile.aerospike1
     container_name: aerospike
     ports:
       - "3000:3000"
       - "3001:3001"
     volumes:
+      - ./aerospike_data:/opt/aerospike/data
       - ./etc/aerospike/aerospike.conf:/etc/aerospike/aerospike.conf
-      - ./aerospike_data:/opt/aerospike/data 
-    command: ["--config-file", "/etc/aerospike/aerospike.conf", "--foreground"]
+    command: ["asd", "--config-file", "/etc/aerospike/aerospike.conf", "--foreground"]
+    restart: always
     networks:
       - kafka-platform
 
   aerospike2:
-    image: aerospike/aerospike-server
+    build:
+      context: .
+      dockerfile: Dockerfile.aerospike2
     container_name: aerospike2
     ports:
       - "4000:3000"
       - "4001:3001"
     volumes:
+      - ./aerospike_data:/opt/aerospike/data
       - ./etc/aerospike/aerospike2.conf:/etc/aerospike/aerospike.conf
-      - ./aerospike_data:/opt/aerospike/data 
-    command: ["--config-file", "/etc/aerospike/aerospike.conf", "--foreground"]
+    command: ["asd", "--config-file", "/etc/aerospike/aerospike.conf", "--foreground"]
+    restart: always
     networks:
       - kafka-platform
-
-    # Copyfile aerospike.conf vao container
-    # docker cp etc/aerospike/aerospike.conf aerospike:/etc/aerospike/aerospike.conf
-    # docker cp etc/aerospike/aerospike2.conf aerospike2:/etc/aerospike/aerospike.conf
-
-    # docker restart aerospike aerospike2
 
   aerospike-tools:
     image: aerospike/aerospike-tools
     container_name: aerospike-tools
     depends_on:
       - aerospike
+      - aerospike2
     networks:
       - kafka-platform
     entrypoint: [ "sleep", "infinity" ]
-  # docker exec -it aerospike-tools aql -h aerospike
-  # Để truy cập vào aql của DB, để kiểm thử
-
-  # docker exec -it aerospike-tools aql -h aerospike -c "show sets"
-  # docker exec -it aerospike-tools aql -h aerospike2 -c "show sets"
 
 networks:
   kafka-platform:
     name: kafka-platform
     driver: bridge
-
-  # docker-compose -f zk-kafka-single-node-stack.yml up -d
-
-  # https://grafana.com/grafana/dashboards/20860-aerospike-batch-transactions-view/
-  # Grafana dashboard for Aerospike
-  # Updating ...

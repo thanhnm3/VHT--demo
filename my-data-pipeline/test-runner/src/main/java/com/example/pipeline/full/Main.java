@@ -29,13 +29,11 @@ public class Main {
             }
 
             // Lấy cấu hình Kafka
-            String kafkaBrokerSource = config.getKafka().getBrokers().getSource();
-            String kafkaBrokerTarget = config.getKafka().getBrokers().getTarget();
+            String kafkaBroker = config.getKafka().getBroker();
 
             // Xóa và tạo lại topic trước khi bắt đầu
-            logger.info("Dang xoa tat ca topic tu 2 kafka ...");
-            DeleteTopic.deleteAllTopics(kafkaBrokerSource);
-            DeleteTopic.deleteAllTopics(kafkaBrokerTarget);
+            logger.info("Dang xoa tat ca topic tu kafka ...");
+            DeleteTopic.deleteAllTopics(kafkaBroker);
 
             // Cấu hình performance
             int producerThreadPoolSize = config.getPerformance().getWorker_pool().getProducer();
@@ -46,6 +44,13 @@ public class Main {
             ExecutorService executor = Executors.newCachedThreadPool();
             List<CountDownLatch> producerLatches = new ArrayList<>();
             List<CountDownLatch> consumerLatches = new ArrayList<>();
+
+            logger.info("=== Starting Full Pipeline ===");
+            logger.info("Kafka Broker: {}", kafkaBroker);
+            logger.info("Producer Thread Pool Size: {}", producerThreadPoolSize);
+            logger.info("Consumer Thread Pool Size: {}", consumerThreadPoolSize);
+            logger.info("Max Retries: {}", maxRetries);
+            logger.info("===========================");
 
             // Khởi tạo producer một lần duy nhất
             Config.Producer producer = config.getProducers().get(0);
@@ -61,7 +66,7 @@ public class Main {
             executor.submit(() -> {
                 try {
                     String[] producerArgs = new String[] {
-                        kafkaBrokerSource,           // kafkaBroker
+                        kafkaBroker,           // kafkaBroker
                         producer.getHost(),          // aerospikeHost
                         String.valueOf(producer.getPort()), // aerospikePort
                         producer.getNamespace(),     // namespace
@@ -122,7 +127,7 @@ public class Main {
                 executor.submit(() -> {
                     try {
                         String[] consumerArgs = new String[] {
-                            kafkaBrokerTarget,           // kafkaBroker
+                            kafkaBroker,           // kafkaBroker
                             finalConsumerTopic,         // consumerTopic
                             finalConsumerGroup,         // consumerGroup
                             consumer.getHost(),         // aerospikeHost

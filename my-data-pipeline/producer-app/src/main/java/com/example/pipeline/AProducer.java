@@ -200,14 +200,13 @@ public class AProducer {
                 String group = prefixToGroupMap.get(prefix);
                 
                 try {
-                    String mirroredTopic = "source-kafka." + topic;
-                    long topicLag = lagMonitor.calculateTopicLag(mirroredTopic, group);
+                    long topicLag = lagMonitor.calculateTopicLag(topic, group);
                     
                     if (topicLag >= 0) {
                         totalLag += topicLag;
                         hasValidLag = true;
-                        logger.info("Topic {} (mirrored as {}) has lag: {} for consumer group: {}", 
-                                  topic, mirroredTopic, topicLag, group);
+                        logger.info("Topic {} has lag: {} for consumer group: {}", 
+                                  topic, topicLag, group);
                     }
                 } catch (Exception e) {
                     logger.warn("Error calculating lag for topic {} with consumer group {}: {}", 

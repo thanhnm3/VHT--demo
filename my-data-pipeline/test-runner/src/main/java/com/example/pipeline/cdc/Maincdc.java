@@ -30,29 +30,33 @@ public class Maincdc {
             }
 
             // Lấy cấu hình Kafka
-            String kafkaBrokerSource = config.getKafka().getBrokers().getSource();
-            String kafkaBrokerTarget = config.getKafka().getBrokers().getTarget();
+            String kafkaBroker = config.getKafka().getBroker();
 
             // Xóa và tạo lại topic trước khi bắt đầu
-            logger.info("Deleting all topics from source Kafka broker: {}", kafkaBrokerSource);
-            DeleteTopic.deleteAllTopics(kafkaBrokerSource);
-            logger.info("Deleting all topics from target Kafka broker: {}", kafkaBrokerTarget);
-            DeleteTopic.deleteAllTopics(kafkaBrokerTarget);
+            logger.info("Deleting all topics from Kafka broker: {}", kafkaBroker);
+            DeleteTopic.deleteAllTopics(kafkaBroker);
             logger.info("All topics have been deleted successfully");
 
             // Cấu hình performance
             int producerThreadPoolSize = config.getPerformance().getWorker_pool().getProducer();
             int consumerThreadPoolSize = config.getPerformance().getWorker_pool().getConsumer();
-            int randomOperationsThreadPoolSize = 4; // Số thread cho RandomOperations
+            int randomOperationsThreadPoolSize = 4;
             int maxMessagesPerSecond = config.getPerformance().getMax_messages_per_second();
             int operationsPerSecond = 500; // Số lượng thao tác mỗi giây cho RandomOperations
             int maxRetries = config.getPerformance().getMax_retries();
 
-            // Tạo thread pool cho Producer, Consumer và RandomOperations
+            // Tạo thread pool cho Producer và Consumer
             ExecutorService executor = Executors.newCachedThreadPool();
             List<CountDownLatch> producerLatches = new ArrayList<>();
             List<CountDownLatch> consumerLatches = new ArrayList<>();
             CountDownLatch randomOpsDone = new CountDownLatch(1);
+
+            logger.info("=== Starting CDC Pipeline ===");
+            logger.info("Kafka Broker: {}", kafkaBroker);
+            logger.info("Producer Thread Pool Size: {}", producerThreadPoolSize);
+            logger.info("Consumer Thread Pool Size: {}", consumerThreadPoolSize);
+            logger.info("Random Operations Thread Pool Size: {}", randomOperationsThreadPoolSize);
+            logger.info("===========================");
 
             // Khởi tạo producer một lần duy nhất
             Config.Producer producer = config.getProducers().get(0);
@@ -104,7 +108,7 @@ public class Maincdc {
             executor.submit(() -> {
                 try {
                     String[] producerArgs = new String[] {
-                        kafkaBrokerSource,           // kafkaBroker
+                        kafkaBroker,           // kafkaBroker
                         producer.getHost(),          // aerospikeHost
                         String.valueOf(producer.getPort()), // aerospikePort
                         producer.getNamespace(),     // namespace
@@ -159,23 +163,20 @@ public class Maincdc {
                 String cdcTopic = TopicGenerator.generateCdcTopicName(baseTopic);
                 String cdcGroup = TopicGenerator.generateCdcGroupName(cdcTopic);
 
-                // Tạo mirrored topic name cho consumer
-                String mirroredTopic = "source-kafka." + cdcTopic;
-
                 executor.submit(() -> {
                     try {
                         String[] consumerArgs = new String[] {
-                            kafkaBrokerTarget,           // kafkaBroker
-                            mirroredTopic,              // consumerTopic (mirrored topic)
-                            cdcGroup,                    // consumerGroup
-                            consumer.getHost(),          // destinationHost
+                            kafkaBroker,           // kafkaBroker
+                            cdcTopic,              // consumerTopic
+                            cdcGroup,              // consumerGroup
+                            consumer.getHost(),    // destinationHost
                             String.valueOf(consumer.getPort()), // destinationPort
-                            consumer.getNamespace(),     // destinationNamespace
+                            consumer.getNamespace(), // destinationNamespace
                             String.valueOf(consumerThreadPoolSize) // workerPoolSize
                         };
                         
                         logger.info("[CDC CONSUMER] Starting {} for prefix {}:", consumerName, prefix);
-                        logger.info("[CDC CONSUMER] - Topic: {}", mirroredTopic);
+                        logger.info("[CDC CONSUMER] - Topic: {}", cdcTopic);
                         logger.info("[CDC CONSUMER] - Group: {}", cdcGroup);
                         logger.info("[CDC CONSUMER] - Destination Namespace: {}", consumer.getNamespace());
                         logger.info("[CDC CONSUMER] - Set: {}", consumer.getSet());

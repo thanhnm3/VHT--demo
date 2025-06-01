@@ -23,9 +23,7 @@ prefix_mapping:
   "033": ["consumer1"]
 
 kafka:
-  brokers:
-    source: localhost:9092
-    target: localhost:9093
+  broker: localhost:9092
 
 performance:
   max_messages_per_second: 4000

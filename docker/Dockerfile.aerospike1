@@ -1,0 +1,7 @@
+FROM aerospike/aerospike-server
+
+# Override the default ENTRYPOINT
+ENTRYPOINT []
+
+# Set the command to run Aerospike
+CMD ["asd", "--config-file", "/etc/aerospike/aerospike.conf", "--foreground"] 
