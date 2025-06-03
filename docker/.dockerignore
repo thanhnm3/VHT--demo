@@ -1,0 +1,20 @@
+# Git
+.git
+.gitignore
+
+# Build directories
+build/
+target/
+.gradle/
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+
+# Logs
+*.log
+
+# Other
+*.md
+!README.md 

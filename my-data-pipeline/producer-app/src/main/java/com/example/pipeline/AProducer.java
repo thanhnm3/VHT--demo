@@ -234,11 +234,14 @@ public class AProducer {
 
     private static void shutdownGracefully(AerospikeClient aerospikeClient, 
                                          KafkaProducer<byte[], byte[]> kafkaProducer) {
+        logger.info("[SHUTDOWN] Starting graceful shutdown...");
+
         if (executor != null) {
+            logger.info("[SHUTDOWN] Shutting down executor...");
             executor.shutdown();
             try {
                 if (!executor.awaitTermination(5, TimeUnit.MINUTES)) {
-                    logger.error("Executor did not terminate in time. Forcing shutdown...");
+                    logger.error("[SHUTDOWN] Executor did not terminate in time. Forcing shutdown...");
                     executor.shutdownNow();
                 }
             } catch (InterruptedException e) {
@@ -248,33 +251,44 @@ public class AProducer {
         }
 
         if (rateControlService != null) {
+            logger.info("[SHUTDOWN] Shutting down rate control service...");
             rateControlService.shutdown();
         }
 
         if (kafkaService != null) {
+            logger.info("[SHUTDOWN] Shutting down Kafka service...");
             kafkaService.shutdown();
         }
 
         if (kafkaProducer != null) {
             try {
+                logger.info("[SHUTDOWN] Flushing and closing Kafka producer...");
+                // Process any pending messages first
+                if (messageService != null) {
+                    messageService.processPendingProducerMessages(kafkaProducer, 3);
+                }
+                // Flush all messages
                 kafkaProducer.flush();
+                // Close producer with timeout
                 kafkaProducer.close(Duration.ofSeconds(30));
-                logger.info("Kafka Producer closed successfully.");
+                logger.info("[SHUTDOWN] Kafka Producer closed successfully.");
             } catch (Exception e) {
-                logger.error("Error closing Kafka producer: {}", e.getMessage());
+                logger.error("[SHUTDOWN] Error closing Kafka producer: {}", e.getMessage());
             }
         }
 
         if (aerospikeClient != null) {
             try {
+                logger.info("[SHUTDOWN] Closing Aerospike client...");
                 aerospikeClient.close();
-                logger.info("Aerospike Client closed successfully.");
+                logger.info("[SHUTDOWN] Aerospike Client closed successfully.");
             } catch (Exception e) {
-                logger.error("Error closing Aerospike client: {}", e.getMessage());
+                logger.error("[SHUTDOWN] Error closing Aerospike client: {}", e.getMessage());
             }
         }
 
         if (rateAdjustmentExecutor != null) {
+            logger.info("[SHUTDOWN] Shutting down rate adjustment executor...");
             rateAdjustmentExecutor.shutdown();
             try {
                 if (!rateAdjustmentExecutor.awaitTermination(1, TimeUnit.MINUTES)) {
@@ -285,6 +299,8 @@ public class AProducer {
                 Thread.currentThread().interrupt();
             }
         }
+
+        logger.info("[SHUTDOWN] Graceful shutdown completed.");
     }
 }
 

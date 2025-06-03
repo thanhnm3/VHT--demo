@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.example.pipeline.AConsumer;
 import com.example.pipeline.AProducer;
@@ -17,8 +18,11 @@ import com.example.pipeline.service.TopicGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class Main {
-    private static final Logger logger = LoggerFactory.getLogger(Main.class);
+public class MainAll {
+    private static final Logger logger = LoggerFactory.getLogger(MainAll.class);
+    private static final AtomicBoolean isRunning = new AtomicBoolean(true);
+    private static final int SHUTDOWN_TIMEOUT_SECONDS = 10;
+    private static final AtomicBoolean isShuttingDown = new AtomicBoolean(false);
 
     public static void main(String[] args) {
         try {
@@ -57,6 +61,38 @@ public class Main {
                 .map(prefix -> generateConsumerGroup(producer.getName(), prefix))
                 .toArray(String[]::new));
 
+            // Thêm shutdown hook để xử lý khi chương trình bị tắt
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                logger.info("[MAIN] Shutting down pipeline...");
+                isShuttingDown.set(true);
+                isRunning.set(false);
+                
+                // Đợi producer và consumer hoàn thành
+                try {
+                    for (CountDownLatch latch : producerLatches) {
+                        latch.await(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                    }
+                    for (CountDownLatch latch : consumerLatches) {
+                        latch.await(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+
+                // Shutdown executor
+                executor.shutdown();
+                try {
+                    if (!executor.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                        logger.error("[MAIN] Shutdown timeout reached. Forcing shutdown...");
+                        executor.shutdownNow();
+                    }
+                } catch (InterruptedException e) {
+                    executor.shutdownNow();
+                    Thread.currentThread().interrupt();
+                }
+                logger.info("[MAIN] Pipeline shutdown completed.");
+            }));
+
             // Khởi động Producer với tất cả các prefix
             executor.submit(() -> {
                 try {
@@ -86,6 +122,7 @@ public class Main {
                     logger.error("[PRODUCER] Failed: {}", e.getMessage(), e);
                 } finally {
                     producerDone.countDown();
+                    logger.info("[PRODUCER] Completed.");
                 }
             });
 
@@ -143,40 +180,45 @@ public class Main {
                         logger.error("[CONSUMER] {} failed: {}", consumerName, e.getMessage(), e);
                     } finally {
                         consumerDone.countDown();
+                        logger.info("[CONSUMER] {} completed.", consumerName);
                     }
                 });
             }
 
-            // Thêm shutdown hook để xử lý khi chương trình bị tắt
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                logger.info("[MAIN] Shutting down pipeline...");
-                executor.shutdown();
-                try {
-                    if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
-                        executor.shutdownNow();
-                    }
-                } catch (InterruptedException e) {
-                    executor.shutdownNow();
-                    Thread.currentThread().interrupt();
-                }
-            }));
-
-            // Chờ tất cả producer và consumer kết thúc
+            // Chờ producer và consumer hoàn thành
             try {
+                // Chờ producer hoàn thành
                 for (CountDownLatch latch : producerLatches) {
                     latch.await();
                 }
+                logger.info("[MAIN] Producer completed.");
+                
+                // Chờ consumer hoàn thành
                 for (CountDownLatch latch : consumerLatches) {
                     latch.await();
                 }
+                logger.info("[MAIN] All consumers completed.");
+                
+                // Shutdown executor và chờ tất cả tasks hoàn thành
                 executor.shutdown();
+                if (!executor.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                    logger.error("[MAIN] Executor shutdown timeout reached. Forcing shutdown...");
+                    executor.shutdownNow();
+                }
+                
                 logger.info("[MAIN] Pipeline completed successfully.");
+                
+                // Tự động thoát sau khi hoàn thành
+                logger.info("[MAIN] Auto-shutting down after completion...");
+                System.exit(0);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 logger.error("[MAIN] Pipeline interrupted.");
+                System.exit(1);
             }
         } catch (Exception e) {
             logger.error("Loi nghiem trong: {}", e.getMessage(), e);
+            System.exit(1);
         }
     }
 

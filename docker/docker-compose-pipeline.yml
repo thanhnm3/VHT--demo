@@ -1,0 +1,27 @@
+services:
+
+  producer-all:
+    image: data-pipeline:latest
+    environment:
+      - MODE=all
+    networks:
+      - kafka-platform
+
+  producer-cdc:
+    image: data-pipeline:latest
+    environment:
+      - MODE=cdc
+    networks:
+      - kafka-platform
+
+  producer-both:
+    image: data-pipeline:latest
+    environment:
+      - MODE=both
+    networks:
+      - kafka-platform
+
+networks:
+  kafka-platform:
+    external: true
+    name: kafka-platform
