@@ -127,6 +127,8 @@ public class AerospikeProducerService {
                 }
             }
 
+            // Ensure all messages are sent before finishing
+            producer.flush();
             logger.info("Finished scanning data from Aerospike namespace: {}", sourceNamespace);
         } catch (Exception e) {
             logger.error("Error scanning data from Aerospike: {}", e.getMessage());
