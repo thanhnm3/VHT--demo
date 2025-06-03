@@ -74,7 +74,7 @@ public class KafkaConsumerService {
         props.put("enable.auto.commit", "false");
         props.put("max.poll.records", "10000");
         props.put("fetch.min.bytes", "1048576"); // 1MB
-        props.put("fetch.max.wait.ms", "500");
+        props.put("fetch.max.wait.ms", "100");   // Giảm xuống 100ms để phản hồi nhanh hơn
         props.put("max.poll.interval.ms", "300000");
         props.put("session.timeout.ms", "30000");
         props.put("heartbeat.interval.ms", "10000");
@@ -96,10 +96,9 @@ public class KafkaConsumerService {
         try {
             while (isRunning) {
                 try {
-                    // Poll for records
+                    // Poll với timeout 100ms thay vì 0ms
                     ConsumerRecords<byte[], byte[]> records = consumer.poll(Duration.ofMillis(100));
                     if (!records.isEmpty()) {
-                        // Đợi xử lý xong toàn bộ batch trước khi commit
                         messageService.processRecordsAndWait(records);
                         consumer.commitSync();
                     }

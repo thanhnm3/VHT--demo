@@ -34,6 +34,7 @@ public class Main {
             // Xóa và tạo lại topic trước khi bắt đầu
             logger.info("Dang xoa tat ca topic tu kafka ...");
             DeleteTopic.deleteAllTopics(kafkaBroker);
+            Thread.sleep(10000);
 
             // Cấu hình performance
             int producerThreadPoolSize = config.getPerformance().getWorker_pool().getProducer();

@@ -5,8 +5,11 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class RateControlService {
+    private static final Logger logger = LoggerFactory.getLogger(RateControlService.class);
     private volatile double currentRate;        // Tốc độ hiện tại
     private volatile double targetRate;         // Tốc độ mục tiêu
     private final double maxRate;               // Tốc độ tối đa
@@ -15,8 +18,6 @@ public class RateControlService {
     private final int monitoringIntervalSeconds; // Khoảng thời gian giám sát (giây)
     private final AtomicLong lastRateAdjustmentTime; // Thời điểm điều chỉnh tốc độ cuối cùng
     private final ScheduledExecutorService rateAdjustmentExecutor; // Executor để điều chỉnh tốc độ
-    private final int rateAdjustmentSteps;      // Số bước điều chỉnh
-    private final double maxRateChangePercent;  // Phần trăm thay đổi tốc độ tối đa mỗi bước
 
     public RateControlService() {
         Config config = ConfigLoader.getConfig();
@@ -30,8 +31,6 @@ public class RateControlService {
         this.monitoringIntervalSeconds = rateControl.getMonitoring_interval_seconds();
         this.lastRateAdjustmentTime = new AtomicLong(System.currentTimeMillis());
         this.rateAdjustmentExecutor = Executors.newSingleThreadScheduledExecutor();
-        this.rateAdjustmentSteps = rateControl.getRate_adjustment_steps();
-        this.maxRateChangePercent = rateControl.getMax_rate_change_percent();
     }
 
     public RateControlService(double initialRate, double maxRate, double minRate, 
@@ -44,8 +43,6 @@ public class RateControlService {
         this.monitoringIntervalSeconds = monitoringIntervalSeconds;
         this.lastRateAdjustmentTime = new AtomicLong(System.currentTimeMillis());
         this.rateAdjustmentExecutor = Executors.newSingleThreadScheduledExecutor();
-        this.rateAdjustmentSteps = 5;
-        this.maxRateChangePercent = 0.2;
     }
 
     public double getCurrentRate() {
@@ -59,31 +56,16 @@ public class RateControlService {
     public void adjustRateSmoothly(double newTargetRate) {
         if (newTargetRate == targetRate) return;
 
-        // Tính toán số bước và lượng thay đổi cho mỗi bước
-        final double rateChange = newTargetRate - currentRate;
-        final double stepSize = rateChange / rateAdjustmentSteps;
-        
-        // Giới hạn thay đổi tối đa mỗi bước
-        final double maxStepChange = currentRate * maxRateChangePercent;
-        final double finalStepSize = Math.abs(stepSize) > maxStepChange ? 
-            Math.signum(stepSize) * maxStepChange : stepSize;
-
-        // Lên lịch điều chỉnh tốc độ từng bước
-        for (int i = 0; i < rateAdjustmentSteps; i++) {
-            final int step = i;
-            rateAdjustmentExecutor.schedule(() -> {
-                double newRate = currentRate + finalStepSize;
-                if (finalStepSize > 0) {
-                    currentRate = Math.min(newRate, targetRate);
-                } else {
-                    currentRate = Math.max(newRate, targetRate);
-                }
-            }, step * 1000, TimeUnit.MILLISECONDS);
-        }
-
+        // Điều chỉnh rate ngay lập tức
+        double oldRate = currentRate;
+        currentRate = newTargetRate;
         targetRate = newTargetRate;
-    }
 
+        // Log thay đổi
+        logger.info("Rate adjusted immediately from {} to {}", 
+            String.format("%.2f", oldRate), 
+            String.format("%.2f", newTargetRate));
+    }
 
     public double calculateNewRateForProducer(long totalLag) {
         if (totalLag > lagThreshold) {

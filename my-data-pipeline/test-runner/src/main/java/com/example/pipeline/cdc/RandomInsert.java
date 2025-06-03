@@ -40,7 +40,7 @@ public class RandomInsert {
             WritePolicy policy = new WritePolicy();
             policy.sendKey = true;
 
-            int numThreads = 8; // Số lượng luồng song song (mỗi luồng xử lý 1 prefix)
+            int numThreads = 16; // Số lượng luồng song song (mỗi luồng xử lý 1 prefix)
             ExecutorService executor = Executors.newFixedThreadPool(numThreads);
 
             int maxRecordsPerPrefix = 100_000; // 200 000 bản ghi cho mỗi prefix

@@ -97,7 +97,7 @@ public class AProducer {
                     workerPoolSize,
                     workerPoolSize,
                     60L, TimeUnit.SECONDS,
-                    new LinkedBlockingQueue<>(100000),
+                    new LinkedBlockingQueue<>(1000),
                     new ThreadPoolExecutor.CallerRunsPolicy()
                 );
                 executor = customExecutor;
@@ -215,14 +215,27 @@ public class AProducer {
             }
 
             if (hasValidLag) {
-                double newRate = rateControlService.calculateNewRateForProducer(totalLag);
-                rateControlService.updateRate(newRate);
+                // Sử dụng updateRateForLag thay vì calculateNewRateForProducer
+                rateControlService.updateRateForLag(totalLag);
+                
+                // Lấy rate hiện tại sau khi đã được điều chỉnh
                 currentRate = rateControlService.getCurrentRate();
-                logger.info("[Producer] Adjusted rate to {} messages/second based on total lag: {} for consumer groups: {}", 
-                          String.format("%.2f", currentRate), totalLag, consumerGroup);
+                
+                // Cập nhật rate mới cho AerospikeProducerService
+                if (aerospikeService != null) {
+                    aerospikeService.updateRate(currentRate);
+                }
+                
+                logger.info("[Producer] Current rate: {} messages/second, Target rate: {} messages/second, Total lag: {} for consumer groups: {}", 
+                          String.format("%.2f", currentRate),
+                          String.format("%.2f", rateControlService.getTargetRate()),
+                          totalLag, 
+                          consumerGroup);
             } else {
-                logger.warn("No valid lag found for any topic with consumer groups: {}. Keeping current rate: {}", 
-                          consumerGroup, currentRate);
+                logger.warn("No valid lag found for any topic with consumer groups: {}. Current rate: {}, Target rate: {}", 
+                          consumerGroup, 
+                          String.format("%.2f", currentRate),
+                          String.format("%.2f", rateControlService.getTargetRate()));
             }
                        
             lagMonitor.shutdown();
@@ -256,7 +269,10 @@ public class AProducer {
 
         if (kafkaProducer != null) {
             try {
+                // Đảm bảo tất cả message được gửi đi trước khi đóng
+                long pendingMessages = messageService.getPendingMessageCount();
                 kafkaProducer.flush();
+                logger.info("Flushed messages to Kafka - Pending messages: {}", pendingMessages);
                 kafkaProducer.close(Duration.ofSeconds(30));
                 logger.info("Kafka Producer closed successfully.");
             } catch (Exception e) {

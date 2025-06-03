@@ -10,12 +10,14 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.Base64;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class MessageProducerService {
     private final Map<String, String> prefixToTopicMap;
     private final Queue<ProducerRecord<byte[], byte[]>> pendingMessages;
     private final Object pendingMessagesLock;
     private final ObjectMapper objectMapper;
+    private final AtomicLong pendingMessageCount = new AtomicLong(0);
 
     public MessageProducerService() {
         this.prefixToTopicMap = new ConcurrentHashMap<>();
@@ -161,15 +163,31 @@ public class MessageProducerService {
         return !pendingMessages.isEmpty();
     }
 
+    public void addPendingMessage(ProducerRecord<byte[], byte[]> record) {
+        pendingMessages.add(record);
+        pendingMessageCount.incrementAndGet();
+    }
+
     public void processPendingProducerMessages(KafkaProducer<byte[], byte[]> producer, int maxRetries) {
         List<ProducerRecord<byte[], byte[]>> batch = new ArrayList<>();
-        synchronized (pendingMessagesLock) {
-            while (!pendingMessages.isEmpty()) {
-                batch.add(pendingMessages.poll());
+        ProducerRecord<byte[], byte[]> record;
+        
+        while ((record = pendingMessages.poll()) != null) {
+            batch.add(record);
+            pendingMessageCount.decrementAndGet();
+            
+            if (batch.size() >= 100) {
+                sendBatch(producer, batch, maxRetries);
+                batch.clear();
             }
         }
+        
         if (!batch.isEmpty()) {
             sendBatch(producer, batch, maxRetries);
         }
+    }
+
+    public long getPendingMessageCount() {
+        return pendingMessageCount.get();
     }
 }

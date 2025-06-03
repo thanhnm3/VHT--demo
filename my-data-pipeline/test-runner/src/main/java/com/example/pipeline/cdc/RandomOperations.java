@@ -23,7 +23,7 @@ public class RandomOperations {
         "096", "033"
     };
     private static final int MAX_RECORDS_PER_PREFIX = 200_000;
-    private static final int KEY_LIMIT = 20_000;
+    private static final int KEY_LIMIT = 100_000;
     private static final Map<String, Integer> PREFIX_LIMITS = Map.of(
         "033", 1_000,
         "096", 2_000
