@@ -21,8 +21,8 @@ public class DataVerifier {
 
             // Get producer (source) configuration
             Config.Producer producer = config.getProducers().get(0);
-            String producerHost = producer.getHost();
-            int producerPort = producer.getPort();
+            String producerHost = "localhost";
+            int producerPort = 3000;
             String producerNamespace = producer.getNamespace();
             String producerSetName = producer.getSet();
 
@@ -52,7 +52,7 @@ public class DataVerifier {
                 }
 
                 // Connect to destination Aerospike for this prefix
-                AerospikeClient destClient = new AerospikeClient(consumer.getHost(), consumer.getPort());
+                AerospikeClient destClient = new AerospikeClient("localhost", 4000);
                 
                 for (int i = 1; i <= 10000; i++) {
                     String phoneNumber = String.format("%s%07d", prefix, i);

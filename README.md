@@ -156,6 +156,103 @@ Hệ thống được tích hợp với Grafana để theo dõi các metrics qua
 
 ---
 
+## 🧪 Kịch Bản Test
+
+Dưới đây là các bước để test hệ thống với các kịch bản khác nhau:
+
+### 1. Chuẩn Bị Dữ Liệu Test
+
+Sử dụng script `run_random_insert.sh` để tạo dữ liệu test:
+
+```bash
+./run_random_insert.sh
+```
+
+Script này sẽ hiển thị menu với các tùy chọn:
+- 100,000 bản ghi (kích thước 100-1000 bytes)
+- 1,000,000 bản ghi (kích thước 100-1000 bytes)
+- 100,000 bản ghi (kích thước 500-5000 bytes)
+- 1,000,000 bản ghi (kích thước 500-5000 bytes)
+- Tùy chỉnh thông số
+
+> 💡 **Lưu ý**: 
+> - Dữ liệu test sẽ được chèn vào Aerospike nguồn (Producer)
+> - Dữ liệu sẽ được phân phối dựa trên prefix trong file `config.yaml`:
+>   ```yaml
+>   prefix_mapping:
+>     "096": ["consumer2"]  # Dữ liệu có prefix 096 sẽ được gửi đến consumer2
+>     "033": ["consumer1"]  # Dữ liệu có prefix 033 sẽ được gửi đến consumer1
+>   ```
+> - Bạn có thể chỉnh sửa mapping này để điều hướng dữ liệu đến consumer mong muốn
+
+### 2. Chạy Pipeline
+
+Sau khi có dữ liệu test, chọn một trong ba chế độ chạy:
+
+#### Chế độ "all"
+```bash
+docker-compose -f docker/docker-compose-pipeline.yml up producer-all
+```
+- Xử lý toàn bộ dữ liệu từ Aerospike nguồn
+- Phù hợp cho việc migrate dữ liệu ban đầu
+- Tốc độ xử lý cao, không bị ảnh hưởng bởi thay đổi dữ liệu
+
+#### Chế độ "cdc"
+```bash
+docker-compose -f docker/docker-compose-pipeline.yml up producer-cdc
+```
+- Chỉ xử lý các thay đổi dữ liệu
+- Khi chạy mode này, cần chạy thêm `randomops.sh` để tạo các thay đổi dữ liệu:
+  ```bash
+  ./randomops.sh
+  ```
+  Script này cung cấp các tùy chọn:
+  - 100 ops/sec (8 threads): Phù hợp cho test nhẹ
+  - 1,000 ops/sec (8 threads): Phù hợp cho test trung bình
+  - 10,000 ops/sec (16 threads): Phù hợp cho test tải cao
+  - Tùy chỉnh thông số: Cho phép điều chỉnh ops/sec và số threads
+- Phù hợp cho việc đồng bộ dữ liệu thời gian thực
+
+#### Chế độ "both"
+```bash
+docker-compose -f docker/docker-compose-pipeline.yml up producer-both
+```
+- Kết hợp cả hai chế độ trên
+- Xử lý cả dữ liệu hiện có và các thay đổi mới
+- Phù hợp cho việc vừa migrate vừa đồng bộ
+
+### 3. Theo Dõi Kết Quả
+
+1. Truy cập Grafana Dashboard tại `localhost:4040`
+2. Quan sát các metrics:
+   - Tổng số message đã xử lý
+   - Tốc độ xử lý (TPS)
+   - Độ trễ của consumer
+   - Tỷ lệ thành công/thất bại
+
+### 4. Kiểm Tra Kết Quả
+
+Sử dụng script `check_aerospike.sh` để verify dữ liệu:
+
+```bash
+./check_aerospike.sh
+```
+
+Script này cung cấp các tùy chọn:
+1. Kiểm tra tổng số records giữa Aerospike nguồn và đích
+2. Verify đúng đắn khi so sánh dữ liệu ở DB nguồn với DB đích với 10,000 records
+3. Verify dữ liệu với 50,000 records
+4. Verify dữ liệu với 100,000 records
+5. Verify dữ liệu với số lượng tùy chỉnh
+
+> 📊 **Kết quả mong đợi**:
+> - Số lượng records giống nhau giữa nguồn và đích
+> - Không có lỗi trong quá trình verify
+> - Latency thấp và ổn định
+> - TPS đạt được mục tiêu đề ra
+
+---
+
 ## 📂 Cấu Trúc Thư Mục
 
 ```text
