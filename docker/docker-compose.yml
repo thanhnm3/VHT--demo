@@ -203,11 +203,6 @@ services:
     networks:
       - kafka-platform
 
-    # Copyfile aerospike.conf vao container
-    # docker cp etc/aerospike/aerospike.conf aerospike:/etc/aerospike/aerospike.conf
-    # docker cp etc/aerospike/aerospike2.conf aerospike2:/etc/aerospike/aerospike.conf
-
-    # docker restart aerospike aerospike2
 
   aerospike-tools:
     image: aerospike/aerospike-tools
@@ -228,8 +223,4 @@ networks:
     name: kafka-platform
     driver: bridge
 
-  # docker-compose -f zk-kafka-single-node-stack.yml up -d
 
-  # https://grafana.com/grafana/dashboards/20860-aerospike-batch-transactions-view/
-  # Grafana dashboard for Aerospike
-  # Updating ...

@@ -89,7 +89,15 @@ public class CdcProducerService {
                                     continue;
                                 }
 
-                                ProducerRecord<byte[], byte[]> kafkaRecord = messageService.createKafkaRecord(key, record);
+                                ProducerRecord<byte[], byte[]> kafkaRecord;
+                                try {
+                                    kafkaRecord = messageService.createKafkaRecord(key, record);
+                                } catch (Exception ex) {
+                                    logger.error("Failed to create Kafka record for key: {}", 
+                                        key.userKey != null ? key.userKey.toString() : "null", ex);
+                                    continue;
+                                }
+
                                 if (kafkaRecord != null) {
                                     executor.submit(() -> {
                                         try {
@@ -129,6 +137,18 @@ public class CdcProducerService {
                 logger.error("[CDC Producer] Error during scan, retrying same window: {}", e.getMessage());
                 e.printStackTrace();
             }
+        }
+
+        // Shutdown executor and wait for tasks to complete
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
+                logger.warn("Executor did not terminate in time, forcing shutdown.");
+                executor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
         }
     }
 
