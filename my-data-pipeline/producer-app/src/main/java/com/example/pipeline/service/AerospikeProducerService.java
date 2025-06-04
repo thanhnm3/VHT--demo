@@ -90,7 +90,15 @@ public class AerospikeProducerService {
                             return;
                         }
 
-                        ProducerRecord<byte[], byte[]> kafkaRecord = messageService.createKafkaRecord(key, record);
+                        ProducerRecord<byte[], byte[]> kafkaRecord;
+                        try {
+                            kafkaRecord = messageService.createKafkaRecord(key, record);
+                        } catch (Exception ex) {
+                            logger.error("Failed to create Kafka record for key: {}", 
+                                key.userKey != null ? key.userKey.toString() : "null", ex);
+                            return;
+                        }
+
                         if (kafkaRecord != null) {
                             synchronized (batchLock) {
                                 batch.add(kafkaRecord);
@@ -110,8 +118,8 @@ public class AerospikeProducerService {
                         }
 
                     } catch (Exception e) {
-                        messageService.logFailedMessage(messageService.createKafkaRecord(key, record), 
-                                                      "Processing error", e);
+                        logger.error("Error processing record for key: {}", 
+                            key.userKey != null ? key.userKey.toString() : "null", e);
                     }
                 });
             });
@@ -127,6 +135,21 @@ public class AerospikeProducerService {
                 }
             }
 
+            // Ensure all messages are sent before finishing
+            producer.flush();
+            
+            // Shutdown executor and wait for tasks to complete
+            executor.shutdown();
+            try {
+                if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
+                    logger.warn("Executor did not terminate in time, forcing shutdown.");
+                    executor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                executor.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+            
             logger.info("Finished scanning data from Aerospike namespace: {}", sourceNamespace);
         } catch (Exception e) {
             logger.error("Error scanning data from Aerospike: {}", e.getMessage());

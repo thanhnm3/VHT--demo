@@ -1,20 +1,20 @@
 ---
 producers:
   - name: producer1
-    host: 127.0.0.1
+    host: aerospike
     port: 3000
     namespace: producer
     set: users
 
 consumers:
   - name: consumer1
-    host: 127.0.0.1
-    port: 4000
+    host: aerospike2
+    port: 3000
     namespace: consumer_033
     set: users
   - name: consumer2
-    host: 127.0.0.1
-    port: 4000
+    host: aerospike2
+    port: 3000
     namespace: consumer_096
     set: users
 
@@ -24,8 +24,8 @@ prefix_mapping:
 
 kafka:
   brokers:
-    source: localhost:9092
-    target: localhost:9093
+    source: source-kafka:29092
+    target: target-kafka:39092
 
 performance:
   max_messages_per_second: 4000

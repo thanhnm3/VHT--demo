@@ -21,12 +21,12 @@ public class CdcProducer {
     private static final Logger logger = LoggerFactory.getLogger(CdcProducer.class);
     private static ExecutorService executor;
     private static volatile double currentRate;
-    private static final double MAX_RATE = 100000.0;
-    private static final double MIN_RATE = 1000.0;
-    private static final int LAG_THRESHOLD = 1000;
+    private static double MAX_RATE;
+    private static double MIN_RATE;
+    private static int LAG_THRESHOLD;
     private static AdminClient adminClient;
     private static String consumerGroup;
-    private static final int MONITORING_INTERVAL_SECONDS = 5;
+    private static int MONITORING_INTERVAL_SECONDS;
     private static final ScheduledExecutorService rateAdjustmentExecutor = Executors.newSingleThreadScheduledExecutor();
     private static RateControlService rateControlService;
     private static KafkaProducerService kafkaService;
@@ -49,7 +49,17 @@ public class CdcProducer {
             String consumerGroup = args[6];
             int workerPoolSize = Integer.parseInt(args[7]);
             String topicList = args[8]; // Danh sách topic được phân tách bằng dấu phẩy
-            int maxMessagesPerSecond = Integer.parseInt(args[9]); // Thêm maxMessagesPerSecond
+            int maxMessagesPerSecond = Integer.parseInt(args[9]); // maxMessagesPerSecond
+            double maxRate = Double.parseDouble(args[10]); // MAX_RATE
+            double minRate = Double.parseDouble(args[11]); // MIN_RATE
+            int lagThreshold = Integer.parseInt(args[12]); // LAG_THRESHOLD
+            int monitoringIntervalSeconds = Integer.parseInt(args[13]); // MONITORING_INTERVAL_SECONDS
+
+            // Set rate control parameters
+            MAX_RATE = maxRate;
+            MIN_RATE = minRate;
+            LAG_THRESHOLD = lagThreshold;
+            MONITORING_INTERVAL_SECONDS = monitoringIntervalSeconds;
 
             CdcProducer.consumerGroup = consumerGroup;
             CdcProducer.sourceNamespace = namespace;

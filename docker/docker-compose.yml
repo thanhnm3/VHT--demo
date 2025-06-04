@@ -173,38 +173,36 @@ services:
 
 
   # # =============================== AEROSPIKE ===============================
-
   aerospike:
-    image: aerospike/aerospike-server
+    build:
+      context: .
+      dockerfile: Dockerfile.aerospike1
     container_name: aerospike
     ports:
       - "3000:3000"
       - "3001:3001"
     volumes:
+      - ./aerospike_data:/opt/aerospike/data
       - ./etc/aerospike/aerospike.conf:/etc/aerospike/aerospike.conf
-      - ./aerospike_data:/opt/aerospike/data 
-    command: ["--config-file", "/etc/aerospike/aerospike.conf", "--foreground"]
+    command: ["asd", "--config-file", "/etc/aerospike/aerospike.conf", "--foreground"]
     networks:
       - kafka-platform
 
   aerospike2:
-    image: aerospike/aerospike-server
+    build:
+      context: .
+      dockerfile: Dockerfile.aerospike2
     container_name: aerospike2
     ports:
       - "4000:3000"
       - "4001:3001"
     volumes:
+      - ./aerospike_data:/opt/aerospike/data
       - ./etc/aerospike/aerospike2.conf:/etc/aerospike/aerospike.conf
-      - ./aerospike_data:/opt/aerospike/data 
-    command: ["--config-file", "/etc/aerospike/aerospike.conf", "--foreground"]
+    command: ["asd", "--config-file", "/etc/aerospike/aerospike.conf", "--foreground"]
     networks:
       - kafka-platform
 
-    # Copyfile aerospike.conf vao container
-    # docker cp etc/aerospike/aerospike.conf aerospike:/etc/aerospike/aerospike.conf
-    # docker cp etc/aerospike/aerospike2.conf aerospike2:/etc/aerospike/aerospike.conf
-
-    # docker restart aerospike aerospike2
 
   aerospike-tools:
     image: aerospike/aerospike-tools
@@ -225,8 +223,4 @@ networks:
     name: kafka-platform
     driver: bridge
 
-  # docker-compose -f zk-kafka-single-node-stack.yml up -d
 
-  # https://grafana.com/grafana/dashboards/20860-aerospike-batch-transactions-view/
-  # Grafana dashboard for Aerospike
-  # Updating ...

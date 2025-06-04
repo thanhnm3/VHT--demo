@@ -143,6 +143,9 @@ public class MessageProducerService {
                 }
             }
         }
+        
+        // Ensure all messages in the batch are sent
+        producer.flush();
     }
 
     public void logSkippedMessage(String key, String reason) {

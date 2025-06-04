@@ -22,7 +22,7 @@ public class RandomOperations {
     private static final String[] PHONE_PREFIXES = {
         "096", "033"
     };
-    private static final int MAX_RECORDS_PER_PREFIX = 200_000;
+    private static final int MAX_RECORDS_PER_PREFIX = 100000;
     private static final int KEY_LIMIT = 20_000;
     private static final Map<String, Integer> PREFIX_LIMITS = Map.of(
         "033", 1_000,
@@ -34,6 +34,17 @@ public class RandomOperations {
             int threadPoolSize) {
         // Kết nối đến Aerospike
         AerospikeClient client = new AerospikeClient(aeroHost, aeroPort);
+        System.out.println("Đang kết nối đến Aerospike tại " + aeroHost + ":" + aeroPort);
+        
+        // Kiểm tra kết nối
+        try {
+            client.isConnected();
+            System.out.println("Kết nối thành công đến Aerospike");
+        } catch (Exception e) {
+            System.err.println("Lỗi kết nối đến Aerospike: " + e.getMessage());
+            return;
+        }
+        
         WritePolicy writePolicy = new WritePolicy();
         Policy readPolicy = new Policy();
         writePolicy.sendKey = true;
@@ -57,8 +68,12 @@ public class RandomOperations {
         AtomicInteger totalDeleteCount = new AtomicInteger(0);
 
         // Lấy danh sách key từ database
+        System.out.println("Đang lấy keys từ namespace: " + namespace + ", set: " + setName);
         ConcurrentLinkedQueue<Key> randomKeys = getRandomKeysFromDatabase(client, namespace, setName, KEY_LIMIT);
         System.out.println("Da lay " + randomKeys.size() + " keys tu database");
+        if (randomKeys.isEmpty()) {
+            System.out.println("Cảnh báo: Không tìm thấy key nào trong database. Hãy kiểm tra lại namespace và set name.");
+        }
 
         // Tạo thread pool
         ExecutorService executor = Executors.newFixedThreadPool(threadPoolSize);
@@ -228,7 +243,7 @@ public class RandomOperations {
                 return false;
             }
 
-            byte[] updatedBytes = generateRandomBytes(random, 100, 1_000);
+            byte[] updatedBytes = generateRandomBytes(random, 100, 1000);
             Bin updatedPersonBin = new Bin("personData", updatedBytes);
             Bin updatedLastUpdateBin = new Bin("lastUpdate", System.currentTimeMillis());
 
