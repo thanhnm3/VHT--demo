@@ -22,7 +22,7 @@ public class RandomOperations {
     private static final String[] PHONE_PREFIXES = {
         "096", "033"
     };
-    private static final int MAX_RECORDS_PER_PREFIX = 200_000;
+    private static final int MAX_RECORDS_PER_PREFIX = 100000;
     private static final int KEY_LIMIT = 20_000;
     private static final Map<String, Integer> PREFIX_LIMITS = Map.of(
         "033", 1_000,
@@ -243,7 +243,7 @@ public class RandomOperations {
                 return false;
             }
 
-            byte[] updatedBytes = generateRandomBytes(random, 100, 1_000);
+            byte[] updatedBytes = generateRandomBytes(random, 100, 1000);
             Bin updatedPersonBin = new Bin("personData", updatedBytes);
             Bin updatedLastUpdateBin = new Bin("lastUpdate", System.currentTimeMillis());
 
