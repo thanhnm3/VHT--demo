@@ -6,6 +6,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.Map;
+import java.util.HashMap;
 
 import com.example.pipeline.AProducer;
 import com.example.pipeline.service.config.Config;
@@ -53,32 +55,38 @@ public class MainProducer {
             CountDownLatch producerDone = new CountDownLatch(1);
             producerLatches.add(producerDone);
 
-            // Tạo danh sách consumer groups cho tất cả các prefix
-            String consumerGroups = String.join(",", config.getPrefix_mapping().keySet().stream()
-                .map(prefix -> generateConsumerGroup(producer.getName(), prefix))
-                .toArray(String[]::new));
+            // Tạo mapping từ region sang topic và consumer group
+            Map<String, String> regionToTopicMap = new HashMap<>();
+            List<String> consumerGroups = new ArrayList<>();
+            
+            // Tạo mapping cho mỗi region
+            for (String region : config.getRegions()) {
+                String topicName = TopicGenerator.generateATopicName(
+                    TopicGenerator.TopicNameGenerator.generateTopicName(producer.getName(), region));
+                String consumerGroup = TopicGenerator.generateAGroupName(producer.getName() + "_" + region);
+                
+                regionToTopicMap.put(region, topicName);
+                consumerGroups.add(consumerGroup);
+            }
 
-            // Khởi động Producer với tất cả các prefix
+            // Khởi động Producer với tất cả các region
             executor.submit(() -> {
                 try {
                     String[] producerArgs = new String[] {
                         kafkaBroker,           // kafkaBroker
-                        producer.getHost(),          // aerospikeHost
+                        producer.getHost(),    // aerospikeHost
                         String.valueOf(producer.getPort()), // aerospikePort
                         producer.getNamespace(),     // namespace
                         producer.getSet(),           // setName
                         String.valueOf(maxRetries),  // maxRetries
-                        consumerGroups,              // consumerGroup (danh sách các group phân cách bằng dấu phẩy)
+                        String.join(",", consumerGroups),  // consumerGroup (danh sách các group phân cách bằng dấu phẩy)
                         String.valueOf(producerThreadPoolSize), // workerPoolSize
-                        String.join(",", config.getPrefix_mapping().keySet().stream()
-                            .map(prefix -> TopicGenerator.generateATopicName(
-                                TopicGenerator.TopicNameGenerator.generateTopicName(producer.getName(), prefix)))
-                            .toArray(String[]::new)) // topics (comma-separated list)
+                        String.join(",", regionToTopicMap.values()) // topics (comma-separated list)
                     };
                     
                     logger.info("[PRODUCER] Starting with configuration:");
-                    logger.info("[PRODUCER] - Topics: {}", producerArgs[8]);
-                    logger.info("[PRODUCER] - Consumer Groups: {}", consumerGroups);
+                    logger.info("[PRODUCER] - Region to Topic Mapping: {}", regionToTopicMap);
+                    logger.info("[PRODUCER] - Consumer Groups: {}", String.join(",", consumerGroups));
                     logger.info("[PRODUCER] - Namespace: {}", producer.getNamespace());
                     logger.info("[PRODUCER] - Set: {}", producer.getSet());
                     
@@ -118,10 +126,5 @@ public class MainProducer {
         } catch (Exception e) {
             logger.error("[MAIN] Critical error: {}", e.getMessage(), e);
         }
-    }
-
-    // Phương thức chung để tạo consumer group
-    private static String generateConsumerGroup(String producerName, String prefix) {
-        return TopicGenerator.generateAGroupName(producerName + "_" + prefix);
     }
 } 

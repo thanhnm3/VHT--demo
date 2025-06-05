@@ -10,17 +10,23 @@ consumers:
   - name: consumer1
     host: 127.0.0.1
     port: 4000
-    namespace: consumer_033
+    namespace: north
     set: users
   - name: consumer2
     host: 127.0.0.1
     port: 4000
-    namespace: consumer_096
-    set: users
+    namespace: central
+    set: users_north
+  - name: consumer3
+    host: 127.0.0.1
+    port: 4000
+    namespace: central
+    set: users_central
 
-prefix_mapping:
-  "096": ["consumer2"]
-  "033": ["consumer1"]
+region_mapping:
+  "north": ["consumer1"]
+  "central": ["consumer2"]
+  "south": ["consumer2"]
 
 region_groups:
   north:

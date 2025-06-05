@@ -8,12 +8,13 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
 
 public class Config {
     private static final String CONFIG_PATH = "my-data-pipeline/common/src/main/resources/config.yaml";
     private List<Producer> producers;
     private List<Consumer> consumers;
-    private Map<String, List<String>> prefix_mapping;
+    private Map<String, List<String>> region_mapping;
     private Map<String, RegionConfig> region_groups;
     private KafkaConfig kafka;
     private PerformanceConfig performance;
@@ -169,9 +170,9 @@ public class Config {
     public void setProducers(List<Producer> producers) { this.producers = producers; }
     public List<Consumer> getConsumers() { return consumers; }
     public void setConsumers(List<Consumer> consumers) { this.consumers = consumers; }
-    public Map<String, List<String>> getPrefix_mapping() { return prefix_mapping; }
-    public void setPrefix_mapping(Map<String, List<String>> prefix_mapping) { 
-        this.prefix_mapping = prefix_mapping; 
+    public Map<String, List<String>> getRegion_mapping() { return region_mapping; }
+    public void setRegion_mapping(Map<String, List<String>> region_mapping) { 
+        this.region_mapping = region_mapping; 
     }
     public Map<String, RegionConfig> getRegion_groups() { return region_groups; }
     public void setRegion_groups(Map<String, RegionConfig> region_groups) { 
@@ -182,5 +183,13 @@ public class Config {
     public PerformanceConfig getPerformance() { return performance; }
     public void setPerformance(PerformanceConfig performance) { 
         this.performance = performance; 
+    }
+
+    // Lấy danh sách các region từ region_mapping
+    public List<String> getRegions() {
+        if (region_mapping == null) {
+            return new ArrayList<>();
+        }
+        return new ArrayList<>(region_mapping.keySet());
     }
 }

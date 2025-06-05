@@ -18,7 +18,7 @@ import java.nio.charset.StandardCharsets;
 public class CdcProducerService {
     private final ExecutorService executor;
     private final MessageProducerService messageService;
-    private final Map<String, String> prefixToTopicMap;
+    private final Map<String, String> regionToTopicMap;
     private final String sourceNamespace;
     private long lastPolledTime;
     private final AtomicInteger messagesSentThisSecond;
@@ -27,18 +27,18 @@ public class CdcProducerService {
 
     public CdcProducerService(ExecutorService executor,
                             MessageProducerService messageService,
-                            Map<String, String> prefixToTopicMap,
+                            Map<String, String> regionToTopicMap,
                             String sourceNamespace) {
         this.executor = executor;
         this.messageService = messageService;
-        this.prefixToTopicMap = prefixToTopicMap;
+        this.regionToTopicMap = regionToTopicMap;
         this.sourceNamespace = sourceNamespace;
         this.lastPolledTime = System.currentTimeMillis() - 10_000;
         this.messagesSentThisSecond = new AtomicInteger(0);
         this.scheduler = Executors.newSingleThreadScheduledExecutor();
         
         // Khởi tạo message service với topic mapping
-        messageService.initializeTopicMapping(prefixToTopicMap);
+        messageService.initializeTopicMapping(regionToTopicMap);
     }
 
     public void readDataFromAerospike(AerospikeClient client,
@@ -64,8 +64,8 @@ public class CdcProducerService {
                         Record record = records.getRecord();
                         
                         if (key != null && key.userKey != null) {
-                            long updateTime = record != null && record.getValue("lastUpdate") != null ? 
-                                (long) record.getValue("lastUpdate") : 
+                            long updateTime = record != null && record.getValue("last_updated") != null ? 
+                                (long) record.getValue("last_updated") : 
                                 System.currentTimeMillis();
                             
                             if (updateTime > windowStart) {
@@ -76,16 +76,16 @@ public class CdcProducerService {
                                     continue;
                                 }
 
-                                // Lấy prefix từ key
-                                String prefix = extractPrefix(keyBytes);
-                                if (prefix == null) {
-                                    logger.warn("Invalid key format: {}", new String(keyBytes));
+                                // Lấy region từ record
+                                String region = extractRegion(record);
+                                if (region == null) {
+                                    logger.warn("Region field is null or invalid for key: {}", new String(keyBytes));
                                     continue;
                                 }
 
-                                String topic = prefixToTopicMap.get(prefix);
+                                String topic = regionToTopicMap.get(region);
                                 if (topic == null) {
-                                    logger.warn("No topic mapping found for prefix: {}", prefix);
+                                    logger.warn("No topic mapping found for region: {}", region);
                                     continue;
                                 }
 
@@ -100,7 +100,7 @@ public class CdcProducerService {
                                                     messagesSentThisSecond.incrementAndGet();
                                                     if (messagesSentThisSecond.get() % 1000 == 0) {
                                                         logger.info("[{}] Sent {} messages to topic {}", 
-                                                                 prefix, messagesSentThisSecond.get(), topic);
+                                                                 region, messagesSentThisSecond.get(), topic);
                                                     }
                                                 }
                                             });
@@ -132,11 +132,11 @@ public class CdcProducerService {
         }
     }
 
-    private String extractPrefix(byte[] key) {
-        if (key == null || key.length < 3) {
+    private String extractRegion(Record record) {
+        if (record == null || record.bins == null) {
             return null;
         }
-        return new String(key, 0, 3, StandardCharsets.UTF_8);
+        return (String) record.getValue("region");
     }
 
     public void shutdown() {

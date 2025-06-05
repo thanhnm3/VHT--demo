@@ -34,7 +34,7 @@ public class CdcProducer {
     private static CdcProducerService cdcProducerService;
     private static int maxMessagesPerSecond;
 
-    private static final Map<String, String> prefixToTopicMap = new ConcurrentHashMap<>();
+    private static final Map<String, String> regionToTopicMap = new ConcurrentHashMap<>();
     private static String sourceNamespace;
 
     public static void main(String[] args) {
@@ -66,7 +66,7 @@ public class CdcProducer {
                                                           LAG_THRESHOLD, MONITORING_INTERVAL_SECONDS);
                 kafkaService = new KafkaProducerService(kafkaBroker, null, consumerGroup);
                 messageService = new MessageProducerService();
-                messageService.initializeTopicMapping(prefixToTopicMap);
+                messageService.initializeTopicMapping(regionToTopicMap);
 
                 ClientPolicy clientPolicy = new ClientPolicy();
                 clientPolicy.timeout = 5000;
@@ -108,14 +108,14 @@ public class CdcProducer {
                 cdcProducerService = new CdcProducerService(
                     executor,
                     messageService,
-                    prefixToTopicMap,
+                    regionToTopicMap,
                     sourceNamespace
                 );
 
                 logger.info("Starting CDC producer with configuration:");
                 logger.info("  Namespace: {}", namespace);
                 logger.info("  Set: {}", setName);
-                logger.info("  Topics: {}", prefixToTopicMap);
+                logger.info("  Topics: {}", regionToTopicMap);
                 logger.info("  Consumer group: {}", consumerGroup);
                 logger.info("  Worker pool size: {}", workerPoolSize);
 
@@ -141,20 +141,20 @@ public class CdcProducer {
     }
 
     private static void initializeTopicMapping(String topicList) {
-        // Phân tách danh sách topic và tạo mapping từ prefix sang topic
+        // Phân tách danh sách topic và tạo mapping từ region sang topic
         String[] topicArray = topicList.split(",");
         for (String topic : topicArray) {
             String trimmedTopic = topic.trim();
-            // Lấy prefix từ topic name (ví dụ: từ "producer1_096-cdc" lấy "096")
-            String prefix = trimmedTopic.split("_")[1].split("-")[0];
-            prefixToTopicMap.put(prefix, trimmedTopic);
+            // Lấy region từ topic name (ví dụ: từ "producer1_north-cdc" lấy "north")
+            String region = trimmedTopic.split("_")[1].split("-")[0];
+            regionToTopicMap.put(region, trimmedTopic);
         }
-        logger.info("Initialized topic mapping from prefix to topic: {}", prefixToTopicMap);
+        logger.info("Initialized topic mapping from region to topic: {}", regionToTopicMap);
     }
 
     private static void createTopics() {
         try {
-            Set<String> topics = new HashSet<>(prefixToTopicMap.values());
+            Set<String> topics = new HashSet<>(regionToTopicMap.values());
             
             for (String topic : topics) {
                 try {
@@ -183,24 +183,24 @@ public class CdcProducer {
             // Tách consumer groups thành mảng
             String[] consumerGroups = consumerGroup.split(",");
             
-            // Tạo map từ prefix sang topic và consumer group
-            Map<String, String> prefixToTopicMap = new HashMap<>();
-            Map<String, String> prefixToGroupMap = new HashMap<>();
+            // Tạo map từ region sang topic và consumer group
+            Map<String, String> regionToTopicMap = new HashMap<>();
+            Map<String, String> regionToGroupMap = new HashMap<>();
             
             for (String group : consumerGroups) {
                 group = group.trim();
-                // Lấy prefix từ consumer group (ví dụ: từ "producer1_096-cdc-group" lấy "096")
-                String prefix = group.split("_")[1].split("-")[0];
-                String topic = "producer1_" + prefix + "-cdc";
-                prefixToTopicMap.put(prefix, topic);
-                prefixToGroupMap.put(prefix, group);
+                // Lấy region từ consumer group (ví dụ: từ "producer1_north-cdc-group" lấy "north")
+                String region = group.split("_")[1].split("-")[0];
+                String topic = "producer1_" + region + "-cdc";
+                regionToTopicMap.put(region, topic);
+                regionToGroupMap.put(region, group);
             }
             
             // Tính tổng lag cho mỗi cặp topic-group tương ứng
-            for (Map.Entry<String, String> entry : prefixToTopicMap.entrySet()) {
-                String prefix = entry.getKey();
+            for (Map.Entry<String, String> entry : regionToTopicMap.entrySet()) {
+                String region = entry.getKey();
                 String topic = entry.getValue();
-                String group = prefixToGroupMap.get(prefix);
+                String group = regionToGroupMap.get(region);
                 
                 try {
                     long topicLag = lagMonitor.calculateTopicLag(topic, group);

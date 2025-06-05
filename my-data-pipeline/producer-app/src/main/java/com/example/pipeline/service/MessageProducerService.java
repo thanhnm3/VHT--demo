@@ -9,25 +9,24 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.Base64;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class MessageProducerService {
-    private final Map<String, String> prefixToTopicMap;
+    private final Map<String, String> regionToTopicMap;
     private final Queue<ProducerRecord<byte[], byte[]>> pendingMessages;
     private final Object pendingMessagesLock;
     private final ObjectMapper objectMapper;
     private final AtomicLong pendingMessageCount = new AtomicLong(0);
 
     public MessageProducerService() {
-        this.prefixToTopicMap = new ConcurrentHashMap<>();
+        this.regionToTopicMap = new ConcurrentHashMap<>();
         this.pendingMessages = new ConcurrentLinkedQueue<>();
         this.pendingMessagesLock = new Object();
         this.objectMapper = new ObjectMapper();
     }
 
     public void initializeTopicMapping(Map<String, String> topicMapping) {
-        this.prefixToTopicMap.putAll(topicMapping);
+        this.regionToTopicMap.putAll(topicMapping);
     }
 
     public boolean isValidRecord(Record record) {
@@ -45,15 +44,15 @@ public class MessageProducerService {
             return null;
         }
 
-        String prefix = extractPrefix(keyBytes);
-        if (prefix == null) {
-            logSkippedMessage(new String(keyBytes), "Invalid key format");
+        String region = (String) record.getValue("region");
+        if (region == null) {
+            logSkippedMessage(new String(keyBytes), "Region field is null or invalid");
             return null;
         }
 
-        String topic = prefixToTopicMap.get(prefix);
+        String topic = regionToTopicMap.get(region);
         if (topic == null) {
-            logSkippedMessage(new String(keyBytes), "No topic mapping found for prefix: " + prefix);
+            logSkippedMessage(new String(keyBytes), "No topic mapping found for region: " + region);
             return null;
         }
 
@@ -66,31 +65,20 @@ public class MessageProducerService {
         return new ProducerRecord<>(topic, keyBytes, valueBytes);
     }
 
-    private String extractPrefix(byte[] key) {
-        // Extract prefix from key (e.g., "096123456" -> "096")
-        if (key == null || key.length < 3) {
-            return null;
-        }
-        // Convert first 3 bytes to string
-        return new String(key, 0, 3, StandardCharsets.UTF_8);
-    }
 
     private byte[] serializeRecord(Record record) {
         try {
             Map<String, Object> data = new HashMap<>();
             
-            // Lấy personData dạng byte array
-            byte[] personData = (byte[]) record.getValue("personData");
-            if (personData != null) {
-                // Encode byte array thành base64 string để JSON có thể serialize
-                String personDataBase64 = Base64.getEncoder().encodeToString(personData);
-                data.put("personData", personDataBase64);
-            } else {
-                data.put("personData", null);
-            }
-
-            // Lấy lastUpdate dạng timestamp
-            Object lastUpdateObj = record.getValue("lastUpdate");
+            // Lấy các trường dữ liệu từ record
+            data.put("user_id", record.getValue("user_id"));
+            data.put("phone", record.getValue("phone"));
+            data.put("service_type", record.getValue("service_type"));
+            data.put("province", record.getValue("province"));
+            data.put("region", record.getValue("region"));
+            
+            // Xử lý last_updated
+            Object lastUpdateObj = record.getValue("last_updated");
             long lastUpdate;
             if (lastUpdateObj != null) {
                 if (lastUpdateObj instanceof Long) {
@@ -103,7 +91,10 @@ public class MessageProducerService {
             } else {
                 lastUpdate = System.currentTimeMillis();
             }
-            data.put("lastUpdate", lastUpdate);
+            data.put("last_updated", lastUpdate);
+
+            // Giữ nguyên trường notes
+            data.put("notes", record.getValue("notes"));
 
             return objectMapper.writeValueAsBytes(data);
         } catch (Exception e) {

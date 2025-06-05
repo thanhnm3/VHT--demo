@@ -5,7 +5,7 @@ import java.util.Map;
 
 public class ConsumerConfig {
     private List<Consumer> consumers;
-    private Map<String, List<String>> prefix_mapping;
+    private Map<String, List<String>> region_mapping;
 
     public static class Consumer {
         private String name;
@@ -31,9 +31,9 @@ public class ConsumerConfig {
     public List<Consumer> getConsumers() { return consumers; }
     public void setConsumers(List<Consumer> consumers) { this.consumers = consumers; }
 
-    // Getters và Setters cho prefix_mapping
-    public Map<String, List<String>> getPrefix_mapping() { return prefix_mapping; }
-    public void setPrefix_mapping(Map<String, List<String>> prefix_mapping) { 
-        this.prefix_mapping = prefix_mapping; 
+    // Getters và Setters cho region_mapping
+    public Map<String, List<String>> getRegion_mapping() { return region_mapping; }
+    public void setRegion_mapping(Map<String, List<String>> region_mapping) { 
+        this.region_mapping = region_mapping; 
     }
 }

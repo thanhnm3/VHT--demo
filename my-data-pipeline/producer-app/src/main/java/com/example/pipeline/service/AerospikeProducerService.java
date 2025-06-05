@@ -1,6 +1,7 @@
 package com.example.pipeline.service;
 
-import com.aerospike.client.*;
+import com.aerospike.client.AerospikeClient;
+import com.aerospike.client.Record;
 import com.aerospike.client.policy.ScanPolicy;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -17,7 +18,7 @@ public class AerospikeProducerService {
     private final ExecutorService executor;
     private final MessageProducerService messageService;
     private final String sourceNamespace;
-    private final Map<String, String> prefixToTopicMap;
+    private final Map<String, String> regionToTopicMap;
     private volatile double currentRate;
     private volatile ScanPolicy scanPolicy;
     private final AtomicLong totalRecordsProcessed = new AtomicLong(0);
@@ -30,23 +31,23 @@ public class AerospikeProducerService {
 
     public AerospikeProducerService(ExecutorService executor, 
                                   MessageProducerService messageService,
-                                  Map<String, String> prefixToTopicMap,
+                                  Map<String, String> regionToTopicMap,
                                   String sourceNamespace) {
         this.executor = executor;
         this.messageService = messageService;
         this.sourceNamespace = sourceNamespace;
-        this.prefixToTopicMap = prefixToTopicMap;
+        this.regionToTopicMap = regionToTopicMap;
         this.currentRate = 5000.0; // Default rate
         
         // Initialize message service with topic mapping
-        messageService.initializeTopicMapping(prefixToTopicMap);
+        messageService.initializeTopicMapping(regionToTopicMap);
     }
 
-    private String extractPrefix(byte[] key) {
-        if (key == null || key.length < 3) {
+    private String extractRegion(Record record) {
+        if (record == null || record.bins == null) {
             return null;
         }
-        return new String(key, 0, 3, StandardCharsets.UTF_8);
+        return (String) record.getValue("region");
     }
 
     private void startRateMonitoring() {
@@ -129,19 +130,19 @@ public class AerospikeProducerService {
                             return;
                         }
 
-                        // Lấy prefix từ key
-                        String prefix = extractPrefix(keyBytes);
-                        if (prefix == null) {
+                        // Lấy region từ record
+                        String region = extractRegion(record);
+                        if (region == null) {
                             totalSkippedRecords.incrementAndGet();
-                            messageService.logSkippedMessage(new String(keyBytes), "Invalid key format");
+                            messageService.logSkippedMessage(new String(keyBytes), "Region field is null or invalid");
                             return;
                         }
 
-                        // Kiểm tra xem prefix có trong map không
-                        if (!prefixToTopicMap.containsKey(prefix)) {
+                        // Kiểm tra xem region có trong map không
+                        if (!regionToTopicMap.containsKey(region)) {
                             totalSkippedRecords.incrementAndGet();
                             messageService.logSkippedMessage(new String(keyBytes), 
-                                "No topic mapping found for prefix: " + prefix);
+                                "No topic mapping found for region: " + region);
                             return;
                         }
 

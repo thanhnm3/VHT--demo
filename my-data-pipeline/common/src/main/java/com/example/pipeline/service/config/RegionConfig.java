@@ -2,6 +2,7 @@ package com.example.pipeline.service.config;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 public class RegionConfig {
     private List<String> unchanged;
@@ -39,5 +40,53 @@ public class RegionConfig {
 
     public int getTotalProvinces() {
         return getTotalUnchangedCount() + getTotalChangedCount() + getTotalMergedCount();
+    }
+
+    public static class ProvinceInfo {
+        private final String region;
+        private final String correspondingProvince;
+
+        public ProvinceInfo(String region, String correspondingProvince) {
+            this.region = region;
+            this.correspondingProvince = correspondingProvince;
+        }
+
+        public String getRegion() {
+            return region;
+        }
+
+        public String getCorrespondingProvince() {
+            return correspondingProvince;
+        }
+    }
+
+    public ProvinceInfo findProvinceInfo(String provinceName, Map<String, RegionConfig> regionGroups) {
+        // Check in unchanged provinces
+        for (Map.Entry<String, RegionConfig> entry : regionGroups.entrySet()) {
+            String region = entry.getKey();
+            RegionConfig config = entry.getValue();
+            
+            // Check in unchanged list
+            if (config.getUnchanged() != null && config.getUnchanged().contains(provinceName)) {
+                return new ProvinceInfo(region, provinceName);
+            }
+            
+            // Check in changed map
+            if (config.getChanged() != null) {
+                // Check if province is a key in changed map
+                if (config.getChanged().containsKey(provinceName)) {
+                    return new ProvinceInfo(region, provinceName);
+                }
+                
+                // Check if province is in any of the value lists
+                for (Map.Entry<String, List<String>> changedEntry : config.getChanged().entrySet()) {
+                    if (changedEntry.getValue().contains(provinceName)) {
+                        return new ProvinceInfo(region, changedEntry.getKey());
+                    }
+                }
+            }
+        }
+        
+        return null; // Province not found
     }
 } 

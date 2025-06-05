@@ -8,8 +8,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.Base64;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.nio.charset.StandardCharsets;
 
@@ -19,6 +22,7 @@ public class CdcService {
     private final String namespace;
     private final String setName;
     private final ObjectMapper objectMapper;
+    private static final Logger logger = LoggerFactory.getLogger(CdcService.class);
 
     public CdcService(AerospikeClient aerospikeClient, WritePolicy writePolicy, String namespace, String setName) {
         this.aerospikeClient = aerospikeClient;
@@ -30,60 +34,80 @@ public class CdcService {
 
     public void processRecord(ConsumerRecord<byte[], byte[]> record) {
         try {
-            byte[] keyBytes = record.key();
-            if (keyBytes == null) {
-                System.err.println("Nhan duoc key null, bo qua record.");
+            // Check if key is null
+            if (record.key() == null) {
+                logger.error("Received null key, skipping record");
                 return;
             }
 
-            // Tao key tu Kafka key
-            Key aerospikeKey = new Key(namespace, setName, keyBytes);
+            // Create Aerospike key using record key
+            Key aerospikeKey = new Key(namespace, setName, record.key());
 
-            // Giai ma JSON tu Kafka value
+            // Parse JSON from Kafka value
             Map<String, Object> data = null;
             if (record.value() != null) {
                 String jsonString = new String(record.value(), StandardCharsets.UTF_8);
                 try {
                     data = objectMapper.readValue(jsonString, new TypeReference<Map<String, Object>>() {});
                 } catch (JsonProcessingException e) {
-                    System.err.println("Loi giai ma JSON: " + e.getMessage());
-                    data = null;
+                    logger.error("Error parsing JSON: {}", e.getMessage());
+                    throw new RuntimeException("Failed to parse JSON message", e);
                 }
             }
 
-            // Xu ly personData
-            String personDataBase64 = data != null ? (String) data.get("personData") : null;
-            byte[] personData = null;
-            if (personDataBase64 != null) {
+            if (data == null) {
+                logger.error("No data to process");
+                return;
+            }
+
+            // Create bins list for Aerospike
+            List<Bin> bins = new ArrayList<>();
+
+            // Add basic fields
+            if (data.containsKey("user_id")) {
+                bins.add(new Bin("user_id", String.valueOf(data.get("user_id"))));
+            }
+            if (data.containsKey("phone")) {
+                bins.add(new Bin("phone", String.valueOf(data.get("phone"))));
+            }
+            if (data.containsKey("service_type")) {
+                bins.add(new Bin("service_type", String.valueOf(data.get("service_type"))));
+            }
+            if (data.containsKey("province")) {
+                bins.add(new Bin("province", String.valueOf(data.get("province"))));
+            }
+            if (data.containsKey("region")) {
+                bins.add(new Bin("region", String.valueOf(data.get("region"))));
+            }
+
+            // Handle last_updated
+            Object lastUpdateObj = data.get("last_updated");
+            long lastUpdate;
+            if (lastUpdateObj != null) {
                 try {
-                    personData = Base64.getDecoder().decode(personDataBase64);
-                } catch (IllegalArgumentException e) {
-                    System.err.println("Loi giai ma personData: " + e.getMessage());
-                    personData = null;
+                    lastUpdate = ((Number) lastUpdateObj).longValue();
+                } catch (Exception e) {
+                    logger.error("Error parsing last_updated: {}", e.getMessage());
+                    lastUpdate = System.currentTimeMillis();
+                }
+            } else {
+                lastUpdate = System.currentTimeMillis();
+            }
+            bins.add(new Bin("last_updated", lastUpdate));
+
+            // Handle notes
+            if (data.containsKey("notes")) {
+                Object notesObj = data.get("notes");
+                if (notesObj != null) {
+                    bins.add(new Bin("notes", String.valueOf(notesObj)));
                 }
             }
 
-            // Xu ly lastUpdate
-            long lastUpdate = System.currentTimeMillis(); // Default to current time
-            if (data != null) {
-                Object lastUpdateObj = data.get("lastUpdate");
-                if (lastUpdateObj != null) {
-                    try {
-                        lastUpdate = ((Number) lastUpdateObj).longValue();
-                    } catch (Exception e) {
-                        System.err.println("Loi xu ly lastUpdate: " + e.getMessage());
-                        // Giữ nguyên giá trị mặc định là thời gian hiện tại
-                    }
-                }
-            }
-
-            // Tạo bins và ghi vào Aerospike
-            Bin personDataBin = new Bin("personData", personData);
-            Bin lastUpdateBin = new Bin("lastUpdate", lastUpdate);
-            aerospikeClient.put(writePolicy, aerospikeKey, personDataBin, lastUpdateBin);
+            // Write to Aerospike with all bins
+            aerospikeClient.put(writePolicy, aerospikeKey, bins.toArray(new Bin[0]));
 
         } catch (Exception e) {
-            System.err.println("Loi xu ly record: " + e.getMessage());
+            logger.error("Error processing record: {}", e.getMessage(), e);
             throw e;
         }
     }

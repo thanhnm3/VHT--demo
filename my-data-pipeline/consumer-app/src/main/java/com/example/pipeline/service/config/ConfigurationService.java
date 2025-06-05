@@ -10,8 +10,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ConfigurationService {
     private static ConfigurationService instance;
     private final Map<String, Config.Consumer> consumerConfigs;
-    private final Map<String, List<String>> prefixMappings;
-    private final Map<String, String> prefixToTopicMap;
+    private final Map<String, List<String>> regionMappings;
+    private final Map<String, String> regionToTopicMap;
     private Config baseConfig;
     
     // Consumer-specific configurations
@@ -20,8 +20,8 @@ public class ConfigurationService {
     
     private ConfigurationService() {
         this.consumerConfigs = new ConcurrentHashMap<>();
-        this.prefixMappings = new ConcurrentHashMap<>();
-        this.prefixToTopicMap = new ConcurrentHashMap<>();
+        this.regionMappings = new ConcurrentHashMap<>();
+        this.regionToTopicMap = new ConcurrentHashMap<>();
         this.baseConfig = loadBaseConfig();
         initializeConfigurations();
     }
@@ -47,39 +47,43 @@ public class ConfigurationService {
             consumerConfigs.put(consumer.getName(), consumer);
         }
         
-        // Initialize prefix mappings
-        prefixMappings.putAll(baseConfig.getPrefix_mapping());
+        // Initialize region mappings
+        regionMappings.putAll(baseConfig.getRegion_mapping());
         
-        // Initialize topic mappings
-        prefixToTopicMap.putAll(TopicGenerator.generateTopics());
+        // Initialize topic mappings for each region
+        for (String region : baseConfig.getRegions()) {
+            String topicName = TopicGenerator.generateATopicName(
+                TopicGenerator.TopicNameGenerator.generateTopicName("producer1", region));
+            regionToTopicMap.put(region, topicName);
+        }
     }
     
     public List<Config.Consumer> getConsumers() {
         return baseConfig.getConsumers();
     }
     
-    public Map<String, List<String>> getPrefixMappings() {
-        return new HashMap<>(prefixMappings);
+    public Map<String, List<String>> getRegionMappings() {
+        return new HashMap<>(regionMappings);
     }
     
     public Config.Consumer getConsumerConfig(String consumerName) {
         return consumerConfigs.get(consumerName);
     }
     
-    public List<String> getConsumerNamesForPrefix(String prefix) {
-        return prefixMappings.get(prefix);
+    public List<String> getConsumerNamesForRegion(String region) {
+        return regionMappings.get(region);
     }
     
-    public String getTopicForPrefix(String prefix) {
-        return prefixToTopicMap.get(prefix);
+    public String getTopicForRegion(String region) {
+        return regionToTopicMap.get(region);
     }
     
-    public Map<String, String> getAllPrefixToTopicMappings() {
-        return new HashMap<>(prefixToTopicMap);
+    public Map<String, String> getAllRegionToTopicMappings() {
+        return new HashMap<>(regionToTopicMap);
     }
     
-    public String getConsumerGroup(String consumerName) {
-        String baseGroup = consumerName + "-group";
+    public String getConsumerGroup(String consumerName, String region) {
+        String baseGroup = consumerName + "_" + region + "-group";
         if (consumerName.endsWith("-cdc")) {
             return baseGroup + "-cdc";
         }

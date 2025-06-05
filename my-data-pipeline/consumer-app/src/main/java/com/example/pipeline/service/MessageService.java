@@ -16,9 +16,9 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -106,51 +106,105 @@ public class MessageService {
             // Create Aerospike key using record key as PK
             Key key = new Key(namespace, setName, record.key());
             
-            // Initialize default values
-            byte[] personData = null;
-            long lastUpdate = System.currentTimeMillis();
-            
             // Try to parse message if value is not null
             if (record.value() != null) {
                 try {
                     String message = new String(record.value(), StandardCharsets.UTF_8);
                     Map<String, Object> data = objectMapper.readValue(message, new TypeReference<Map<String, Object>>() {});
                     
-                    // Parse personData
-                    String personDataBase64 = (String) data.get("personData");
-                    if (personDataBase64 != null) {
-                        try {
-                            personData = Base64.getDecoder().decode(personDataBase64);
-                        } catch (IllegalArgumentException e) {
-                            logger.error("[{}] Error decoding personData: {}", prefix, e.getMessage());
+                    // Create bins list for Aerospike
+                    List<Bin> bins = new ArrayList<>();
+                    
+                    // Add basic fields with original data types
+                    if (data.containsKey("user_id")) {
+                        Object userId = data.get("user_id");
+                        bins.add(new Bin("user_id", userId != null ? userId.toString() : null));
+                    }
+                    if (data.containsKey("phone")) {
+                        Object phone = data.get("phone");
+                        bins.add(new Bin("phone", phone != null ? phone.toString() : null));
+                    }
+                    if (data.containsKey("service_type")) {
+                        Object serviceType = data.get("service_type");
+                        bins.add(new Bin("service_type", serviceType != null ? serviceType.toString() : null));
+                    }
+                    if (data.containsKey("province")) {
+                        Object province = data.get("province");
+                        bins.add(new Bin("province", province != null ? province.toString() : null));
+                    }
+                    if (data.containsKey("region")) {
+                        Object region = data.get("region");
+                        bins.add(new Bin("region", region != null ? region.toString() : null));
+                    }
+                    
+                    // Handle last_updated with original data type
+                    Object lastUpdateObj = data.get("last_updated");
+                    if (lastUpdateObj != null) {
+                        if (lastUpdateObj instanceof Long) {
+                            bins.add(new Bin("last_updated", (Long) lastUpdateObj));
+                        } else if (lastUpdateObj instanceof Integer) {
+                            bins.add(new Bin("last_updated", ((Integer) lastUpdateObj).longValue()));
+                        } else {
+                            bins.add(new Bin("last_updated", System.currentTimeMillis()));
+                        }
+                    } else {
+                        bins.add(new Bin("last_updated", System.currentTimeMillis()));
+                    }
+                    
+                    // Handle notes with binary data format
+                    if (data.containsKey("notes")) {
+                        Object notesObj = data.get("notes");
+                        if (notesObj != null) {
+                            if (notesObj instanceof String) {
+                                // If notes is a string, try to decode it as hex
+                                try {
+                                    String hexString = (String) notesObj;
+                                    byte[] notesBytes = hexStringToByteArray(hexString);
+                                    bins.add(new Bin("notes", notesBytes));
+                                } catch (Exception e) {
+                                    logger.error("[{}] Error converting notes hex string to bytes: {}", prefix, e.getMessage());
+                                    // Fallback to original string if conversion fails
+                                    bins.add(new Bin("notes", notesObj.toString()));
+                                }
+                            } else if (notesObj instanceof byte[]) {
+                                // If notes is already a byte array, use it directly
+                                bins.add(new Bin("notes", (byte[]) notesObj));
+                            } else {
+                                // For other types, convert to string and then to bytes
+                                bins.add(new Bin("notes", notesObj.toString().getBytes(StandardCharsets.UTF_8)));
+                            }
                         }
                     }
                     
-                    // Parse lastUpdate
-                    Object lastUpdateObj = data.get("lastUpdate");
-                    if (lastUpdateObj != null) {
-                        try {
-                            lastUpdate = ((Number) lastUpdateObj).longValue();
-                        } catch (Exception e) {
-                            logger.error("[{}] Error parsing lastUpdate: {}", prefix, e.getMessage());
-                        }
-                    }
+                    // Write to Aerospike with all bins
+                    destinationClient.put(writePolicy, key, bins.toArray(new Bin[0]));
+                    
+                } catch (JsonProcessingException e) {
+                    logger.error("[{}] Error parsing JSON message: {}", prefix, e.getMessage());
+                    throw new RuntimeException("Failed to parse JSON message", e);
                 } catch (Exception e) {
-                    logger.error("[{}] Error parsing message: {}", prefix, e.getMessage());
+                    logger.error("[{}] Error processing message: {}", prefix, e.getMessage());
+                    throw e;
                 }
+            } else {
+                logger.error("[{}] Error: Record value is null", prefix);
             }
-            
-            // Create bins with available data
-            Bin personDataBin = new Bin("personData", personData);
-            Bin lastUpdateBin = new Bin("lastUpdate", lastUpdate);
-            
-            // Write to Aerospike with both bins
-            destinationClient.put(writePolicy, key, personDataBin, lastUpdateBin);
             
         } catch (Exception e) {
             logger.error("[{}] Error writing to Aerospike: {}", prefix, e.getMessage(), e);
             throw e;
         }
+    }
+
+    // Helper method to convert hex string to byte array
+    private byte[] hexStringToByteArray(String hexString) {
+        int len = hexString.length();
+        byte[] data = new byte[len / 2];
+        for (int i = 0; i < len; i += 2) {
+            data[i / 2] = (byte) ((Character.digit(hexString.charAt(i), 16) << 4)
+                    + Character.digit(hexString.charAt(i + 1), 16));
+        }
+        return data;
     }
 
     public long getCurrentOffset() {

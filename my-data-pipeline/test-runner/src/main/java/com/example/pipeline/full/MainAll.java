@@ -17,8 +17,8 @@ import com.example.pipeline.service.TopicGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class Main {
-    private static final Logger logger = LoggerFactory.getLogger(Main.class);
+public class MainAll {
+    private static final Logger logger = LoggerFactory.getLogger(MainAll.class);
 
     public static void main(String[] args) {
         try {
@@ -28,20 +28,20 @@ public class Main {
                 throw new IllegalStateException("Failed to load configuration");
             }
 
-            // Lấy cấu hình Kafka
+            // Get Kafka configuration
             String kafkaBroker = config.getKafka().getBroker();
 
-            // Xóa và tạo lại topic trước khi bắt đầu
-            logger.info("Dang xoa tat ca topic tu kafka ...");
+            // Delete and recreate topics before starting
+            logger.info("Deleting all topics from Kafka...");
             DeleteTopic.deleteAllTopics(kafkaBroker);
-            Thread.sleep(10000);
+            Thread.sleep(5000);
 
-            // Cấu hình performance
+            // Performance configuration
             int producerThreadPoolSize = config.getPerformance().getWorker_pool().getProducer();
             int consumerThreadPoolSize = config.getPerformance().getWorker_pool().getConsumer();
             int maxRetries = config.getPerformance().getMax_retries();
 
-            // Tạo thread pool cho Producer và Consumer
+            // Create thread pool for Producer and Consumer
             ExecutorService executor = Executors.newCachedThreadPool();
             List<CountDownLatch> producerLatches = new ArrayList<>();
             List<CountDownLatch> consumerLatches = new ArrayList<>();
@@ -53,31 +53,31 @@ public class Main {
             logger.info("Max Retries: {}", maxRetries);
             logger.info("===========================");
 
-            // Khởi tạo producer một lần duy nhất
+            // Initialize producer once
             Config.Producer producer = config.getProducers().get(0);
             CountDownLatch producerDone = new CountDownLatch(1);
             producerLatches.add(producerDone);
 
-            // Tạo danh sách consumer groups cho tất cả các prefix
-            String consumerGroups = String.join(",", config.getPrefix_mapping().keySet().stream()
-                .map(prefix -> generateConsumerGroup(producer.getName(), prefix))
+            // Create list of consumer groups for all regions
+            String consumerGroups = String.join(",", config.getRegion_mapping().keySet().stream()
+                .map(region -> generateConsumerGroup(producer.getName(), region))
                 .toArray(String[]::new));
 
-            // Khởi động Producer với tất cả các prefix
+            // Start Producer with all regions
             executor.submit(() -> {
                 try {
                     String[] producerArgs = new String[] {
                         kafkaBroker,           // kafkaBroker
-                        producer.getHost(),          // aerospikeHost
+                        producer.getHost(),    // aerospikeHost
                         String.valueOf(producer.getPort()), // aerospikePort
                         producer.getNamespace(),     // namespace
                         producer.getSet(),           // setName
                         String.valueOf(maxRetries),  // maxRetries
-                        consumerGroups,              // consumerGroup (danh sách các group phân cách bằng dấu phẩy)
+                        consumerGroups,              // consumerGroup (comma-separated list)
                         String.valueOf(producerThreadPoolSize), // workerPoolSize
-                        String.join(",", config.getPrefix_mapping().keySet().stream()
-                            .map(prefix -> TopicGenerator.generateATopicName(
-                                TopicGenerator.TopicNameGenerator.generateTopicName(producer.getName(), prefix)))
+                        String.join(",", config.getRegion_mapping().keySet().stream()
+                            .map(region -> TopicGenerator.generateATopicName(
+                                TopicGenerator.TopicNameGenerator.generateTopicName(producer.getName(), region)))
                             .toArray(String[]::new)) // topics (comma-separated list)
                     };
                     
@@ -95,20 +95,20 @@ public class Main {
                 }
             });
 
-            // Khởi động các Consumer cho từng prefix
-            for (Map.Entry<String, List<String>> entry : config.getPrefix_mapping().entrySet()) {
-                String prefix = entry.getKey();
+            // Start Consumers for each region
+            for (Map.Entry<String, List<String>> entry : config.getRegion_mapping().entrySet()) {
+                String region = entry.getKey();
                 List<String> consumerNames = entry.getValue();
 
-                // Tạo topic và consumer group cho prefix này
-                String baseTopic = TopicGenerator.TopicNameGenerator.generateTopicName(producer.getName(), prefix);
+                // Create topic and consumer group for this region
+                String baseTopic = TopicGenerator.TopicNameGenerator.generateTopicName(producer.getName(), region);
                 String consumerTopic = TopicGenerator.generateATopicName(baseTopic);
-                final String consumerGroup = generateConsumerGroup(producer.getName(), prefix);
+                final String consumerGroup = generateConsumerGroup(producer.getName(), region);
 
-                logger.info("[CONSUMER] Starting consumers for prefix {}: {}", prefix, consumerNames);
+                logger.info("[CONSUMER] Starting consumers for region {}: {}", region, consumerNames);
 
-                // Chỉ tạo một consumer cho mỗi prefix
-                String consumerName = consumerNames.get(0); // Lấy consumer đầu tiên
+                // Create one consumer for each region
+                String consumerName = consumerNames.get(0); // Get first consumer
                 Config.Consumer consumer = config.getConsumers().stream()
                     .filter(c -> c.getName().equals(consumerName))
                     .findFirst()
@@ -122,16 +122,16 @@ public class Main {
                 CountDownLatch consumerDone = new CountDownLatch(1);
                 consumerLatches.add(consumerDone);
 
-                // Khởi động Consumer với consumer group tương ứng
+                // Start Consumer with corresponding consumer group
                 final String finalConsumerTopic = consumerTopic;
                 final String finalConsumerGroup = consumerGroup;
                 executor.submit(() -> {
                     try {
                         String[] consumerArgs = new String[] {
                             kafkaBroker,           // kafkaBroker
-                            finalConsumerTopic,         // consumerTopic
-                            finalConsumerGroup,         // consumerGroup
-                            consumer.getHost(),         // aerospikeHost
+                            finalConsumerTopic,    // consumerTopic
+                            finalConsumerGroup,    // consumerGroup
+                            consumer.getHost(),    // aerospikeHost
                             String.valueOf(consumer.getPort()), // aerospikePort
                             consumer.getNamespace(),    // aerospikeNamespace
                             consumer.getSet(),          // aerospikeSetName
@@ -153,7 +153,7 @@ public class Main {
                 });
             }
 
-            // Thêm shutdown hook để xử lý khi chương trình bị tắt
+            // Add shutdown hook to handle program termination
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 logger.info("[MAIN] Shutting down pipeline...");
                 executor.shutdown();
@@ -167,7 +167,7 @@ public class Main {
                 }
             }));
 
-            // Chờ tất cả producer và consumer kết thúc
+            // Wait for all producer and consumer to finish
             try {
                 for (CountDownLatch latch : producerLatches) {
                     latch.await();
@@ -182,12 +182,12 @@ public class Main {
                 logger.error("[MAIN] Pipeline interrupted.");
             }
         } catch (Exception e) {
-            logger.error("Loi nghiem trong: {}", e.getMessage(), e);
+            logger.error("Critical error: {}", e.getMessage(), e);
         }
     }
 
-    // Phương thức chung để tạo consumer group
-    private static String generateConsumerGroup(String producerName, String prefix) {
-        return TopicGenerator.generateAGroupName(producerName + "_" + prefix);
+    // Common method to generate consumer group
+    private static String generateConsumerGroup(String producerName, String region) {
+        return TopicGenerator.generateAGroupName(producerName + "_" + region);
     }
 }

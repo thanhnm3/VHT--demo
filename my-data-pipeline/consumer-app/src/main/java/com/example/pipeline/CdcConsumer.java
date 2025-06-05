@@ -82,16 +82,16 @@ public class CdcConsumer {
 
     private void start() {
         try {
-            Map<String, List<String>> prefixMapping = configService.getPrefixMappings();
-            Map<String, String> prefixToTopicMap = kafkaService.getPrefixToTopicMap();
+            Map<String, List<String>> regionMapping = configService.getRegionMappings();
+            Map<String, String> regionToTopicMap = kafkaService.getRegionToTopicMap();
             
-            // Lấy prefix từ consumer group (ví dụ: từ "producer1_033-cdc-group" lấy "033")
-            String consumerGroupPrefix = consumerGroup.split("_")[1].split("-")[0];
+            // Extract region from consumer group (e.g., from "producer1_033-cdc-group" get "033")
+            String consumerGroupRegion = consumerGroup.split("_")[1].split("-")[0];
             
-            // Chỉ xử lý prefix tương ứng với consumer group
-            List<String> consumerNames = prefixMapping.get(consumerGroupPrefix);
+            // Only process region corresponding to consumer group
+            List<String> consumerNames = regionMapping.get(consumerGroupRegion);
             if (consumerNames == null || consumerNames.isEmpty()) {
-                logger.warn("No consumers found for prefix {}", consumerGroupPrefix);
+                logger.warn("No consumers found for region {}", consumerGroupRegion);
                 return;
             }
 
@@ -102,13 +102,13 @@ public class CdcConsumer {
                 return;
             }
 
-            String topic = prefixToTopicMap.get(consumerGroupPrefix);
+            String topic = regionToTopicMap.get(consumerGroupRegion);
             if (topic == null) {
-                logger.warn("No topic found for prefix {}", consumerGroupPrefix);
+                logger.warn("No topic found for region {}", consumerGroupRegion);
                 return;
             }
             
-            // Sử dụng TopicGenerator để tạo consumer group cho CDC
+            // Use TopicGenerator to create consumer group for CDC
             String topicConsumerGroup = TopicGenerator.generateCdcGroupName(topic);
             
             KafkaConsumer<byte[], byte[]> kafkaConsumer = kafkaService.createConsumer(
@@ -120,50 +120,50 @@ public class CdcConsumer {
                 consumer.getNamespace(),
                 consumer.getSet()
             );
-            cdcServices.put(consumerGroupPrefix, cdcService);
-            workerPools.put(consumerGroupPrefix, Executors.newFixedThreadPool(workerPoolSize));
+            cdcServices.put(consumerGroupRegion, cdcService);
+            workerPools.put(consumerGroupRegion, Executors.newFixedThreadPool(workerPoolSize));
             
-            final String currentPrefix = consumerGroupPrefix;
+            final String currentRegion = consumerGroupRegion;
             new Thread(() -> {
                 try {
                     while (!Thread.currentThread().isInterrupted()) {
                         var records = kafkaConsumer.poll(java.time.Duration.ofMillis(100));
                         if (!records.isEmpty()) {
-                            // Tạo một CountDownLatch để đợi tất cả các record được xử lý
+                            // Create a CountDownLatch to wait for all records to be processed
                             CountDownLatch processingLatch = new CountDownLatch(records.count());
                             
                             for (var record : records) {
-                                workerPools.get(currentPrefix).submit(() -> {
+                                workerPools.get(currentRegion).submit(() -> {
                                     try {
                                         cdcService.processRecord(record);
                                     } catch (Exception e) {
                                         logger.error("[{}] Error processing record: {}", 
-                                            currentPrefix, e.getMessage(), e);
+                                            currentRegion, e.getMessage(), e);
                                     } finally {
                                         processingLatch.countDown();
                                     }
                                 });
                             }
                             
-                            // Đợi tất cả các record được xử lý
+                            // Wait for all records to be processed
                             try {
                                 processingLatch.await(30, TimeUnit.SECONDS);
-                                // Commit offset sau khi xử lý thành công
+                                // Commit offset after successful processing
                                 kafkaConsumer.commitSync();
                                 logger.debug("[{}] Committed offset for {} records", 
-                                    currentPrefix, records.count());
+                                    currentRegion, records.count());
                             } catch (InterruptedException e) {
                                 Thread.currentThread().interrupt();
                                 logger.error("[{}] Interrupted while waiting for records to process", 
-                                    currentPrefix);
+                                    currentRegion);
                             }
                         }
                     }
                 } catch (Exception e) {
                     logger.error("[{}] Error in CDC service: {}", 
-                        currentPrefix, e.getMessage(), e);
+                        currentRegion, e.getMessage(), e);
                 }
-            }, currentPrefix + "-cdc-service").start();
+            }, currentRegion + "-cdc-service").start();
             
         } catch (Exception e) {
             logger.error("Error starting CDC consumer: {}", e.getMessage(), e);

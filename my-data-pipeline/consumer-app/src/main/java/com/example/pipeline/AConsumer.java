@@ -60,7 +60,7 @@ public class AConsumer {
         
         // Initialize WritePolicy
         WritePolicy writePolicy = new WritePolicy();
-        writePolicy.sendKey = true;  // Đảm bảo lưu key
+        writePolicy.sendKey = true;  // Ensure key is stored
         writePolicy.totalTimeout = 5000;
         
         // Initialize MessageService with Aerospike client and policy
@@ -92,7 +92,7 @@ public class AConsumer {
             logger.info("Aerospike namespace: {}", aerospikeNamespace);
             logger.info("Aerospike set name: {}", aerospikeSetName);
 
-            // Start consuming messages from the original topic
+            // Start consuming messages from the topic
             kafkaConsumerService.startConsuming(consumerTopic, consumerGroup, messageService);
 
         } catch (Exception e) {
@@ -102,12 +102,16 @@ public class AConsumer {
     }
 
     public void shutdown() {
+        logger.info("Starting graceful shutdown...");
+        
         kafkaConsumerService.shutdown();
         messageService.shutdown();
         executorService.shutdown();
+        
         if (aerospikeClient != null) {
             aerospikeClient.close();
         }
+        
         try {
             if (!executorService.awaitTermination(60, TimeUnit.SECONDS)) {
                 executorService.shutdownNow();
@@ -116,5 +120,7 @@ public class AConsumer {
             executorService.shutdownNow();
             Thread.currentThread().interrupt();
         }
+        
+        logger.info("Shutdown completed successfully");
     }
 }
