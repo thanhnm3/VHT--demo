@@ -67,9 +67,9 @@ public class Maincdc {
             StringBuilder topicList = new StringBuilder();
             StringBuilder consumerGroupList = new StringBuilder();
             
-            for (Map.Entry<String, List<String>> entry : config.getPrefix_mapping().entrySet()) {
-                String prefix = entry.getKey();
-                String baseTopic = TopicGenerator.TopicNameGenerator.generateTopicName(producer.getName(), prefix);
+            for (Map.Entry<String, List<String>> entry : config.getRegion_mapping().entrySet()) {
+                String region = entry.getKey();
+                String baseTopic = TopicGenerator.TopicNameGenerator.generateTopicName(producer.getName(), region);
                 String cdcTopic = TopicGenerator.generateCdcTopicName(baseTopic);
                 
                 if (topicList.length() > 0) {
@@ -104,7 +104,7 @@ public class Maincdc {
                 }
             });
 
-            // Khởi động Producer với tất cả các prefix
+            // Khởi động Producer với tất cả các region
             executor.submit(() -> {
                 try {
                     String[] producerArgs = new String[] {
@@ -140,8 +140,8 @@ public class Maincdc {
             Thread.sleep(1000);
 
             // Khởi động Consumer cho CDC
-            for (Map.Entry<String, List<String>> entry : config.getPrefix_mapping().entrySet()) {
-                String prefix = entry.getKey();
+            for (Map.Entry<String, List<String>> entry : config.getRegion_mapping().entrySet()) {
+                String region = entry.getKey();
                 List<String> consumerNames = entry.getValue();
                 String consumerName = consumerNames.get(0);
 
@@ -158,8 +158,8 @@ public class Maincdc {
                 CountDownLatch consumerDone = new CountDownLatch(1);
                 consumerLatches.add(consumerDone);
 
-                // Tạo topic và consumer group cho prefix này
-                String baseTopic = TopicGenerator.TopicNameGenerator.generateTopicName(producer.getName(), prefix);
+                // Tạo topic và consumer group cho region này
+                String baseTopic = TopicGenerator.TopicNameGenerator.generateTopicName(producer.getName(), region);
                 String cdcTopic = TopicGenerator.generateCdcTopicName(baseTopic);
                 String cdcGroup = TopicGenerator.generateCdcGroupName(cdcTopic);
 
@@ -175,7 +175,7 @@ public class Maincdc {
                             String.valueOf(consumerThreadPoolSize) // workerPoolSize
                         };
                         
-                        logger.info("[CDC CONSUMER] Starting {} for prefix {}:", consumerName, prefix);
+                        logger.info("[CDC CONSUMER] Starting {} for region {}:", consumerName, region);
                         logger.info("[CDC CONSUMER] - Topic: {}", cdcTopic);
                         logger.info("[CDC CONSUMER] - Group: {}", cdcGroup);
                         logger.info("[CDC CONSUMER] - Destination Namespace: {}", consumer.getNamespace());
@@ -183,7 +183,7 @@ public class Maincdc {
                         
                         CdcConsumer.main(consumerArgs);
                     } catch (Exception e) {
-                        logger.error("[CDC CONSUMER] {} failed for prefix {}: {}", consumerName, prefix, e.getMessage(), e);
+                        logger.error("[CDC CONSUMER] {} failed for region {}: {}", consumerName, region, e.getMessage(), e);
                     } finally {
                         consumerDone.countDown();
                     }

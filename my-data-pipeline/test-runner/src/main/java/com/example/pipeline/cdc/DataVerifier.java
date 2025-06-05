@@ -35,12 +35,12 @@ public class DataVerifier {
             AtomicInteger totalVerified = new AtomicInteger(0);
             AtomicInteger mismatches = new AtomicInteger(0);
 
-            // Verify records for each prefix mapping
-            for (Map.Entry<String, List<String>> entry : config.getPrefix_mapping().entrySet()) {
-                String prefix = entry.getKey();
+            // Verify records for each region mapping
+            for (Map.Entry<String, List<String>> entry : config.getRegion_mapping().entrySet()) {
+                String region = entry.getKey();
                 List<String> consumerNames = entry.getValue();
                 
-                // Get the first consumer for this prefix
+                // Get the first consumer for this region
                 String consumerName = consumerNames.get(0);
                 Config.Consumer consumer = config.getConsumers().stream()
                     .filter(c -> c.getName().equals(consumerName))
@@ -48,14 +48,15 @@ public class DataVerifier {
                     .orElse(null);
 
                 if (consumer == null) {
+                    System.err.println("No consumer found for region: " + region);
                     continue;
                 }
 
-                // Connect to destination Aerospike for this prefix
+                // Connect to destination Aerospike for this region
                 AerospikeClient destClient = new AerospikeClient(consumer.getHost(), consumer.getPort());
                 
-                for (int i = 1; i <= 10000; i++) {
-                    String phoneNumber = String.format("%s%07d", prefix, i);
+                for (int i = 1; i <= 1000; i++) {
+                    String phoneNumber = String.format("%s%07d", region, i);
                     byte[] phoneBytes = phoneNumber.getBytes();
 
                     // Read from source
@@ -71,17 +72,49 @@ public class DataVerifier {
                         continue;
                     }
 
-                    byte[] sourceData = (byte[]) sourceRecord.getValue("personData");
-                    byte[] destData = (byte[]) destRecord.getValue("personData");
+                    // Verify all fields
+                    boolean isMatch = true;
+                    
+                    // Check basic fields
+                    String[] fieldsToCheck = {"user_id", "phone", "service_type", "province", "region"};
+                    for (String field : fieldsToCheck) {
+                        Object sourceValue = sourceRecord.getValue(field);
+                        Object destValue = destRecord.getValue(field);
+                        if (!equals(sourceValue, destValue)) {
+                            isMatch = false;
+                            System.err.println(String.format("Mismatch in field %s for phone %s", field, phoneNumber));
+                            break;
+                        }
+                    }
 
-                    if (!Arrays.equals(sourceData, destData)) {
+                    // Check last_updated
+                    if (isMatch) {
+                        Object sourceLastUpdate = sourceRecord.getValue("last_updated");
+                        Object destLastUpdate = destRecord.getValue("last_updated");
+                        if (!equals(sourceLastUpdate, destLastUpdate)) {
+                            isMatch = false;
+                            System.err.println(String.format("Mismatch in last_updated for phone %s", phoneNumber));
+                        }
+                    }
+
+                    // Check notes (binary data)
+                    if (isMatch) {
+                        byte[] sourceNotes = (byte[]) sourceRecord.getValue("notes");
+                        byte[] destNotes = (byte[]) destRecord.getValue("notes");
+                        if (!Arrays.equals(sourceNotes, destNotes)) {
+                            isMatch = false;
+                            System.err.println(String.format("Mismatch in notes for phone %s", phoneNumber));
+                        }
+                    }
+
+                    if (!isMatch) {
                         mismatches.incrementAndGet();
                     }
 
                     totalVerified.incrementAndGet();
                 }
 
-                // Close destination client for this prefix
+                // Close destination client for this region
                 destClient.close();
             }
 
@@ -99,5 +132,15 @@ public class DataVerifier {
             System.err.println("Error during verification: " + e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    private static boolean equals(Object obj1, Object obj2) {
+        if (obj1 == obj2) {
+            return true;
+        }
+        if (obj1 == null || obj2 == null) {
+            return false;
+        }
+        return obj1.toString().equals(obj2.toString());
     }
 } 

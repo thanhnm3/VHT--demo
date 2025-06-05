@@ -19,14 +19,15 @@ import java.util.Map;
 import java.util.HashMap;
 
 public class RandomOperations {
-    private static final String[] PHONE_PREFIXES = {
-        "096", "033"
+    private static final String[] REGIONS = {
+        "north", "central", "south"
     };
-    private static final int MAX_RECORDS_PER_PREFIX = 200_000;
+    private static final int MAX_RECORDS_PER_REGION = 200_000;
     private static final int KEY_LIMIT = 100_000;
-    private static final Map<String, Integer> PREFIX_LIMITS = Map.of(
-        "033", 1_000,
-        "096", 2_000
+    private static final Map<String, Integer> REGION_LIMITS = Map.of(
+        "north", 1_000,
+        "central", 2_000,
+        "south", 1_500
     );
     private static final Map<String, Map<String, AtomicInteger>> OPERATION_COUNTERS = new HashMap<>();
 
@@ -40,13 +41,13 @@ public class RandomOperations {
 
         Random random = new Random();
 
-        // Khởi tạo bộ đếm cho mỗi prefix và mỗi loại thao tác
-        for (String prefix : PHONE_PREFIXES) {
-            Map<String, AtomicInteger> prefixCounters = new HashMap<>();
-            prefixCounters.put("insert", new AtomicInteger(0));
-            prefixCounters.put("update", new AtomicInteger(0));
-            prefixCounters.put("delete", new AtomicInteger(0));
-            OPERATION_COUNTERS.put(prefix, prefixCounters);
+        // Khởi tạo bộ đếm cho mỗi region và mỗi loại thao tác
+        for (String region : REGIONS) {
+            Map<String, AtomicInteger> regionCounters = new HashMap<>();
+            regionCounters.put("insert", new AtomicInteger(0));
+            regionCounters.put("update", new AtomicInteger(0));
+            regionCounters.put("delete", new AtomicInteger(0));
+            OPERATION_COUNTERS.put(region, regionCounters);
         }
 
         // Sử dụng RateLimiter để kiểm soát tốc độ
@@ -63,7 +64,7 @@ public class RandomOperations {
         // Tạo thread pool
         ExecutorService executor = Executors.newFixedThreadPool(threadPoolSize);
 
-        // Kiểm tra xem tất cả prefix và loại thao tác đã đạt giới hạn chưa
+        // Kiểm tra xem tất cả region và loại thao tác đã đạt giới hạn chưa
         boolean allOperationsReachedLimit = false;
         while (!allOperationsReachedLimit) {
             rateLimiter.acquire();
@@ -74,46 +75,46 @@ public class RandomOperations {
                                      operationType == 1 ? "update" : "delete";
                 boolean operationPerformed = false;
                 
-                // Chọn prefix ngẫu nhiên
-                String prefix = PHONE_PREFIXES[random.nextInt(PHONE_PREFIXES.length)];
+                // Chọn region ngẫu nhiên
+                String region = REGIONS[random.nextInt(REGIONS.length)];
                 
-                // Kiểm tra giới hạn cho prefix và loại thao tác
-                if (OPERATION_COUNTERS.get(prefix).get(operationName).get() >= PREFIX_LIMITS.get(prefix)) {
+                // Kiểm tra giới hạn cho region và loại thao tác
+                if (OPERATION_COUNTERS.get(region).get(operationName).get() >= REGION_LIMITS.get(region)) {
                     return;
                 }
                 
                 switch (operationType) {
                     case 0: // Insert
-                        operationPerformed = performInsert(client, writePolicy, namespace, setName, random, prefix);
+                        operationPerformed = performInsert(client, writePolicy, namespace, setName, random, region);
                         if (operationPerformed) {
                             totalInsertCount.incrementAndGet();
-                            OPERATION_COUNTERS.get(prefix).get("insert").incrementAndGet();
+                            OPERATION_COUNTERS.get(region).get("insert").incrementAndGet();
                         }
                         break;
                     case 1: // Update
-                        operationPerformed = performUpdate(client, writePolicy, readPolicy, namespace, setName, randomKeys, random, prefix);
+                        operationPerformed = performUpdate(client, writePolicy, readPolicy, namespace, setName, randomKeys, random, region);
                         if (operationPerformed) {
                             totalUpdateCount.incrementAndGet();
-                            OPERATION_COUNTERS.get(prefix).get("update").incrementAndGet();
+                            OPERATION_COUNTERS.get(region).get("update").incrementAndGet();
                         }
                         break;
                     case 2: // Delete
-                        operationPerformed = performDelete(client, namespace, setName, randomKeys, prefix);
+                        operationPerformed = performDelete(client, namespace, setName, randomKeys, region);
                         if (operationPerformed) {
                             totalDeleteCount.incrementAndGet();
-                            OPERATION_COUNTERS.get(prefix).get("delete").incrementAndGet();
+                            OPERATION_COUNTERS.get(region).get("delete").incrementAndGet();
                         }
                         break;
                 }
             });
 
-            // Kiểm tra xem tất cả prefix và loại thao tác đã đạt giới hạn chưa
+            // Kiểm tra xem tất cả region và loại thao tác đã đạt giới hạn chưa
             allOperationsReachedLimit = true;
-            for (Map.Entry<String, Map<String, AtomicInteger>> prefixEntry : OPERATION_COUNTERS.entrySet()) {
-                String prefix = prefixEntry.getKey();
-                Map<String, AtomicInteger> operations = prefixEntry.getValue();
+            for (Map.Entry<String, Map<String, AtomicInteger>> regionEntry : OPERATION_COUNTERS.entrySet()) {
+                String region = regionEntry.getKey();
+                Map<String, AtomicInteger> operations = regionEntry.getValue();
                 for (AtomicInteger counter : operations.values()) {
-                    if (counter.get() < PREFIX_LIMITS.get(prefix)) {
+                    if (counter.get() < REGION_LIMITS.get(region)) {
                         allOperationsReachedLimit = false;
                         break;
                     }
@@ -134,17 +135,17 @@ public class RandomOperations {
         System.out.println("Them moi: " + totalInsertCount.get());
         System.out.println("Cap nhat: " + totalUpdateCount.get());
         System.out.println("Xoa: " + totalDeleteCount.get());
-        System.out.println("\nSo luong thay doi theo prefix:");
-        for (Map.Entry<String, Map<String, AtomicInteger>> prefixEntry : OPERATION_COUNTERS.entrySet()) {
-            String prefix = prefixEntry.getKey();
-            Map<String, AtomicInteger> operations = prefixEntry.getValue();
-            System.out.printf("  %s:\n", prefix);
+        System.out.println("\nSo luong thay doi theo region:");
+        for (Map.Entry<String, Map<String, AtomicInteger>> regionEntry : OPERATION_COUNTERS.entrySet()) {
+            String region = regionEntry.getKey();
+            Map<String, AtomicInteger> operations = regionEntry.getValue();
+            System.out.printf("  %s:\n", region);
             System.out.printf("    Insert: %d/%d\n", 
-                operations.get("insert").get(), PREFIX_LIMITS.get(prefix));
+                operations.get("insert").get(), REGION_LIMITS.get(region));
             System.out.printf("    Update: %d/%d\n", 
-                operations.get("update").get(), PREFIX_LIMITS.get(prefix));
+                operations.get("update").get(), REGION_LIMITS.get(region));
             System.out.printf("    Delete: %d/%d\n", 
-                operations.get("delete").get(), PREFIX_LIMITS.get(prefix));
+                operations.get("delete").get(), REGION_LIMITS.get(region));
         }
         System.out.println("================================");
 
@@ -152,14 +153,14 @@ public class RandomOperations {
     }
 
     private static boolean performInsert(AerospikeClient client, WritePolicy writePolicy, String namespace, String setName,
-            Random random, String prefix) {
-        // Kiểm tra giới hạn cho prefix và loại thao tác
-        if (OPERATION_COUNTERS.get(prefix).get("insert").get() >= PREFIX_LIMITS.get(prefix)) {
+            Random random, String region) {
+        // Kiểm tra giới hạn cho region và loại thao tác
+        if (OPERATION_COUNTERS.get(region).get("insert").get() >= REGION_LIMITS.get(region)) {
             return false;
         }
 
-        int number = random.nextInt(MAX_RECORDS_PER_PREFIX) + 1;
-        String phoneNumber = String.format("%s%07d", prefix, number);
+        int number = random.nextInt(MAX_RECORDS_PER_REGION) + 1;
+        String phoneNumber = String.format("%s%07d", region, number);
         byte[] phoneBytes = phoneNumber.getBytes();
 
         Key key = new Key(namespace, setName, phoneBytes);
@@ -176,12 +177,24 @@ public class RandomOperations {
             return false;
         }
 
-        byte[] personBytes = generateRandomBytes(random, 100, 1_000);
-        Bin personBin = new Bin("personData", personBytes);
-        Bin lastUpdateBin = new Bin("lastUpdate", System.currentTimeMillis());
+        // Tạo dữ liệu ngẫu nhiên cho các trường
+        String userId = String.format("user_%s_%d", region, number);
+        String phone = phoneNumber;
+        String serviceType = random.nextBoolean() ? "prepaid" : "postpaid";
+        String province = getProvinceForRegion(region);
+        long lastUpdated = System.currentTimeMillis();
+        byte[] notes = generateRandomBytes(random, 100, 1_000);
 
         try {
-            client.put(writePolicy, key, personBin, lastUpdateBin);
+            client.put(writePolicy, key,
+                new Bin("user_id", userId),
+                new Bin("phone", phone),
+                new Bin("service_type", serviceType),
+                new Bin("province", province),
+                new Bin("region", region),
+                new Bin("last_updated", lastUpdated),
+                new Bin("notes", notes)
+            );
             return true;
         } catch (AerospikeException e) {
             System.err.println("Loi khi them ban ghi voi key: " + key.userKey + " (loi: " + e.getMessage() + ")");
@@ -190,9 +203,9 @@ public class RandomOperations {
     }
 
     private static boolean performUpdate(AerospikeClient client, WritePolicy writePolicy, Policy readPolicy,
-            String namespace, String setName, ConcurrentLinkedQueue<Key> randomKeys, Random random, String prefix) {
-        // Kiểm tra giới hạn cho prefix và loại thao tác
-        if (OPERATION_COUNTERS.get(prefix).get("update").get() >= PREFIX_LIMITS.get(prefix)) {
+            String namespace, String setName, ConcurrentLinkedQueue<Key> randomKeys, Random random, String region) {
+        // Kiểm tra giới hạn cho region và loại thao tác
+        if (OPERATION_COUNTERS.get(region).get("update").get() >= REGION_LIMITS.get(region)) {
             return false;
         }
 
@@ -203,12 +216,12 @@ public class RandomOperations {
         }
 
         try {
-            // Lấy prefix từ key
+            // Lấy region từ key
             String keyStr = new String((byte[])randomKey.userKey.getObject());
-            String keyPrefix = keyStr.substring(0, 3);
+            String keyRegion = keyStr.substring(0, 2); // Lấy 2 ký tự đầu cho region
             
-            // Chỉ cập nhật nếu prefix khớp
-            if (!keyPrefix.equals(prefix)) {
+            // Chỉ cập nhật nếu region khớp
+            if (!keyRegion.equals(region)) {
                 randomKeys.offer(randomKey);
                 return false;
             }
@@ -221,18 +234,16 @@ public class RandomOperations {
                 return false;
             }
 
-            // Kiểm tra xem bản ghi đã bị xóa chưa (personData là null)
-            if (record.getValue("personData") == null) {
-                // Bản ghi đã bị xóa, không thực hiện update
-                randomKeys.offer(randomKey);
-                return false;
-            }
+            // Cập nhật các trường
+            String serviceType = random.nextBoolean() ? "prepaid" : "postpaid";
+            long lastUpdated = System.currentTimeMillis();
+            byte[] notes = generateRandomBytes(random, 100, 1_000);
 
-            byte[] updatedBytes = generateRandomBytes(random, 100, 1_000);
-            Bin updatedPersonBin = new Bin("personData", updatedBytes);
-            Bin updatedLastUpdateBin = new Bin("lastUpdate", System.currentTimeMillis());
-
-            client.put(writePolicy, randomKey, updatedPersonBin, updatedLastUpdateBin);
+            client.put(writePolicy, randomKey,
+                new Bin("service_type", serviceType),
+                new Bin("last_updated", lastUpdated),
+                new Bin("notes", notes)
+            );
             return true;
         } catch (AerospikeException e) {
             System.err.println(
@@ -244,9 +255,9 @@ public class RandomOperations {
     }
 
     private static boolean performDelete(AerospikeClient client, String namespace, String setName,
-            ConcurrentLinkedQueue<Key> randomKeys, String prefix) {
-        // Kiểm tra giới hạn cho prefix và loại thao tác
-        if (OPERATION_COUNTERS.get(prefix).get("delete").get() >= PREFIX_LIMITS.get(prefix)) {
+            ConcurrentLinkedQueue<Key> randomKeys, String region) {
+        // Kiểm tra giới hạn cho region và loại thao tác
+        if (OPERATION_COUNTERS.get(region).get("delete").get() >= REGION_LIMITS.get(region)) {
             return false;
         }
 
@@ -257,12 +268,12 @@ public class RandomOperations {
         }
 
         try {
-            // Lấy prefix từ key
+            // Lấy region từ key
             String keyStr = new String((byte[])randomKey.userKey.getObject());
-            String keyPrefix = keyStr.substring(0, 3);
+            String keyRegion = keyStr.substring(0, 5); // Lấy 5 ký tự đầu cho region (north, south, etc.)
             
-            // Chỉ xóa nếu prefix khớp
-            if (!keyPrefix.equals(prefix)) {
+            // Chỉ xóa nếu region khớp
+            if (!keyRegion.equals(region)) {
                 randomKeys.offer(randomKey);
                 return false;
             }
@@ -275,22 +286,35 @@ public class RandomOperations {
                 return false;
             }
 
-            // Kiểm tra xem bản ghi đã bị xóa chưa (personData là null)
-            if (record.getValue("personData") == null) {
-                // Bản ghi đã bị xóa, không thực hiện delete
-                randomKeys.offer(randomKey);
-                return false;
-            }
-
-            Bin deleteBin = Bin.asNull("personData");
-            Bin lastUpdateBin = new Bin("lastUpdate", System.currentTimeMillis());
-            client.put(null, randomKey, deleteBin, lastUpdateBin);
+            // Đánh dấu bản ghi là đã xóa bằng cách set tất cả các trường thành null
+            client.put(null, randomKey,
+                Bin.asNull("user_id"),
+                Bin.asNull("phone"),
+                Bin.asNull("service_type"),
+                Bin.asNull("province"),
+                Bin.asNull("region"),
+                Bin.asNull("last_updated"),
+                Bin.asNull("notes")
+            );
             return true;
         } catch (AerospikeException e) {
             System.err.println(
                     "Loi khi xoa ban ghi voi key: " + randomKey.userKey + " (loi: " + e.getMessage() + ")");
         }
         return false;
+    }
+
+    private static String getProvinceForRegion(String region) {
+        switch (region) {
+            case "north":
+                return "Ha Noi";
+            case "central":
+                return "Da Nang";
+            case "south":
+                return "Ho Chi Minh";
+            default:
+                return "Unknown";
+        }
     }
 
     private static byte[] generateRandomBytes(Random random, int minSize, int maxSize) {

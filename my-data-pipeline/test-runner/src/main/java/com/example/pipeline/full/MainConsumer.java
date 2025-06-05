@@ -44,29 +44,29 @@ public class MainConsumer {
             logger.info("Max Retries: {}", maxRetries);
             logger.info("===========================");
 
-            // Khởi động các Consumer theo prefix mapping
-            Map<String, List<String>> prefixMapping = config.getPrefix_mapping();
-            for (Map.Entry<String, List<String>> entry : prefixMapping.entrySet()) {
-                String prefix = entry.getKey();
+            // Khởi động các Consumer theo region mapping
+            Map<String, List<String>> regionMapping = config.getRegion_mapping();
+            for (Map.Entry<String, List<String>> entry : regionMapping.entrySet()) {
+                String region = entry.getKey();
                 List<String> consumerNames = entry.getValue();
 
                 if (consumerNames.isEmpty()) {
-                    logger.warn("No consumers found for prefix: {}", prefix);
+                    logger.warn("No consumers found for region: {}", region);
                     continue;
                 }
 
-                // Tạo topic và consumer group cho prefix này
+                // Tạo topic và consumer group cho region này
                 String producerName = config.getProducers().get(0).getName();
-                String baseTopic = TopicGenerator.TopicNameGenerator.generateTopicName(producerName, prefix);
+                String baseTopic = TopicGenerator.TopicNameGenerator.generateTopicName(producerName, region);
                 String consumerTopic = TopicGenerator.generateATopicName(baseTopic);
-                final String consumerGroup = TopicGenerator.generateAGroupName(producerName + "_" + prefix);
+                final String consumerGroup = TopicGenerator.generateAGroupName(producerName + "_" + region);
 
-                logger.info("Starting Consumers for prefix {}: {}", prefix, consumerNames);
+                logger.info("Starting Consumers for region {}: {}", region, consumerNames);
                 logger.info("  Base Topic: {}", baseTopic);
                 logger.info("  Consumer Topic: {}", consumerTopic);
                 logger.info("  Consumer Group: {}", consumerGroup);
 
-                // Khởi động các Consumer cho prefix này
+                // Khởi động các Consumer cho region này
                 for (String consumerName : consumerNames) {
                     Config.Consumer consumer = config.getConsumers().stream()
                         .filter(c -> c.getName().equals(consumerName))
@@ -81,7 +81,7 @@ public class MainConsumer {
                     CountDownLatch consumerDone = new CountDownLatch(1);
                     consumerLatches.add(consumerDone);
 
-                    logger.info("Starting A Consumer for prefix {}: {}", prefix, consumerName);
+                    logger.info("Starting A Consumer for region {}: {}", region, consumerName);
                     logger.info("  Host: {}", consumer.getHost());
                     logger.info("  Port: {}", consumer.getPort());
                     logger.info("  Namespace: {}", consumer.getNamespace());
