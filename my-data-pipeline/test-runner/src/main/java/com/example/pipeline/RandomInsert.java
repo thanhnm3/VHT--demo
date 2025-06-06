@@ -1,4 +1,4 @@
-package com.example.pipeline.cdc;
+package com.example.pipeline;
 
 import com.aerospike.client.*;
 import com.aerospike.client.policy.WritePolicy;

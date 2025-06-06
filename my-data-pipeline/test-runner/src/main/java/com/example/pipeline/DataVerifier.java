@@ -1,4 +1,4 @@
-package com.example.pipeline.cdc;
+package com.example.pipeline;
 
 import com.aerospike.client.*;
 import com.aerospike.client.policy.QueryPolicy;
@@ -99,9 +99,26 @@ public class DataVerifier {
 
                     // Check notes (binary data)
                     if (isMatch) {
-                        byte[] sourceNotes = (byte[]) sourceRecord.getValue("notes");
-                        byte[] destNotes = (byte[]) destRecord.getValue("notes");
-                        if (!Arrays.equals(sourceNotes, destNotes)) {
+                        Object sourceNotesObj = sourceRecord.getValue("notes");
+                        Object destNotesObj = destRecord.getValue("notes");
+                        
+                        // Handle both String and byte[] cases
+                        byte[] sourceNotes = null;
+                        byte[] destNotes = null;
+                        
+                        if (sourceNotesObj instanceof String) {
+                            sourceNotes = ((String) sourceNotesObj).getBytes();
+                        } else if (sourceNotesObj instanceof byte[]) {
+                            sourceNotes = (byte[]) sourceNotesObj;
+                        }
+                        
+                        if (destNotesObj instanceof String) {
+                            destNotes = ((String) destNotesObj).getBytes();
+                        } else if (destNotesObj instanceof byte[]) {
+                            destNotes = (byte[]) destNotesObj;
+                        }
+                        
+                        if (sourceNotes == null || destNotes == null || !Arrays.equals(sourceNotes, destNotes)) {
                             isMatch = false;
                             System.err.println(String.format("Mismatch in notes for phone %s", phoneNumber));
                         }

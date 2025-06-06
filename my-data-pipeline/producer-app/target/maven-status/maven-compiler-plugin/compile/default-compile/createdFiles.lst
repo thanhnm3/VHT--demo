@@ -1,2 +1,7 @@
-com/example/pipeline/AProducer.class
-com/example/pipeline/CdcProducer.class
+com\example\pipeline\AProducer.class
+com\example\pipeline\CdcProducer.class
+com\example\pipeline\service\config\ConfigProducerService.class
+com\example\pipeline\service\CdcProducerService.class
+com\example\pipeline\service\KafkaProducerService.class
+com\example\pipeline\service\MessageProducerService.class
+com\example\pipeline\service\AerospikeProducerService.class

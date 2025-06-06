@@ -1,4 +1,4 @@
-package com.example.pipeline.cdc;
+package com.example.pipeline;
 
 import com.aerospike.client.*;
 import com.aerospike.client.policy.WritePolicy;
@@ -26,31 +26,30 @@ public class RandomOperations {
     private static final int MAX_RECORDS_PER_REGION = 200_000;
     private static final int KEY_LIMIT = 30_000;
     
-    // Định nghĩa giới hạn cho từng loại thao tác của mỗi region
-    private static final Map<String, Map<String, Integer>> OPERATION_LIMITS = Map.of(
-        "north", Map.of(
-            "insert", 1000,
-            "update", 1000,
-            "delete", 1000
-        ),
-        "central", Map.of(
-            "insert", 1000,
-            "update", 1000,
-            "delete", 1000
-        ),
-        "south", Map.of(
-            "insert", 1000,
-            "update", 1000,
-            "delete", 1000
-        )
+    // Định nghĩa giới hạn cho từng region
+    private static final Map<String, Integer> REGION_LIMITS = Map.of(
+        "north", 1000,
+        "central", 1000,
+        "south", 1000
     );
 
     private static final Map<String, Map<String, AtomicInteger>> OPERATION_COUNTERS = new HashMap<>();
     private static final Map<String, Map<String, AtomicLong>> OPERATION_START_TIMES = new HashMap<>();
     private static final Map<String, Map<String, AtomicLong>> OPERATION_LAST_LOG_TIMES = new HashMap<>();
 
-    public static void main(String aeroHost, int aeroPort, String namespace, String setName, int operationsPerSecond,
-            int threadPoolSize) {
+    public static void main(String[] args) {
+        if (args.length != 6) {
+            System.out.println("Usage: java RandomOperations <aeroHost> <aeroPort> <namespace> <setName> <operationsPerSecond> <threadPoolSize>");
+            System.exit(1);
+        }
+
+        String aeroHost = args[0];
+        int aeroPort = Integer.parseInt(args[1]);
+        String namespace = args[2];
+        String setName = args[3];
+        int operationsPerSecond = Integer.parseInt(args[4]);
+        int threadPoolSize = Integer.parseInt(args[5]);
+
         // Kết nối đến Aerospike
         AerospikeClient client = new AerospikeClient(aeroHost, aeroPort);
         WritePolicy writePolicy = new WritePolicy();
@@ -105,7 +104,7 @@ public class RandomOperations {
                 String region = REGIONS[random.nextInt(REGIONS.length)];
                 
                 // Kiểm tra giới hạn cho region và loại thao tác
-                if (OPERATION_COUNTERS.get(region).get(operationName).get() >= OPERATION_LIMITS.get(region).get(operationName)) {
+                if (OPERATION_COUNTERS.get(region).get(operationName).get() >= REGION_LIMITS.get(region)) {
                     return;
                 }
                 
@@ -145,7 +144,7 @@ public class RandomOperations {
                 for (Map.Entry<String, AtomicInteger> operationEntry : operations.entrySet()) {
                     String operationName = operationEntry.getKey();
                     AtomicInteger counter = operationEntry.getValue();
-                    if (counter.get() < OPERATION_LIMITS.get(region).get(operationName)) {
+                    if (counter.get() < REGION_LIMITS.get(region)) {
                         allOperationsReachedLimit = false;
                         break;
                     }
@@ -209,7 +208,7 @@ public class RandomOperations {
             
             for (String operation : new String[]{"insert", "update", "delete"}) {
                 int count = operations.get(operation).get();
-                int limit = OPERATION_LIMITS.get(region).get(operation);
+                int limit = REGION_LIMITS.get(region);
                 long startTime = OPERATION_START_TIMES.get(region).get(operation).get();
                 long endTime = System.currentTimeMillis();
                 double opsPerSecond = (count * 1000.0) / (endTime - startTime);
@@ -225,9 +224,7 @@ public class RandomOperations {
             int regionTotal = operations.get("insert").get() + 
                             operations.get("update").get() + 
                             operations.get("delete").get();
-            int regionLimit = OPERATION_LIMITS.get(region).get("insert") + 
-                            OPERATION_LIMITS.get(region).get("update") + 
-                            OPERATION_LIMITS.get(region).get("delete");
+            int regionLimit = REGION_LIMITS.get(region) * 3; // Tổng giới hạn cho 3 loại thao tác
             System.out.printf("Tong cong: %d/%d thao tac (%.1f%%)\n", 
                 regionTotal, regionLimit, (regionTotal * 100.0) / regionLimit);
         }
@@ -243,7 +240,7 @@ public class RandomOperations {
     private static boolean performInsert(AerospikeClient client, WritePolicy writePolicy, String namespace, String setName,
             Random random, String region) {
         // Kiểm tra giới hạn cho region và loại thao tác
-        if (OPERATION_COUNTERS.get(region).get("insert").get() >= OPERATION_LIMITS.get(region).get("insert")) {
+        if (OPERATION_COUNTERS.get(region).get("insert").get() >= REGION_LIMITS.get(region)) {
             return false;
         }
 
@@ -293,7 +290,7 @@ public class RandomOperations {
     private static boolean performUpdate(AerospikeClient client, WritePolicy writePolicy, Policy readPolicy,
             String namespace, String setName, ConcurrentLinkedQueue<Key> randomKeys, Random random, String region) {
         // Kiểm tra giới hạn cho region và loại thao tác
-        if (OPERATION_COUNTERS.get(region).get("update").get() >= OPERATION_LIMITS.get(region).get("update")) {
+        if (OPERATION_COUNTERS.get(region).get("update").get() >= REGION_LIMITS.get(region)) {
             return false;
         }
 
@@ -336,7 +333,7 @@ public class RandomOperations {
     private static boolean performDelete(AerospikeClient client, String namespace, String setName,
             ConcurrentLinkedQueue<Key> randomKeys, String region) {
         // Kiểm tra giới hạn cho region và loại thao tác
-        if (OPERATION_COUNTERS.get(region).get("delete").get() >= OPERATION_LIMITS.get(region).get("delete")) {
+        if (OPERATION_COUNTERS.get(region).get("delete").get() >= REGION_LIMITS.get(region)) {
             return false;
         }
 
