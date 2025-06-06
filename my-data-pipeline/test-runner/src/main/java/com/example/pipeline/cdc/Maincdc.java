@@ -40,22 +40,18 @@ public class Maincdc {
             // Cấu hình performance
             int producerThreadPoolSize = config.getPerformance().getWorker_pool().getProducer();
             int consumerThreadPoolSize = config.getPerformance().getWorker_pool().getConsumer();
-            int randomOperationsThreadPoolSize = 4;
             int maxMessagesPerSecond = config.getPerformance().getMax_messages_per_second();
-            int operationsPerSecond = 500; // Số lượng thao tác mỗi giây cho RandomOperations
             int maxRetries = config.getPerformance().getMax_retries();
 
             // Tạo thread pool cho Producer và Consumer
             ExecutorService executor = Executors.newCachedThreadPool();
             List<CountDownLatch> producerLatches = new ArrayList<>();
             List<CountDownLatch> consumerLatches = new ArrayList<>();
-            CountDownLatch randomOpsDone = new CountDownLatch(1);
 
             logger.info("=== Starting CDC Pipeline ===");
             logger.info("Kafka Broker: {}", kafkaBroker);
             logger.info("Producer Thread Pool Size: {}", producerThreadPoolSize);
             logger.info("Consumer Thread Pool Size: {}", consumerThreadPoolSize);
-            logger.info("Random Operations Thread Pool Size: {}", randomOperationsThreadPoolSize);
             logger.info("===========================");
 
             // Khởi tạo producer một lần duy nhất
@@ -79,30 +75,6 @@ public class Maincdc {
                 topicList.append(cdcTopic);
                 consumerGroupList.append(TopicGenerator.generateCdcGroupName(cdcTopic));
             }
-
-            // Khởi động RandomOperations
-            executor.submit(() -> {
-                try {
-                    logger.info("[RANDOM OPS] Starting with configuration:");
-                    logger.info("[RANDOM OPS] - Host: {}", producer.getHost());
-                    logger.info("[RANDOM OPS] - Port: {}", producer.getPort());
-                    logger.info("[RANDOM OPS] - Namespace: {}", producer.getNamespace());
-                    logger.info("[RANDOM OPS] - Set: {}", producer.getSet());
-                    
-                    RandomOperations.main(
-                        producer.getHost(),
-                        producer.getPort(),
-                        producer.getNamespace(),
-                        producer.getSet(),
-                        operationsPerSecond,
-                        randomOperationsThreadPoolSize
-                    );
-                } catch (Exception e) {
-                    logger.error("[RANDOM OPS] Failed: {}", e.getMessage(), e);
-                } finally {
-                    randomOpsDone.countDown();
-                }
-            });
 
             // Khởi động Producer với tất cả các region
             executor.submit(() -> {
@@ -204,9 +176,8 @@ public class Maincdc {
                 }
             }));
 
-            // Chờ tất cả producer, consumer và random operations kết thúc
+            // Chờ tất cả producer và consumer kết thúc
             try {
-                randomOpsDone.await();
                 for (CountDownLatch latch : producerLatches) {
                     latch.await();
                 }

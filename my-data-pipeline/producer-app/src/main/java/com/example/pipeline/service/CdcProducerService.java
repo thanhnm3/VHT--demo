@@ -13,7 +13,6 @@ import org.slf4j.LoggerFactory;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.nio.charset.StandardCharsets;
 
 public class CdcProducerService {
     private final ExecutorService executor;

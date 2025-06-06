@@ -17,19 +17,37 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class RandomOperations {
     private static final String[] REGIONS = {
         "north", "central", "south"
     };
     private static final int MAX_RECORDS_PER_REGION = 200_000;
-    private static final int KEY_LIMIT = 100_000;
-    private static final Map<String, Integer> REGION_LIMITS = Map.of(
-        "north", 1_000,
-        "central", 2_000,
-        "south", 1_500
+    private static final int KEY_LIMIT = 30_000;
+    
+    // Định nghĩa giới hạn cho từng loại thao tác của mỗi region
+    private static final Map<String, Map<String, Integer>> OPERATION_LIMITS = Map.of(
+        "north", Map.of(
+            "insert", 1000,
+            "update", 1000,
+            "delete", 1000
+        ),
+        "central", Map.of(
+            "insert", 1000,
+            "update", 1000,
+            "delete", 1000
+        ),
+        "south", Map.of(
+            "insert", 1000,
+            "update", 1000,
+            "delete", 1000
+        )
     );
+
     private static final Map<String, Map<String, AtomicInteger>> OPERATION_COUNTERS = new HashMap<>();
+    private static final Map<String, Map<String, AtomicLong>> OPERATION_START_TIMES = new HashMap<>();
+    private static final Map<String, Map<String, AtomicLong>> OPERATION_LAST_LOG_TIMES = new HashMap<>();
 
     public static void main(String aeroHost, int aeroPort, String namespace, String setName, int operationsPerSecond,
             int threadPoolSize) {
@@ -41,13 +59,21 @@ public class RandomOperations {
 
         Random random = new Random();
 
-        // Khởi tạo bộ đếm cho mỗi region và mỗi loại thao tác
+        // Khởi tạo bộ đếm và thời gian cho mỗi region và mỗi loại thao tác
         for (String region : REGIONS) {
             Map<String, AtomicInteger> regionCounters = new HashMap<>();
-            regionCounters.put("insert", new AtomicInteger(0));
-            regionCounters.put("update", new AtomicInteger(0));
-            regionCounters.put("delete", new AtomicInteger(0));
+            Map<String, AtomicLong> regionStartTimes = new HashMap<>();
+            Map<String, AtomicLong> regionLastLogTimes = new HashMap<>();
+            
+            for (String operation : new String[]{"insert", "update", "delete"}) {
+                regionCounters.put(operation, new AtomicInteger(0));
+                regionStartTimes.put(operation, new AtomicLong(System.currentTimeMillis()));
+                regionLastLogTimes.put(operation, new AtomicLong(System.currentTimeMillis()));
+            }
+            
             OPERATION_COUNTERS.put(region, regionCounters);
+            OPERATION_START_TIMES.put(region, regionStartTimes);
+            OPERATION_LAST_LOG_TIMES.put(region, regionLastLogTimes);
         }
 
         // Sử dụng RateLimiter để kiểm soát tốc độ
@@ -79,7 +105,7 @@ public class RandomOperations {
                 String region = REGIONS[random.nextInt(REGIONS.length)];
                 
                 // Kiểm tra giới hạn cho region và loại thao tác
-                if (OPERATION_COUNTERS.get(region).get(operationName).get() >= REGION_LIMITS.get(region)) {
+                if (OPERATION_COUNTERS.get(region).get(operationName).get() >= OPERATION_LIMITS.get(region).get(operationName)) {
                     return;
                 }
                 
@@ -89,6 +115,7 @@ public class RandomOperations {
                         if (operationPerformed) {
                             totalInsertCount.incrementAndGet();
                             OPERATION_COUNTERS.get(region).get("insert").incrementAndGet();
+                            logOperationRate(region, "insert");
                         }
                         break;
                     case 1: // Update
@@ -96,6 +123,7 @@ public class RandomOperations {
                         if (operationPerformed) {
                             totalUpdateCount.incrementAndGet();
                             OPERATION_COUNTERS.get(region).get("update").incrementAndGet();
+                            logOperationRate(region, "update");
                         }
                         break;
                     case 2: // Delete
@@ -103,6 +131,7 @@ public class RandomOperations {
                         if (operationPerformed) {
                             totalDeleteCount.incrementAndGet();
                             OPERATION_COUNTERS.get(region).get("delete").incrementAndGet();
+                            logOperationRate(region, "delete");
                         }
                         break;
                 }
@@ -113,8 +142,10 @@ public class RandomOperations {
             for (Map.Entry<String, Map<String, AtomicInteger>> regionEntry : OPERATION_COUNTERS.entrySet()) {
                 String region = regionEntry.getKey();
                 Map<String, AtomicInteger> operations = regionEntry.getValue();
-                for (AtomicInteger counter : operations.values()) {
-                    if (counter.get() < REGION_LIMITS.get(region)) {
+                for (Map.Entry<String, AtomicInteger> operationEntry : operations.entrySet()) {
+                    String operationName = operationEntry.getKey();
+                    AtomicInteger counter = operationEntry.getValue();
+                    if (counter.get() < OPERATION_LIMITS.get(region).get(operationName)) {
                         allOperationsReachedLimit = false;
                         break;
                     }
@@ -130,32 +161,89 @@ public class RandomOperations {
             System.err.println("Luong bi ngat: " + e.getMessage());
         }
 
-        System.out.println("\n=== Ket qua thuc hien thao tac ===");
-        System.out.println("Tong so thao tac:");
-        System.out.println("Them moi: " + totalInsertCount.get());
-        System.out.println("Cap nhat: " + totalUpdateCount.get());
-        System.out.println("Xoa: " + totalDeleteCount.get());
-        System.out.println("\nSo luong thay doi theo region:");
+        // In kết quả cuối cùng
+        printFinalResults(totalInsertCount, totalUpdateCount, totalDeleteCount, randomKeys.size(), threadPoolSize, operationsPerSecond);
+
+        client.close();
+    }
+
+    private static void logOperationRate(String region, String operation) {
+        long currentTime = System.currentTimeMillis();
+        long lastLogTime = OPERATION_LAST_LOG_TIMES.get(region).get(operation).get();
+        
+        // Log mỗi giây
+        if (currentTime - lastLogTime >= 1000) {
+            int count = OPERATION_COUNTERS.get(region).get(operation).get();
+            long startTime = OPERATION_START_TIMES.get(region).get(operation).get();
+            double opsPerSecond = (count * 1000.0) / (currentTime - startTime);
+            
+            System.out.printf("[%s] %s: %d thao tac, %.2f ops/s\n", 
+                region.toUpperCase(), 
+                operation.toUpperCase(), 
+                count, 
+                opsPerSecond);
+            
+            OPERATION_LAST_LOG_TIMES.get(region).get(operation).set(currentTime);
+        }
+    }
+
+    private static void printFinalResults(AtomicInteger totalInsertCount, AtomicInteger totalUpdateCount, 
+            AtomicInteger totalDeleteCount, int keyCount, int threadPoolSize, int operationsPerSecond) {
+        System.out.println("\n=== KET QUA THUC HIEN THAO TAC ===");
+        System.out.println("Thoi gian ket thuc: " + java.time.LocalDateTime.now());
+        System.out.println("\n1. Tong so thao tac da thuc hien:");
+        System.out.println("--------------------------------");
+        System.out.printf("Them moi (Insert): %d thao tac\n", totalInsertCount.get());
+        System.out.printf("Cap nhat (Update): %d thao tac\n", totalUpdateCount.get());
+        System.out.printf("Xoa (Delete): %d thao tac\n", totalDeleteCount.get());
+        System.out.printf("Tong cong: %d thao tac\n", 
+            totalInsertCount.get() + totalUpdateCount.get() + totalDeleteCount.get());
+
+        System.out.println("\n2. Chi tiet theo tung region:");
+        System.out.println("--------------------------------");
         for (Map.Entry<String, Map<String, AtomicInteger>> regionEntry : OPERATION_COUNTERS.entrySet()) {
             String region = regionEntry.getKey();
             Map<String, AtomicInteger> operations = regionEntry.getValue();
-            System.out.printf("  %s:\n", region);
-            System.out.printf("    Insert: %d/%d\n", 
-                operations.get("insert").get(), REGION_LIMITS.get(region));
-            System.out.printf("    Update: %d/%d\n", 
-                operations.get("update").get(), REGION_LIMITS.get(region));
-            System.out.printf("    Delete: %d/%d\n", 
-                operations.get("delete").get(), REGION_LIMITS.get(region));
+            System.out.printf("\nRegion: %s\n", region.toUpperCase());
+            System.out.println("--------------------------------");
+            
+            for (String operation : new String[]{"insert", "update", "delete"}) {
+                int count = operations.get(operation).get();
+                int limit = OPERATION_LIMITS.get(region).get(operation);
+                long startTime = OPERATION_START_TIMES.get(region).get(operation).get();
+                long endTime = System.currentTimeMillis();
+                double opsPerSecond = (count * 1000.0) / (endTime - startTime);
+                
+                System.out.printf("%s: %d/%d (%.1f%%) - %.2f ops/s\n", 
+                    operation.toUpperCase(), 
+                    count, 
+                    limit,
+                    (count * 100.0) / limit,
+                    opsPerSecond);
+            }
+            
+            int regionTotal = operations.get("insert").get() + 
+                            operations.get("update").get() + 
+                            operations.get("delete").get();
+            int regionLimit = OPERATION_LIMITS.get(region).get("insert") + 
+                            OPERATION_LIMITS.get(region).get("update") + 
+                            OPERATION_LIMITS.get(region).get("delete");
+            System.out.printf("Tong cong: %d/%d thao tac (%.1f%%)\n", 
+                regionTotal, regionLimit, (regionTotal * 100.0) / regionLimit);
         }
-        System.out.println("================================");
 
-        client.close();
+        System.out.println("\n3. Thong tin khac:");
+        System.out.println("--------------------------------");
+        System.out.println("So luong key da lay tu database: " + keyCount);
+        System.out.println("So luong thread da su dung: " + threadPoolSize);
+        System.out.println("Toc do thao tac: " + operationsPerSecond + " ops/s");
+        System.out.println("================================================");
     }
 
     private static boolean performInsert(AerospikeClient client, WritePolicy writePolicy, String namespace, String setName,
             Random random, String region) {
         // Kiểm tra giới hạn cho region và loại thao tác
-        if (OPERATION_COUNTERS.get(region).get("insert").get() >= REGION_LIMITS.get(region)) {
+        if (OPERATION_COUNTERS.get(region).get("insert").get() >= OPERATION_LIMITS.get(region).get("insert")) {
             return false;
         }
 
@@ -205,7 +293,7 @@ public class RandomOperations {
     private static boolean performUpdate(AerospikeClient client, WritePolicy writePolicy, Policy readPolicy,
             String namespace, String setName, ConcurrentLinkedQueue<Key> randomKeys, Random random, String region) {
         // Kiểm tra giới hạn cho region và loại thao tác
-        if (OPERATION_COUNTERS.get(region).get("update").get() >= REGION_LIMITS.get(region)) {
+        if (OPERATION_COUNTERS.get(region).get("update").get() >= OPERATION_LIMITS.get(region).get("update")) {
             return false;
         }
 
@@ -216,16 +304,6 @@ public class RandomOperations {
         }
 
         try {
-            // Lấy region từ key
-            String keyStr = new String((byte[])randomKey.userKey.getObject());
-            String keyRegion = keyStr.substring(0, 2); // Lấy 2 ký tự đầu cho region
-            
-            // Chỉ cập nhật nếu region khớp
-            if (!keyRegion.equals(region)) {
-                randomKeys.offer(randomKey);
-                return false;
-            }
-
             // Kiểm tra xem bản ghi có tồn tại không
             Record record = client.get(readPolicy, randomKey);
             if (record == null) {
@@ -234,21 +312,22 @@ public class RandomOperations {
                 return false;
             }
 
-            // Cập nhật các trường
-            String serviceType = random.nextBoolean() ? "prepaid" : "postpaid";
-            long lastUpdated = System.currentTimeMillis();
-            byte[] notes = generateRandomBytes(random, 100, 1_000);
+            // Lấy region từ trường region của bản ghi
+            String recordRegion = record.getString("region");
+            if (recordRegion == null || !recordRegion.equals(region)) {
+                // Region không khớp, không thực hiện update
+                randomKeys.offer(randomKey);
+                return false;
+            }
 
-            client.put(writePolicy, randomKey,
-                new Bin("service_type", serviceType),
-                new Bin("last_updated", lastUpdated),
-                new Bin("notes", notes)
-            );
+            // Chỉ cập nhật notes
+            byte[] notes = generateRandomBytes(random, 100, 1_000);
+            client.put(writePolicy, randomKey, new Bin("notes", notes));
             return true;
         } catch (AerospikeException e) {
-            System.err.println(
-                    "Loi khi cap nhat ban ghi voi key: " + randomKey.userKey + " (loi: " + e.getMessage() + ")");
+            System.err.println("Loi khi cap nhat ban ghi voi key: " + randomKey.userKey + " (loi: " + e.getMessage() + ")");
         } finally {
+            // Luôn trả key về queue
             randomKeys.offer(randomKey);
         }
         return false;
@@ -257,7 +336,7 @@ public class RandomOperations {
     private static boolean performDelete(AerospikeClient client, String namespace, String setName,
             ConcurrentLinkedQueue<Key> randomKeys, String region) {
         // Kiểm tra giới hạn cho region và loại thao tác
-        if (OPERATION_COUNTERS.get(region).get("delete").get() >= REGION_LIMITS.get(region)) {
+        if (OPERATION_COUNTERS.get(region).get("delete").get() >= OPERATION_LIMITS.get(region).get("delete")) {
             return false;
         }
 
@@ -268,16 +347,6 @@ public class RandomOperations {
         }
 
         try {
-            // Lấy region từ key
-            String keyStr = new String((byte[])randomKey.userKey.getObject());
-            String keyRegion = keyStr.substring(0, 5); // Lấy 5 ký tự đầu cho region (north, south, etc.)
-            
-            // Chỉ xóa nếu region khớp
-            if (!keyRegion.equals(region)) {
-                randomKeys.offer(randomKey);
-                return false;
-            }
-
             // Kiểm tra xem bản ghi có tồn tại không
             Record record = client.get(null, randomKey);
             if (record == null) {
@@ -286,20 +355,22 @@ public class RandomOperations {
                 return false;
             }
 
-            // Đánh dấu bản ghi là đã xóa bằng cách set tất cả các trường thành null
-            client.put(null, randomKey,
-                Bin.asNull("user_id"),
-                Bin.asNull("phone"),
-                Bin.asNull("service_type"),
-                Bin.asNull("province"),
-                Bin.asNull("region"),
-                Bin.asNull("last_updated"),
-                Bin.asNull("notes")
-            );
+            // Lấy region từ trường region của bản ghi
+            String recordRegion = record.getString("region");
+            if (recordRegion == null || !recordRegion.equals(region)) {
+                // Region không khớp, không thực hiện delete
+                randomKeys.offer(randomKey);
+                return false;
+            }
+
+            // Chỉ set notes thành null
+            client.put(null, randomKey, Bin.asNull("notes"));
             return true;
         } catch (AerospikeException e) {
-            System.err.println(
-                    "Loi khi xoa ban ghi voi key: " + randomKey.userKey + " (loi: " + e.getMessage() + ")");
+            System.err.println("Loi khi xoa ban ghi voi key: " + randomKey.userKey + " (loi: " + e.getMessage() + ")");
+        } finally {
+            // Luôn trả key về queue
+            randomKeys.offer(randomKey);
         }
         return false;
     }

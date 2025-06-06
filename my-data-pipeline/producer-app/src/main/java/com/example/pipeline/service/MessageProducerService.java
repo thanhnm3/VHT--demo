@@ -14,14 +14,12 @@ import java.util.concurrent.atomic.AtomicLong;
 public class MessageProducerService {
     private final Map<String, String> regionToTopicMap;
     private final Queue<ProducerRecord<byte[], byte[]>> pendingMessages;
-    private final Object pendingMessagesLock;
     private final ObjectMapper objectMapper;
     private final AtomicLong pendingMessageCount = new AtomicLong(0);
 
     public MessageProducerService() {
         this.regionToTopicMap = new ConcurrentHashMap<>();
         this.pendingMessages = new ConcurrentLinkedQueue<>();
-        this.pendingMessagesLock = new Object();
         this.objectMapper = new ObjectMapper();
     }
 

@@ -2,8 +2,12 @@ package com.example.pipeline.cdc;
 
 import com.example.pipeline.service.config.Config;
 import com.example.pipeline.service.ConfigLoader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class RunRandomOperations {
+    private static final Logger logger = LoggerFactory.getLogger(RunRandomOperations.class);
+
     public static void main(String[] args) {
         try {
             // Load configuration from config.yaml
@@ -22,22 +26,44 @@ public class RunRandomOperations {
             int randomOperationsThreadPoolSize = 4; // So thread cho RandomOperations
             int operationsPerSecond = 2000; // So luong thao tac moi giay cho RandomOperations
 
-            System.out.println("=== Bat dau Random Operations ===");
-            System.out.println("Producer Host: " + producerHost);
-            System.out.println("Producer Port: " + producerPort);
-            System.out.println("Producer Namespace: " + producerNamespace);
-            System.out.println("Producer Set Name: " + producerSetName);
-            System.out.println("Random Operations Thread Pool Size: " + randomOperationsThreadPoolSize);
-            System.out.println("Operations Per Second: " + operationsPerSecond);
-            System.out.println("===============================");
+            logger.info("=== Bat dau Random Operations ===");
+            logger.info("Cau hinh Aerospike:");
+            logger.info("- Host: {}", producerHost);
+            logger.info("- Port: {}", producerPort);
+            logger.info("- Namespace: {}", producerNamespace);
+            logger.info("- Set Name: {}", producerSetName);
+            
+            logger.info("\nCau hinh Performance:");
+            logger.info("- Thread Pool Size: {}", randomOperationsThreadPoolSize);
+            logger.info("- Operations Per Second: {}", operationsPerSecond);
+            
+            logger.info("\nGioi han thao tac theo region:");
+            logger.info("North:");
+            logger.info("- Insert: 1000");
+            logger.info("- Update: 1000");
+            logger.info("- Delete: 1000");
+            logger.info("Central:");
+            logger.info("- Insert: 1000");
+            logger.info("- Update: 1000");
+            logger.info("- Delete: 1000");
+            logger.info("South:");
+            logger.info("- Insert: 1000");
+            logger.info("- Update: 1000");
+            logger.info("- Delete: 1000");
+            logger.info("===============================");
 
             // Chay RandomOperations
-            RandomOperations.main(producerHost, producerPort, producerNamespace, producerSetName, 
-                operationsPerSecond, randomOperationsThreadPoolSize);
+            RandomOperations.main(
+                producerHost, 
+                producerPort, 
+                producerNamespace, 
+                producerSetName, 
+                operationsPerSecond, 
+                randomOperationsThreadPoolSize
+            );
 
         } catch (Exception e) {
-            System.err.println("Loi: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Loi khi chay Random Operations: {}", e.getMessage(), e);
         }
     }
 } 
