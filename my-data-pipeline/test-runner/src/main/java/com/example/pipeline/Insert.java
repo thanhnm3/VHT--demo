@@ -1,6 +1,7 @@
 package com.example.pipeline;
 
 import com.aerospike.client.*;
+import com.aerospike.client.Record;
 import com.aerospike.client.policy.WritePolicy;
 import com.aerospike.client.policy.ClientPolicy;
 import com.example.pipeline.service.config.Config;
@@ -28,22 +29,21 @@ public class Insert {
             System.out.println("Producer Set Name: " + producerSetName);
             System.out.println("===============================");
 
-            // Configure client
+            // Configure client với cấu hình đơn giản
             ClientPolicy clientPolicy = new ClientPolicy();
-            clientPolicy.tendInterval = 0;     // Set to 0 to disable tend thread
-            clientPolicy.maxConnsPerNode = 1;  // Minimize connections
-            clientPolicy.timeout = 10000;      // Increase timeout
-            clientPolicy.rackAware = false;
-            clientPolicy.rackId = 0;
+            clientPolicy.timeout = 30000;      // Tăng timeout lên 30 giây
+            clientPolicy.maxConnsPerNode = 1;  // Giảm số kết nối
+            clientPolicy.tendInterval = 0;     // Tắt tend thread
+            clientPolicy.rackAware = false;    // Tắt rack awareness
 
-            // Connect to Aerospike through port mapping
+            // Chỉ kết nối đến một node
             Host[] hosts = new Host[] {
-                new Host("localhost", 3000)  // Use localhost with port mapping
+                new Host("localhost", 3000)
             };
             
-            System.out.println("Đang kết nối qua port mapping: localhost:3000");
+            System.out.println("Đang kết nối đến Aerospike...");
             AerospikeClient client = new AerospikeClient(clientPolicy, hosts);
-            System.out.println("Kết nối đến Aerospike thành công!");
+            System.out.println("Kết nối thành công!");
 
             // Create write policy
             WritePolicy policy = new WritePolicy();
@@ -53,7 +53,7 @@ public class Insert {
             String key = "test_" + System.currentTimeMillis();
             
             // Create bins
-            Bin messageBin = new Bin("message", "Hello");
+            Bin messageBin = new Bin("message", "Hello from cluster");
             Bin timestampBin = new Bin("timestamp", System.currentTimeMillis());
 
             // Insert record
@@ -61,8 +61,12 @@ public class Insert {
             client.put(policy, recordKey, messageBin, timestampBin);
             
             System.out.println("Đã insert thành công record với key: " + key);
-            System.out.println("Message: Hello");
-            System.out.println("Timestamp: " + System.currentTimeMillis());
+
+            // Đọc record để kiểm tra
+            Record record = client.get(policy, recordKey);
+            System.out.println("Đọc record:");
+            System.out.println("Message: " + record.getString("message"));
+            System.out.println("Timestamp: " + record.getLong("timestamp"));
 
             // Close client
             client.close();
