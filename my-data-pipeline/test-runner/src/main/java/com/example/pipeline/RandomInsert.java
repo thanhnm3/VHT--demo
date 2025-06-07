@@ -2,6 +2,7 @@ package com.example.pipeline;
 
 import com.aerospike.client.*;
 import com.aerospike.client.policy.WritePolicy;
+import com.aerospike.client.policy.ClientPolicy;
 import com.example.pipeline.service.config.Config;
 import com.example.pipeline.service.ConfigLoader;
 import com.example.pipeline.service.config.RegionConfig;
@@ -41,7 +42,19 @@ public class RandomInsert {
             System.out.println("===============================");
 
             // Kết nối đến Aerospike
-            AerospikeClient client = new AerospikeClient(producerHost, producerPort);
+            ClientPolicy clientPolicy = new ClientPolicy();
+            clientPolicy.tendInterval = -1;    // Tắt peer discovery
+            clientPolicy.maxConnsPerNode = 300;
+            clientPolicy.timeout = 5000;
+            clientPolicy.rackAware = false;
+            clientPolicy.rackId = 0;
+            
+            // Chỉ kết nối đến node chính thông qua port mapping
+            Host[] hosts = new Host[] {
+                new Host("localhost", 3000)  // Sử dụng localhost vì đã map port từ container
+            };
+            
+            AerospikeClient client = new AerospikeClient(clientPolicy, hosts);
             System.out.println("Ket noi den Aerospike thanh cong!");
             WritePolicy policy = new WritePolicy();
             policy.sendKey = true;

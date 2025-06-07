@@ -1,91 +1,91 @@
 version: '4'
 services:
-  grafana:
-    image: grafana/grafana:9.5.12
-    ports:
-     - "4040:3000"
-    environment:
-      GF_PATHS_DATA : /var/lib/grafana
-      GF_SECURITY_ADMIN_PASSWORD : kafka
-    volumes:
-     - ./etc/grafana/provisioning:/etc/grafana/provisioning
-     - ./etc/grafana/dashboards:/var/lib/grafana/dashboards
-    container_name: grafana
-    depends_on:
-     - prometheus
-    networks:
-      - kafka-platform
+  # grafana:
+  #   image: grafana/grafana:9.5.12
+  #   ports:
+  #    - "4040:3000"
+  #   environment:
+  #     GF_PATHS_DATA : /var/lib/grafana
+  #     GF_SECURITY_ADMIN_PASSWORD : kafka
+  #   volumes:
+  #    - ./etc/grafana/provisioning:/etc/grafana/provisioning
+  #    - ./etc/grafana/dashboards:/var/lib/grafana/dashboards
+  #   container_name: grafana
+  #   depends_on:
+  #    - prometheus
+  #   networks:
+  #     - kafka-platform
 
-  prometheus:
-    image: prom/prometheus:v2.47.1
-    ports:
-     - "9090:9090"
-    volumes:
-     - ./etc/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-    command: "--config.file=/etc/prometheus/prometheus.yml"
-    container_name: prometheus
-    networks:
-      - kafka-platform
+  # prometheus:
+  #   image: prom/prometheus:v2.47.1
+  #   ports:
+  #    - "9090:9090"
+  #   volumes:
+  #    - ./etc/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+  #   command: "--config.file=/etc/prometheus/prometheus.yml"
+  #   container_name: prometheus
+  #   networks:
+  #     - kafka-platform
 
-  kafka-exporter:
-    image: danielqsj/kafka-exporter:v1.7.0
-    ports:
-      - "9308:9308"
-    environment:
-      - SCRAPE_INTERVAL=1s
-    command:
-      - '--kafka.server=kafka:29092'
-    container_name: kafka-exporter
-    depends_on:
-      kafka:
-        condition: service_healthy
-    networks:
-      - kafka-platform
+  # kafka-exporter:
+  #   image: danielqsj/kafka-exporter:v1.7.0
+  #   ports:
+  #     - "9308:9308"
+  #   environment:
+  #     - SCRAPE_INTERVAL=1s
+  #   command:
+  #     - '--kafka.server=kafka:29092'
+  #   container_name: kafka-exporter
+  #   depends_on:
+  #     kafka:
+  #       condition: service_healthy
+  #   networks:
+  #     - kafka-platform
 
-  zk1:
-    image: confluentinc/cp-zookeeper:7.5.0
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-      ZOOKEEPER_INIT_LIMIT: 5
-      ZOOKEEPER_SYNC_LIMIT: 2
-    ports:
-     - "2181:2181"
-    container_name: zookeeper
-    networks:
-      - kafka-platform
+  # zk1:
+  #   image: confluentinc/cp-zookeeper:7.5.0
+  #   environment:
+  #     ZOOKEEPER_CLIENT_PORT: 2181
+  #     ZOOKEEPER_TICK_TIME: 2000
+  #     ZOOKEEPER_INIT_LIMIT: 5
+  #     ZOOKEEPER_SYNC_LIMIT: 2
+  #   ports:
+  #    - "2181:2181"
+  #   container_name: zookeeper
+  #   networks:
+  #     - kafka-platform
 
-  kafka:
-    image: confluentinc/cp-kafka:7.5.0
-    depends_on:
-      - zk1
-    ports:
-      - "9092:9092"
-      - "9991:9991"
-    container_name: kafka
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_JMX_PORT: 9991
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_LOG_RETENTION_MS: 600000
-      CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: kafka:29092
-      CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: zookeeper:2181
-      CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
-      CONFLUENT_METRICS_ENABLE: 'false'
-    healthcheck:
-      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:29092 --list || exit 1"]
-      interval: 10s
-      timeout: 30s
-      retries: 10
-      start_period: 120s
-    networks:
-      - kafka-platform
+  # kafka:
+  #   image: confluentinc/cp-kafka:7.5.0
+  #   depends_on:
+  #     - zk1
+  #   ports:
+  #     - "9092:9092"
+  #     - "9991:9991"
+  #   container_name: kafka
+  #   environment:
+  #     KAFKA_BROKER_ID: 1
+  #     KAFKA_JMX_PORT: 9991
+  #     KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+  #     KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+  #     KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+  #     KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+  #     KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+  #     KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+  #     KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+  #     KAFKA_LOG_RETENTION_MS: 600000
+  #     CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: kafka:29092
+  #     CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: zookeeper:2181
+  #     CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
+  #     CONFLUENT_METRICS_ENABLE: 'false'
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:29092 --list || exit 1"]
+  #     interval: 10s
+  #     timeout: 30s
+  #     retries: 10
+  #     start_period: 120s
+  #   networks:
+  #     - kafka-platform
 
   # =============================== AEROSPIKE ===============================
 
@@ -97,41 +97,74 @@ services:
     ports:
       - "3000:3000"
       - "3001:3001"
+      - "3002:3002"
+      - "3003:3003"
     volumes:
-      - ./aerospike_data:/opt/aerospike/data
+      - ./data/aerospike:/opt/aerospike/data
       - ./etc/aerospike/aerospike.conf:/etc/aerospike/aerospike.conf
     command: ["asd", "--config-file", "/etc/aerospike/aerospike.conf", "--foreground"]
-    restart: always
     networks:
-      - kafka-platform
+      - aerospike-network
 
-  aerospike2:
+  aerospike-replica:
     build:
       context: .
-      dockerfile: Dockerfile.aerospike2
-    container_name: aerospike2
+      dockerfile: Dockerfile.aerospike1
+    container_name: aerospike-replica
     ports:
-      - "4000:3000"
-      - "4001:3001"
+      - "3010:3000"
+      - "3011:3001"
+      - "3012:3002"
+      - "3013:3003"
     volumes:
-      - ./aerospike_data:/opt/aerospike/data
-      - ./etc/aerospike/aerospike2.conf:/etc/aerospike/aerospike.conf
+      - ./data/aerospike-replica:/opt/aerospike/data
+      - ./etc/aerospike/aerospike-replica.conf:/etc/aerospike/aerospike.conf
     command: ["asd", "--config-file", "/etc/aerospike/aerospike.conf", "--foreground"]
-    restart: always
     networks:
-      - kafka-platform
+      - aerospike-network
+
+  # aerospike2:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.aerospike2
+  #   container_name: aerospike2
+  #   ports:
+  #     - "4000:3000"
+  #     - "4001:3001"
+  #   volumes:
+  #     - ./aerospike_data2:/opt/aerospike/data
+  #     - ./etc/aerospike/aerospike2.conf:/etc/aerospike/aerospike.conf
+  #   command: ["asd", "--config-file", "/etc/aerospike/aerospike.conf", "--foreground"]
+  #   restart: always
+  #   networks:
+  #     - kafka-platform
+
+  # aerospike2-replica:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.aerospike2
+  #   container_name: aerospike2-replica
+  #   ports:
+  #     - "4010:3000"
+  #     - "4011:3001"
+  #   volumes:
+  #     - ./aerospike_data2_replica:/opt/aerospike/data
+  #     - ./etc/aerospike/aerospike2-replica.conf:/etc/aerospike/aerospike.conf
+  #   command: ["asd", "--config-file", "/etc/aerospike/aerospike.conf", "--foreground"]
+  #   restart: always
+  #   networks:
+  #     - kafka-platform
 
   aerospike-tools:
     image: aerospike/aerospike-tools
     container_name: aerospike-tools
-    depends_on:
-      - aerospike
-      - aerospike2
     networks:
-      - kafka-platform
+      - aerospike-network
     entrypoint: [ "sleep", "infinity" ]
 
 networks:
   kafka-platform:
     name: kafka-platform
+    driver: bridge
+  aerospike-network:
     driver: bridge

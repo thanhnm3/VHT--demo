@@ -25,8 +25,16 @@ check_aerospike_totals() {
         namespace=$(echo "$namespace" | tr -d ' ')
         if [ -n "$namespace" ]; then
             echo "=== Namespace: $namespace ==="
-            objects=$(docker exec aerospike asinfo -v "namespace/$namespace" | grep "objects=" | cut -d';' -f3)
-            echo "Objects: $objects"
+            ns_info=$(docker exec aerospike asinfo -v "namespace/$namespace")
+            objects=$(echo "$ns_info" | grep "objects=" | cut -d'=' -f2 | cut -d';' -f1)
+            master_objects=$(echo "$ns_info" | grep "master_objects=" | cut -d'=' -f2 | cut -d';' -f1)
+            prole_objects=$(echo "$ns_info" | grep "prole_objects=" | cut -d'=' -f2 | cut -d';' -f1)
+            replication_factor=$(echo "$ns_info" | grep "replication-factor=" | cut -d'=' -f2 | cut -d';' -f1)
+            
+            echo "Total Objects: $objects"
+            echo "Master Objects: $master_objects"
+            echo "Replica Objects: $prole_objects"
+            echo "Replication Factor: $replication_factor"
             producer_total=$((producer_total + objects))
             echo
         fi
@@ -46,8 +54,16 @@ check_aerospike_totals() {
         namespace=$(echo "$namespace" | tr -d ' ')
         if [ -n "$namespace" ]; then
             echo "=== Namespace: $namespace ==="
-            objects=$(docker exec aerospike2 asinfo -v "namespace/$namespace" | grep "objects=" | cut -d';' -f3)
-            echo "Objects: $objects"
+            ns_info=$(docker exec aerospike2 asinfo -v "namespace/$namespace")
+            objects=$(echo "$ns_info" | grep "objects=" | cut -d'=' -f2 | cut -d';' -f1)
+            master_objects=$(echo "$ns_info" | grep "master_objects=" | cut -d'=' -f2 | cut -d';' -f1)
+            prole_objects=$(echo "$ns_info" | grep "prole_objects=" | cut -d'=' -f2 | cut -d';' -f1)
+            replication_factor=$(echo "$ns_info" | grep "replication-factor=" | cut -d'=' -f2 | cut -d';' -f1)
+            
+            echo "Total Objects: $objects"
+            echo "Master Objects: $master_objects"
+            echo "Replica Objects: $prole_objects"
+            echo "Replication Factor: $replication_factor"
             consumer_total=$((consumer_total + objects))
             echo
         fi
