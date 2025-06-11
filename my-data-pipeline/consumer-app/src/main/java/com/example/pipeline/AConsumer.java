@@ -3,7 +3,6 @@ package com.example.pipeline;
 import com.example.pipeline.service.KafkaConsumerService;
 import com.example.pipeline.service.MessageService;
 import com.example.pipeline.service.config.ConfigurationService;
-import com.example.pipeline.service.TopicGenerator;
 import com.aerospike.client.AerospikeClient;
 import com.aerospike.client.policy.ClientPolicy;
 import com.aerospike.client.policy.WritePolicy;
@@ -61,7 +60,7 @@ public class AConsumer {
         
         // Initialize WritePolicy
         WritePolicy writePolicy = new WritePolicy();
-        writePolicy.sendKey = true;  // Đảm bảo lưu key
+        writePolicy.sendKey = true;  // Ensure key is stored
         writePolicy.totalTimeout = 5000;
         
         // Initialize MessageService with Aerospike client and policy
@@ -86,19 +85,15 @@ public class AConsumer {
 
     private void start() {
         try {
-            // Generate mirrored topic name
-            String mirroredTopic = TopicGenerator.generateMirroredTopicName(consumerTopic);
-            
             logger.info("Starting consumer with:");
             logger.info("Topic: {}", consumerTopic);
-            logger.info("Mirrored topic: {}", mirroredTopic);
             logger.info("Consumer group: {}", consumerGroup);
             logger.info("Worker pool size: {}", workerPoolSize);
             logger.info("Aerospike namespace: {}", aerospikeNamespace);
             logger.info("Aerospike set name: {}", aerospikeSetName);
 
-            // Start consuming messages from the mirrored topic
-            kafkaConsumerService.startConsuming(mirroredTopic, consumerGroup, messageService);
+            // Start consuming messages from the topic
+            kafkaConsumerService.startConsuming(consumerTopic, consumerGroup, messageService);
 
         } catch (Exception e) {
             logger.error("Error starting consumer: {}", e.getMessage(), e);

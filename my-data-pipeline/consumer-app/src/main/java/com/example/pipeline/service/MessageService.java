@@ -16,7 +16,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
@@ -31,7 +30,7 @@ public class MessageService {
     private final ExecutorService workerPool;
     private final String namespace;
     private final String setName;
-    private final String prefix;
+    private final String region;
     private volatile boolean isRunning = true;
     private final AtomicLong lastProcessedOffset = new AtomicLong(0);
     private final AtomicLong currentOffset = new AtomicLong(0);
@@ -39,13 +38,13 @@ public class MessageService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public MessageService(AerospikeClient destinationClient, WritePolicy writePolicy, 
-                         String namespace, String setName, String prefix,
+                         String namespace, String setName, String region,
                          int workerPoolSize) {
         this.destinationClient = destinationClient;
         this.writePolicy = writePolicy;
         this.namespace = namespace;
         this.setName = setName;
-        this.prefix = prefix;
+        this.region = region;
         
         // Create worker pool with CallerRunsPolicy
         this.workerPool = new ThreadPoolExecutor(
@@ -58,7 +57,7 @@ public class MessageService {
                 @Override
                 public Thread newThread(Runnable r) {
                     Thread thread = new Thread(r);
-                    thread.setName(prefix + "-worker-" + threadCount.getAndIncrement());
+                    thread.setName(region + "-worker-" + threadCount.getAndIncrement());
                     return thread;
                 }
             },
@@ -89,7 +88,7 @@ public class MessageService {
                     lastProcessedOffset.set(record.offset());
                     processedRecords.incrementAndGet();
                 } catch (Exception e) {
-                    logger.error("[{}] Error processing record: {}", prefix, e.getMessage());
+                    logger.error("[{}] Error processing record: {}", region, e.getMessage());
                 }
             });
         }
@@ -99,16 +98,12 @@ public class MessageService {
         try {
             // Check if key is null
             if (record.key() == null) {
-                logger.error("[{}] Error: Record key is null", prefix);
+                logger.error("[{}] Error: Record key is null", region);
                 return;
             }
 
             // Create Aerospike key using record key as PK
             Key key = new Key(namespace, setName, record.key());
-            
-            // Initialize default values
-            byte[] personData = null;
-            long lastUpdate = System.currentTimeMillis();
             
             // Try to parse message if value is not null
             if (record.value() != null) {
@@ -116,39 +111,68 @@ public class MessageService {
                     String message = new String(record.value(), StandardCharsets.UTF_8);
                     Map<String, Object> data = objectMapper.readValue(message, new TypeReference<Map<String, Object>>() {});
                     
-                    // Parse personData
-                    String personDataBase64 = (String) data.get("personData");
-                    if (personDataBase64 != null) {
-                        try {
-                            personData = Base64.getDecoder().decode(personDataBase64);
-                        } catch (IllegalArgumentException e) {
-                            logger.error("[{}] Error decoding personData: {}", prefix, e.getMessage());
+                    // Create bins for each field
+                    List<Bin> bins = new ArrayList<>();
+                    
+                    // Add user_id if present
+                    if (data.containsKey("user_id")) {
+                        bins.add(new Bin("user_id", (String) data.get("user_id")));
+                    }
+                    
+                    // Add phone if present
+                    if (data.containsKey("phone")) {
+                        bins.add(new Bin("phone", (String) data.get("phone")));
+                    }
+                    
+                    // Add service_type if present
+                    if (data.containsKey("service_type")) {
+                        bins.add(new Bin("service_type", (String) data.get("service_type")));
+                    }
+                    
+                    // Add province if present
+                    if (data.containsKey("province")) {
+                        bins.add(new Bin("province", (String) data.get("province")));
+                    }
+                    
+                    // Add region if present
+                    if (data.containsKey("region")) {
+                        bins.add(new Bin("region", (String) data.get("region")));
+                    }
+                    
+                    // Add last_updated if present
+                    if (data.containsKey("last_updated")) {
+                        Object lastUpdated = data.get("last_updated");
+                        if (lastUpdated instanceof Number) {
+                            bins.add(new Bin("last_updated", ((Number) lastUpdated).longValue()));
                         }
                     }
                     
-                    // Parse lastUpdate
-                    Object lastUpdateObj = data.get("lastUpdate");
-                    if (lastUpdateObj != null) {
-                        try {
-                            lastUpdate = ((Number) lastUpdateObj).longValue();
-                        } catch (Exception e) {
-                            logger.error("[{}] Error parsing lastUpdate: {}", prefix, e.getMessage());
+                    // Add notes if present
+                    if (data.containsKey("notes")) {
+                        Object notes = data.get("notes");
+                        if (notes instanceof String) {
+                            bins.add(new Bin("notes", (String) notes));
+                        } else if (notes instanceof byte[]) {
+                            bins.add(new Bin("notes", (byte[]) notes));
                         }
                     }
+                    
+                    // Write all bins to Aerospike
+                    if (!bins.isEmpty()) {
+                        destinationClient.put(writePolicy, key, bins.toArray(new Bin[0]));
+                    } else {
+                        logger.warn("[{}] No valid data found in record", region);
+                    }
+                    
                 } catch (Exception e) {
-                    logger.error("[{}] Error parsing message: {}", prefix, e.getMessage());
+                    logger.error("[{}] Error parsing message: {}", region, e.getMessage());
                 }
+            } else {
+                logger.warn("[{}] Record value is null", region);
             }
             
-            // Create bins with available data
-            Bin personDataBin = new Bin("personData", personData);
-            Bin lastUpdateBin = new Bin("lastUpdate", lastUpdate);
-            
-            // Write to Aerospike with both bins
-            destinationClient.put(writePolicy, key, personDataBin, lastUpdateBin);
-            
         } catch (Exception e) {
-            logger.error("[{}] Error writing to Aerospike: {}", prefix, e.getMessage(), e);
+            logger.error("[{}] Error writing to Aerospike: {}", region, e.getMessage(), e);
             throw e;
         }
     }
@@ -192,7 +216,7 @@ public class MessageService {
                     lastProcessedOffset.set(record.offset());
                     processedRecords.incrementAndGet();
                 } catch (Exception e) {
-                    logger.error("[{}] Error processing record: {}", prefix, e.getMessage());
+                    logger.error("[{}] Error processing record: {}", region, e.getMessage());
                 } finally {
                     latch.countDown();
                 }

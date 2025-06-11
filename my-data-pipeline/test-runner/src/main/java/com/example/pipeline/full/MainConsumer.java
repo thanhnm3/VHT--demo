@@ -27,14 +27,14 @@ public class MainConsumer {
                 throw new IllegalStateException("Failed to load configuration");
             }
 
-            // Lấy cấu hình Kafka
-            String kafkaBrokerTarget = config.getKafka().getBrokers().getTarget();
+            // Get Kafka configuration
+            String kafkaBrokerTarget = config.getKafka().getBroker();
 
-            // Cấu hình performance
+            // Performance configuration
             int consumerThreadPoolSize = config.getPerformance().getWorker_pool().getConsumer();
             int maxRetries = config.getPerformance().getMax_retries();
 
-            // Tạo thread pool cho Consumer
+            // Create thread pool for Consumer
             ExecutorService executor = Executors.newCachedThreadPool();
             List<CountDownLatch> consumerLatches = new ArrayList<>();
 
@@ -44,31 +44,29 @@ public class MainConsumer {
             logger.info("Max Retries: {}", maxRetries);
             logger.info("===========================");
 
-            // Khởi động các Consumer theo prefix mapping
-            Map<String, List<String>> prefixMapping = config.getPrefix_mapping();
-            for (Map.Entry<String, List<String>> entry : prefixMapping.entrySet()) {
-                String prefix = entry.getKey();
+            // Start Consumers by region
+            Map<String, List<String>> regionMapping = config.getRegion_mapping();
+            for (Map.Entry<String, List<String>> entry : regionMapping.entrySet()) {
+                String region = entry.getKey();
                 List<String> consumerNames = entry.getValue();
 
                 if (consumerNames.isEmpty()) {
-                    logger.warn("No consumers found for prefix: {}", prefix);
+                    logger.warn("No consumers found for region: {}", region);
                     continue;
                 }
 
-                // Tạo topic và consumer group cho prefix này
+                // Create topic and consumer group for this region
                 String producerName = config.getProducers().get(0).getName();
-                String baseTopic = TopicGenerator.TopicNameGenerator.generateTopicName(producerName, prefix);
+                String baseTopic = TopicGenerator.TopicNameGenerator.generateTopicName(producerName, region);
                 String consumerTopic = TopicGenerator.generateATopicName(baseTopic);
-                String mirroredTopic = TopicGenerator.generateMirroredTopicName(consumerTopic);
-                final String consumerGroup = TopicGenerator.generateAGroupName(producerName + "_" + prefix);
+                final String consumerGroup = TopicGenerator.generateAGroupName(producerName + "_" + region);
 
-                logger.info("Starting Consumers for prefix {}: {}", prefix, consumerNames);
+                logger.info("Starting Consumers for region {}: {}", region, consumerNames);
                 logger.info("  Base Topic: {}", baseTopic);
                 logger.info("  Consumer Topic: {}", consumerTopic);
-                logger.info("  Mirrored Topic: {}", mirroredTopic);
                 logger.info("  Consumer Group: {}", consumerGroup);
 
-                // Khởi động các Consumer cho prefix này
+                // Start Consumers for this region
                 for (String consumerName : consumerNames) {
                     Config.Consumer consumer = config.getConsumers().stream()
                         .filter(c -> c.getName().equals(consumerName))
@@ -83,17 +81,16 @@ public class MainConsumer {
                     CountDownLatch consumerDone = new CountDownLatch(1);
                     consumerLatches.add(consumerDone);
 
-                    logger.info("Starting A Consumer for prefix {}: {}", prefix, consumerName);
+                    logger.info("Starting A Consumer for region {}: {}", region, consumerName);
                     logger.info("  Host: {}", consumer.getHost());
                     logger.info("  Port: {}", consumer.getPort());
                     logger.info("  Namespace: {}", consumer.getNamespace());
                     logger.info("  Set: {}", consumer.getSet());
                     logger.info("  Base Topic: {}", baseTopic);
                     logger.info("  Consumer Topic: {}", consumerTopic);
-                    logger.info("  Mirrored Topic: {}", mirroredTopic);
                     logger.info("  Consumer Group: {}", consumerGroup);
 
-                    // Khởi động Consumer với mirrored topic
+                    // Start Consumer
                     executor.submit(() -> {
                         try {
                             String[] consumerArgs = new String[] {
@@ -115,12 +112,11 @@ public class MainConsumer {
                         }
                     });
                 }
-
             }
 
-            // Thêm shutdown hook để xử lý khi chương trình bị tắt
+            // Add shutdown hook to handle program termination
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                logger.info("Dang tat chuong trinh...");
+                logger.info("Shutting down program...");
                 executor.shutdown();
                 try {
                     if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
@@ -132,19 +128,19 @@ public class MainConsumer {
                 }
             }));
 
-            // Chờ tất cả consumer kết thúc
+            // Wait for all consumers to finish
             try {
                 for (CountDownLatch latch : consumerLatches) {
                     latch.await();
                 }
                 executor.shutdown();
-                logger.info("Chuong trinh da ket thuc.");
+                logger.info("Program has ended.");
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                logger.error("Chuong trinh bi gian doan.");
+                logger.error("Program was interrupted.");
             }
         } catch (Exception e) {
-            logger.error("Loi nghiem trong: {}", e.getMessage(), e);
+            logger.error("Serious error: {}", e.getMessage(), e);
         }
     }
 } 
