@@ -14,18 +14,23 @@ import java.util.Map;
 import java.util.List;
 import java.util.Properties;
 import java.util.stream.Collectors;
+import java.util.Set;
+import java.util.HashSet;
 
 
 public class KafkaProducerService {
     private final String kafkaBroker;
-    private final String kafkaTopic;
+    private final Set<String> kafkaTopics;
     private final String consumerGroup;
     private final AdminClient adminClient;
 
 
-    public KafkaProducerService(String kafkaBroker, String kafkaTopic, String consumerGroup) {
+    public KafkaProducerService(String kafkaBroker, String topics, String consumerGroup) {
         this.kafkaBroker = kafkaBroker;
-        this.kafkaTopic = kafkaTopic;
+        this.kafkaTopics = new HashSet<>();
+        if (topics != null && !topics.isEmpty()) {
+            this.kafkaTopics.addAll(List.of(topics.split(",")));
+        }
         this.consumerGroup = consumerGroup;
 
 
@@ -63,7 +68,7 @@ public class KafkaProducerService {
             Map<TopicPartition, org.apache.kafka.clients.consumer.OffsetAndMetadata> offsets = result.partitionsToOffsetAndMetadata().get();
             
             List<TopicPartition> partitions = offsets.keySet().stream()
-                .filter(tp -> tp.topic().equals(kafkaTopic))
+                .filter(tp -> kafkaTopics.contains(tp.topic()))
                 .collect(Collectors.toList());
                 
             Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> endOffsets = adminClient.listOffsets(

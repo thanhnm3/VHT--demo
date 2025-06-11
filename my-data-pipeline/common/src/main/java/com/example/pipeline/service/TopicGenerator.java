@@ -16,18 +16,19 @@ public class TopicGenerator {
             // Lấy đối tượng Config
             Config config = ConfigLoader.getConfig();
 
-            // Lấy danh sách producers và prefix_mapping
+            // Lấy danh sách producers và region_mapping
             List<Producer> producers = config.getProducers();
-            Map<String, List<String>> prefixMapping = config.getPrefix_mapping();
+            Map<String, List<String>> regionMapping = config.getRegion_mapping();
 
-            // Tạo tên topic từ danh sách producers và prefix_mapping
-            prefixMapping.forEach((prefix, consumerNames) -> {
+            // Tạo tên topic từ danh sách producers và region_mapping
+            regionMapping.forEach((region, consumerNames) -> {
                 producers.forEach(producer -> {
                     // Tạo tên topic
-                    String topic = TopicNameGenerator.generateTopicName(producer.getName(), prefix);
+                    String baseTopic = TopicNameGenerator.generateTopicName(producer.getName(), region);
+                    String topic = generateATopicName(baseTopic);
 
                     // Lưu tên topic vào Map
-                    topicMap.put(prefix, topic);
+                    topicMap.put(region, topic);
                 });
             });
         } catch (Exception e) {
@@ -62,19 +63,15 @@ public class TopicGenerator {
         return baseTopic + "-a-group";
     }
 
-    // Tạo tên topic cho mirrored topic
-    public static String generateMirroredTopicName(String topic) {
-        return "source-kafka." + topic;
-    }
 
     public static class TopicNameGenerator {
 
-        public static String generateTopicName(String producerName, String prefix) {
-            if (prefix == null || prefix.length() < 3) {
-                throw new IllegalArgumentException("Invalid prefix: " + prefix);
+        public static String generateTopicName(String producerName, String region) {
+            if (region == null || region.isEmpty()) {
+                throw new IllegalArgumentException("Invalid region: " + region);
             }
 
-            return String.format("%s_%s", normalize(producerName), prefix);
+            return String.format("%s_%s", normalize(producerName), normalize(region));
         }
 
         private static String normalize(String name) {

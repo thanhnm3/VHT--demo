@@ -22,7 +22,7 @@ public class KafkaLagMonitor {
     public KafkaLagMonitor() {
         // Lấy target Kafka broker từ config
         Config config = ConfigLoader.getConfig();
-        String targetBroker = config.getKafka().getBrokers().getTarget();
+        String targetBroker = config.getKafka().getBroker();
         
         Properties props = new Properties();
         props.put("bootstrap.servers", targetBroker);

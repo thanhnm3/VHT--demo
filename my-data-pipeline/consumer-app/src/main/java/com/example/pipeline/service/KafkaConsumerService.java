@@ -21,7 +21,7 @@ public class KafkaConsumerService {
     private final AdminClient adminClient;
     private final AtomicLong lastProcessedOffset;
     private final AtomicLong currentOffset;
-    private final Map<String, String> prefixToTopicMap;
+    private final Map<String, String> regionToTopicMap;
     private final ConfigurationService configService;
     private volatile boolean isRunning = true;
 
@@ -30,7 +30,7 @@ public class KafkaConsumerService {
         this.configService = configService;
         this.lastProcessedOffset = new AtomicLong(-1);
         this.currentOffset = new AtomicLong(-1);
-        this.prefixToTopicMap = configService.getAllPrefixToTopicMappings();
+        this.regionToTopicMap = configService.getAllRegionToTopicMappings();
 
         // Initialize AdminClient
         Properties adminProps = new Properties();
@@ -39,13 +39,13 @@ public class KafkaConsumerService {
     }
 
     public void initializeConsumers(String sourceNamespace, int workerPoolSize) {
-        // Initialize prefix to topic mappings
-        for (Map.Entry<String, List<String>> entry : configService.getPrefixMappings().entrySet()) {
-            String prefix = entry.getKey();
+        // Initialize region to topic mappings
+        for (Map.Entry<String, List<String>> entry : configService.getRegionMappings().entrySet()) {
+            String region = entry.getKey();
             List<String> consumerNames = entry.getValue();
             
             if (consumerNames.isEmpty()) {
-                logger.warn("No consumers found for prefix {}", prefix);
+                logger.warn("No consumers found for region {}", region);
                 continue;
             }
 
@@ -58,8 +58,8 @@ public class KafkaConsumerService {
             }
 
             // Topic mapping is already initialized in constructor
-            if (!prefixToTopicMap.containsKey(prefix)) {
-                logger.warn("No topic mapping found for prefix {}", prefix);
+            if (!regionToTopicMap.containsKey(region)) {
+                logger.warn("No topic mapping found for region {}", region);
             }
         }
     }
@@ -125,8 +125,8 @@ public class KafkaConsumerService {
         return lastProcessedOffset.get();
     }
 
-    public Map<String, String> getPrefixToTopicMap() {
-        return prefixToTopicMap;
+    public Map<String, String> getRegionToTopicMap() {
+        return regionToTopicMap;
     }
 
     public void shutdown() {

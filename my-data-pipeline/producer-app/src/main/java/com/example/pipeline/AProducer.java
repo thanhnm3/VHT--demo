@@ -10,6 +10,7 @@ import com.example.pipeline.service.KafkaProducerService;
 import com.example.pipeline.service.MessageProducerService;
 import com.example.pipeline.service.AerospikeProducerService;
 import com.example.pipeline.service.KafkaLagMonitor;
+import com.example.pipeline.service.TopicGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +34,7 @@ public class AProducer {
     private static MessageProducerService messageService;
     private static AerospikeProducerService aerospikeService;
 
-    private static final Map<String, String> prefixToTopicMap = new ConcurrentHashMap<>();
+    private static final Map<String, String> regionToTopicMap = new ConcurrentHashMap<>();
     private static String sourceNamespace;
 
     public static void main(String[] args) {
@@ -45,15 +46,13 @@ public class AProducer {
             String namespace = args[3];
             String setName = args[4];
             int maxRetries = Integer.parseInt(args[5]);
-            String consumerGroup = args[6];
+            String topics = args[6]; // Comma-separated list of topics
             int workerPoolSize = Integer.parseInt(args[7]);
-            String topicList = args[8]; // Danh sách topic được phân tách bằng dấu phẩy
 
-            AProducer.consumerGroup = consumerGroup;
             AProducer.sourceNamespace = namespace;
             
-            // Khởi tạo topic mapping từ danh sách topic được truyền vào
-            initializeTopicMapping(topicList);
+            // Khởi tạo topic mapping từ region
+            initializeTopicMapping();
             
             AerospikeClient aerospikeClient = null;
             KafkaProducer<byte[], byte[]> kafkaProducer = null;
@@ -61,9 +60,12 @@ public class AProducer {
             try {
                 rateControlService = new RateControlService(5000.0, MAX_RATE, MIN_RATE, 
                                                           LAG_THRESHOLD, MONITORING_INTERVAL_SECONDS);
-                kafkaService = new KafkaProducerService(kafkaBroker, null, consumerGroup);
+                
+                // Tạo danh sách topic từ regionToTopicMap
+                kafkaService = new KafkaProducerService(kafkaBroker, topics, null);
+                
                 messageService = new MessageProducerService();
-                messageService.initializeTopicMapping(prefixToTopicMap);  
+                messageService.initializeTopicMapping(regionToTopicMap);  
 
                 ClientPolicy clientPolicy = new ClientPolicy();
                 clientPolicy.timeout = 5000;
@@ -78,6 +80,7 @@ public class AProducer {
 
                 createTopics();
 
+                // Khôi phục monitoring thread
                 Thread monitorThread = new Thread(() -> {
                     while (!Thread.currentThread().isInterrupted()) {
                         try {
@@ -105,15 +108,13 @@ public class AProducer {
                 aerospikeService = new AerospikeProducerService(
                     executor,
                     messageService,
-                    prefixToTopicMap,
                     sourceNamespace
                 );
 
                 logger.info("Starting producer with configuration:");
                 logger.info("  Namespace: {}", namespace);
                 logger.info("  Set: {}", setName);
-                logger.info("  Topics: {}", prefixToTopicMap);
-                logger.info("  Consumer group: {}", consumerGroup);
+                logger.info("  Topics: {}", regionToTopicMap);
                 logger.info("  Worker pool size: {}", workerPoolSize);
 
                 aerospikeService.readDataFromAerospike(
@@ -128,7 +129,6 @@ public class AProducer {
 
             } catch (Exception e) {
                 logger.error("Critical error: {}", e.getMessage());
-                e.printStackTrace();
             } finally {
                 shutdownGracefully(aerospikeClient, kafkaProducer);
             }
@@ -137,26 +137,22 @@ public class AProducer {
         }
     }
 
-    private static void initializeTopicMapping(String topicList) {
-        // Phân tách danh sách topic và tạo mapping từ prefix sang topic
-        String[] topicArray = topicList.split(",");
-        for (String topic : topicArray) {
-            String trimmedTopic = topic.trim();
-            // Lấy prefix từ topic name (ví dụ: từ "producer1_096-a" lấy "096")
-            String prefix = trimmedTopic.split("_")[1].split("-")[0];
-            prefixToTopicMap.put(prefix, trimmedTopic);
-        }
-        logger.info("Initialized topic mapping from prefix to topic: {}", prefixToTopicMap);
+    private static void initializeTopicMapping() {
+        // Sử dụng TopicGenerator để tạo mapping từ region sang topic
+        Map<String, String> generatedTopics = TopicGenerator.generateTopics();
+        regionToTopicMap.putAll(generatedTopics);
+        logger.info("Initialized region to topic mapping: {}", regionToTopicMap);
     }
 
     private static void createTopics() {
         try {
-            Set<String> topics = new HashSet<>(prefixToTopicMap.values());
+            Set<String> topics = new HashSet<>(regionToTopicMap.values());
             
             for (String topic : topics) {
                 try {
-                    kafkaService.createTopic(topic);
-                    logger.info("Created/Verified topic: {}", topic);
+                    // Tạo topic A cho mỗi region
+                    String topicA = TopicGenerator.generateATopicName(topic);
+                    kafkaService.createTopic(topicA);
                 } catch (Exception e) {
                     logger.error("Error creating topic {}: {}", topic, e.getMessage());
                 }
@@ -180,34 +176,34 @@ public class AProducer {
             // Tách consumer groups thành mảng
             String[] consumerGroups = consumerGroup.split(",");
             
-            // Tạo map từ prefix sang topic và consumer group
-            Map<String, String> prefixToTopicMap = new HashMap<>();
-            Map<String, String> prefixToGroupMap = new HashMap<>();
+            // Tạo map từ region sang topic và consumer group
+            Map<String, String> regionToTopicMap = new HashMap<>();
+            Map<String, String> regionToGroupMap = new HashMap<>();
             
             for (String group : consumerGroups) {
                 group = group.trim();
-                // Lấy prefix từ consumer group (ví dụ: từ "producer1_096-a-group" lấy "096")
-                String prefix = group.split("_")[1].split("-")[0];
-                String topic = "producer1_" + prefix + "-a";
-                prefixToTopicMap.put(prefix, topic);
-                prefixToGroupMap.put(prefix, group);
+                // Lấy region từ consumer group (ví dụ: từ "producer1_north-a-group" lấy "north")
+                String region = group.split("_")[1].split("-")[0];
+                String topic = "producer1_" + region;
+                regionToTopicMap.put(region, topic);
+                regionToGroupMap.put(region, group);
             }
             
             // Tính tổng lag cho mỗi cặp topic-group tương ứng
-            for (Map.Entry<String, String> entry : prefixToTopicMap.entrySet()) {
-                String prefix = entry.getKey();
+            for (Map.Entry<String, String> entry : regionToTopicMap.entrySet()) {
+                String region = entry.getKey();
                 String topic = entry.getValue();
-                String group = prefixToGroupMap.get(prefix);
+                String group = regionToGroupMap.get(region);
                 
                 try {
-                    String mirroredTopic = "source-kafka." + topic;
-                    long topicLag = lagMonitor.calculateTopicLag(mirroredTopic, group);
+                    String topicA = TopicGenerator.generateATopicName(topic);
+                    long topicLag = lagMonitor.calculateTopicLag(topicA, group);
                     
                     if (topicLag >= 0) {
                         totalLag += topicLag;
                         hasValidLag = true;
-                        logger.info("Topic {} (mirrored as {}) has lag: {} for consumer group: {}", 
-                                  topic, mirroredTopic, topicLag, group);
+                        logger.info("Topic {} has lag: {} for consumer group: {}", 
+                                  topicA, topicLag, group);
                     }
                 } catch (Exception e) {
                     logger.warn("Error calculating lag for topic {} with consumer group {}: {}", 

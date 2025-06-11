@@ -10,22 +10,96 @@ consumers:
   - name: consumer1
     host: 127.0.0.1
     port: 4000
-    namespace: consumer_033
+    namespace: consumer_north
     set: users
   - name: consumer2
     host: 127.0.0.1
     port: 4000
-    namespace: consumer_096
-    set: users
+    namespace: consumer_central_and_south
+    set: users_central
+  - name: consumer3
+    host: 127.0.0.1
+    port: 4000
+    namespace: consumer_central_and_south
+    set: users_south
 
-prefix_mapping:
-  "096": ["consumer2"]
-  "033": ["consumer1"]
+region_mapping:
+  "north": ["consumer1"]
+  "central": ["consumer2"]
+  "south": ["consumer3"]
+
+region_groups:
+  north:
+    - Ha Noi
+    - Lai Chau
+    - Dien Bien
+    - Son La
+    - Lang Son
+    - Quang Ninh
+    - Cao Bang
+    - Tuyen Quang
+    - Ha Giang
+    - Lao Cai
+    - Yen Bai
+    - Thai Nguyen
+    - Bac Kan
+    - Phu Tho
+    - Vinh Phuc
+    - Hoa Binh
+    - Bac Ninh
+    - Bac Giang
+    - Hung Yen
+    - Thai Binh
+    - Hai Phong
+    - Hai Duong
+    - Ninh Binh
+    - Ha Nam
+    - Nam Dinh
+
+  central:
+    - Thanh Hoa
+    - Nghe An
+    - Ha Tinh
+    - Quang Tri
+    - Quang Binh
+    - Thua Thien Hue
+    - Da Nang
+    - Quang Nam
+    - Quang Ngai
+    - Kon Tum
+    - Gia Lai
+    - Binh Dinh
+    - Khanh Hoa
+    - Ninh Thuận
+    - Lam Dong
+    - Dak Nong
+    - Binh Thuan
+    - Dak Lak
+    - Phu Yen
+
+  south:
+    - TP. Ho Chi Minh
+    - Binh Duong
+    - Ba Ria Vung Tau
+    - Dong Nai
+    - Binh Phuoc
+    - Tay Ninh
+    - Long An
+    - Can Tho
+    - Soc Trang
+    - Hau Giang
+    - Vinh Long
+    - Ben Tre
+    - Tra Vinh
+    - Dong Thap
+    - Tien Giang
+    - Ca Mau
+    - Bac Lieu
+    - An Giang
+    - Kien Giang
 
 kafka:
-  brokers:
-    source: localhost:9092
-    target: localhost:9093
+  broker: localhost:9092
 
 performance:
   max_messages_per_second: 4000

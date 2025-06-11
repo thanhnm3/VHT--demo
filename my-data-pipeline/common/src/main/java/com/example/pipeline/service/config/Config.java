@@ -6,9 +6,10 @@ import java.util.Map;
 public class Config {
     private List<Producer> producers;
     private List<Consumer> consumers;
-    private Map<String, List<String>> prefix_mapping;
+    private Map<String, List<String>> region_mapping;
     private KafkaConfig kafka;
     private PerformanceConfig performance;
+    private RegionGroups region_groups;
 
     public static class Producer {
         private String name;
@@ -49,20 +50,10 @@ public class Config {
     }
 
     public static class KafkaConfig {
-        private Brokers brokers;
+        private String broker;
 
-        public Brokers getBrokers() { return brokers; }
-        public void setBrokers(Brokers brokers) { this.brokers = brokers; }
-
-        public static class Brokers {
-            private String source;
-            private String target;
-
-            public String getSource() { return source; }
-            public void setSource(String source) { this.source = source; }
-            public String getTarget() { return target; }
-            public void setTarget(String target) { this.target = target; }
-        }
+        public String getBroker() { return broker; }
+        public void setBroker(String broker) { this.broker = broker; }
     }
 
     public static class PerformanceConfig {
@@ -156,19 +147,74 @@ public class Config {
         }
     }
 
+    public static class RegionGroups {
+        private List<String> north;
+        private List<String> central;
+        private List<String> south;
+
+        public List<String> getNorth() { return north; }
+        public void setNorth(List<String> north) { this.north = north; }
+        public List<String> getCentral() { return central; }
+        public void setCentral(List<String> central) { this.central = central; }
+        public List<String> getSouth() { return south; }
+        public void setSouth(List<String> south) { this.south = south; }
+
+        public List<String> getProvincesByRegion(String region) {
+            return switch (region.toLowerCase()) {
+                case "north" -> north;
+                case "central" -> central;
+                case "south" -> south;
+                default -> throw new IllegalArgumentException("Invalid region: " + region);
+            };
+        }
+
+        public boolean isProvinceInRegion(String province, String region) {
+            List<String> provinces = getProvincesByRegion(region);
+            return provinces != null && provinces.contains(province);
+        }
+
+        public String getRegionOfProvince(String province) {
+            if (north != null && north.contains(province)) return "north";
+            if (central != null && central.contains(province)) return "central";
+            if (south != null && south.contains(province)) return "south";
+            return null;
+        }
+    }
+
     // Getters và Setters
     public List<Producer> getProducers() { return producers; }
     public void setProducers(List<Producer> producers) { this.producers = producers; }
     public List<Consumer> getConsumers() { return consumers; }
     public void setConsumers(List<Consumer> consumers) { this.consumers = consumers; }
-    public Map<String, List<String>> getPrefix_mapping() { return prefix_mapping; }
-    public void setPrefix_mapping(Map<String, List<String>> prefix_mapping) { 
-        this.prefix_mapping = prefix_mapping; 
+    public Map<String, List<String>> getRegion_mapping() { return region_mapping; }
+    public void setRegion_mapping(Map<String, List<String>> region_mapping) { 
+        this.region_mapping = region_mapping; 
     }
     public KafkaConfig getKafka() { return kafka; }
     public void setKafka(KafkaConfig kafka) { this.kafka = kafka; }
     public PerformanceConfig getPerformance() { return performance; }
     public void setPerformance(PerformanceConfig performance) { 
         this.performance = performance; 
+    }
+    public RegionGroups getRegion_groups() { return region_groups; }
+    public void setRegion_groups(RegionGroups region_groups) { this.region_groups = region_groups; }
+
+    // Helper methods for region mapping
+    public List<String> getConsumersForRegion(String region) {
+        return region_mapping.get(region.toLowerCase());
+    }
+
+    public String getRegionForConsumer(String consumerName) {
+        for (Map.Entry<String, List<String>> entry : region_mapping.entrySet()) {
+            if (entry.getValue().contains(consumerName)) {
+                return entry.getKey();
+            }
+        }
+        return null;
+    }
+
+    public List<String> getConsumersForProvince(String province) {
+        String region = region_groups.getRegionOfProvince(province);
+        return region != null ? getConsumersForRegion(region) : null;
     }
 }

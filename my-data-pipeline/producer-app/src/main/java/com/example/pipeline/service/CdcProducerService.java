@@ -10,7 +10,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Map;
+import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.nio.charset.StandardCharsets;
@@ -18,7 +18,6 @@ import java.nio.charset.StandardCharsets;
 public class CdcProducerService {
     private final ExecutorService executor;
     private final MessageProducerService messageService;
-    private final Map<String, String> prefixToTopicMap;
     private final String sourceNamespace;
     private long lastPolledTime;
     private final AtomicInteger messagesSentThisSecond;
@@ -27,18 +26,13 @@ public class CdcProducerService {
 
     public CdcProducerService(ExecutorService executor,
                             MessageProducerService messageService,
-                            Map<String, String> prefixToTopicMap,
                             String sourceNamespace) {
         this.executor = executor;
         this.messageService = messageService;
-        this.prefixToTopicMap = prefixToTopicMap;
         this.sourceNamespace = sourceNamespace;
         this.lastPolledTime = System.currentTimeMillis() - 10_000;
         this.messagesSentThisSecond = new AtomicInteger(0);
         this.scheduler = Executors.newSingleThreadScheduledExecutor();
-        
-        // Khởi tạo message service với topic mapping
-        messageService.initializeTopicMapping(prefixToTopicMap);
     }
 
     public void readDataFromAerospike(AerospikeClient client,
@@ -76,16 +70,24 @@ public class CdcProducerService {
                                     continue;
                                 }
 
-                                // Lấy prefix từ key
-                                String prefix = extractPrefix(keyBytes);
-                                if (prefix == null) {
+                                // Lấy province từ key
+                                String province = extractProvince(keyBytes);
+                                if (province == null) {
                                     logger.warn("Invalid key format: {}", new String(keyBytes));
                                     continue;
                                 }
 
-                                String topic = prefixToTopicMap.get(prefix);
-                                if (topic == null) {
-                                    logger.warn("No topic mapping found for prefix: {}", prefix);
+                                // Lấy region từ province
+                                String region = messageService.getRegionOfProvince(province);
+                                if (region == null) {
+                                    logger.warn("No region found for province: {}", province);
+                                    continue;
+                                }
+
+                                // Lấy danh sách consumers cho region
+                                List<String> consumers = messageService.getConsumersForRegion(region);
+                                if (consumers == null || consumers.isEmpty()) {
+                                    logger.warn("No consumers found for region: {}", region);
                                     continue;
                                 }
 
@@ -99,8 +101,8 @@ public class CdcProducerService {
                                                 } else {
                                                     messagesSentThisSecond.incrementAndGet();
                                                     if (messagesSentThisSecond.get() % 1000 == 0) {
-                                                        logger.info("[{}] Sent {} messages to topic {}", 
-                                                                 prefix, messagesSentThisSecond.get(), topic);
+                                                        logger.info("[{}] Sent {} messages to region {}", 
+                                                                 province, messagesSentThisSecond.get(), region);
                                                     }
                                                 }
                                             });
@@ -132,7 +134,7 @@ public class CdcProducerService {
         }
     }
 
-    private String extractPrefix(byte[] key) {
+    private String extractProvince(byte[] key) {
         if (key == null || key.length < 3) {
             return null;
         }

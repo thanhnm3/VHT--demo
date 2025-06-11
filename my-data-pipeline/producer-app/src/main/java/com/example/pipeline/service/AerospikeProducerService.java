@@ -8,7 +8,6 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
@@ -18,26 +17,14 @@ public class AerospikeProducerService {
     private final ExecutorService executor;
     private final MessageProducerService messageService;
     private final String sourceNamespace;
-    private final Map<String, String> prefixToTopicMap;
+
 
     public AerospikeProducerService(ExecutorService executor, 
                                   MessageProducerService messageService,
-                                  Map<String, String> prefixToTopicMap,
                                   String sourceNamespace) {
         this.executor = executor;
         this.messageService = messageService;
         this.sourceNamespace = sourceNamespace;
-        this.prefixToTopicMap = prefixToTopicMap;
-        
-        // Initialize message service with topic mapping
-        messageService.initializeTopicMapping(prefixToTopicMap);
-    }
-
-    private String extractPrefix(byte[] key) {
-        if (key == null || key.length < 3) {
-            return null;
-        }
-        return new String(key, 0, 3, StandardCharsets.UTF_8);
     }
 
     public void readDataFromAerospike(AerospikeClient client, 
@@ -46,8 +33,8 @@ public class AerospikeProducerService {
                                     String setName,
                                     int maxRetries) {
         ScanPolicy scanPolicy = new ScanPolicy();
-        scanPolicy.concurrentNodes = true;
-        scanPolicy.maxConcurrentNodes = 4;
+        scanPolicy.concurrentNodes = false;
+        scanPolicy.maxConcurrentNodes = 2;
         scanPolicy.recordsPerSecond = (int) currentRate;
 
         RateLimiter rateLimiter = RateLimiter.create(currentRate);
@@ -63,33 +50,23 @@ public class AerospikeProducerService {
 
                 executor.submit(() -> {
                     try {
-                        if (!messageService.isValidRecord(record)) {
-                            String keyStr = key.userKey != null ? key.userKey.toString() : "null";
-                            messageService.logSkippedMessage(keyStr, "Invalid record structure");
+                        if (record == null) {
                             return;
                         }
 
-                        // Lấy key dạng byte array
-                        byte[] keyBytes = (byte[]) key.userKey.getObject();
-                        if (keyBytes == null) {
-                            messageService.logSkippedMessage("null", "Key is null");
+                        // Lấy region từ record
+                        String recordRegion = record.getString("region");
+                        if (recordRegion == null) {
                             return;
                         }
 
-                        // Lấy prefix từ key
-                        String prefix = extractPrefix(keyBytes);
-                        if (prefix == null) {
-                            messageService.logSkippedMessage(new String(keyBytes), "Invalid key format");
+                        // Kiểm tra consumers cho region này
+                        List<String> consumers = messageService.getConsumersForRegion(recordRegion);
+                        if (consumers == null || consumers.isEmpty()) {
                             return;
                         }
 
-                        // Kiểm tra xem prefix có trong map không
-                        if (!prefixToTopicMap.containsKey(prefix)) {
-                            messageService.logSkippedMessage(new String(keyBytes), 
-                                "No topic mapping found for prefix: " + prefix);
-                            return;
-                        }
-
+                        // Tạo và gửi Kafka record
                         ProducerRecord<byte[], byte[]> kafkaRecord = messageService.createKafkaRecord(key, record);
                         if (kafkaRecord != null) {
                             synchronized (batchLock) {
@@ -110,6 +87,7 @@ public class AerospikeProducerService {
                         }
 
                     } catch (Exception e) {
+                        logger.error("Error processing record: {}", e.getMessage());
                         messageService.logFailedMessage(messageService.createKafkaRecord(key, record), 
                                                       "Processing error", e);
                     }
@@ -132,7 +110,7 @@ public class AerospikeProducerService {
             logger.info("Finished scanning data from Aerospike namespace: {}", sourceNamespace);
         } catch (Exception e) {
             logger.error("Error scanning data from Aerospike: {}", e.getMessage());
-            e.printStackTrace();
         }
     }
+
 } 

@@ -115,6 +115,7 @@ public class MainConsumer {
                         }
                     });
                 }
+
             }
 
             // Thêm shutdown hook để xử lý khi chương trình bị tắt
