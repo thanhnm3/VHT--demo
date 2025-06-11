@@ -54,12 +54,39 @@ public class KafkaProducerService {
         props.put(ProducerConfig.BUFFER_MEMORY_CONFIG, "134217728");
         props.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "lz4");
         props.put(ProducerConfig.MAX_REQUEST_SIZE_CONFIG, "10485760");
+        
+        // Thêm các cấu hình mới để đảm bảo an toàn khi broker bị tắt
+        props.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, "1000"); // Thời gian chờ giữa các lần retry
+        props.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, "30000"); // Timeout cho mỗi request
+        props.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, "120000"); // Timeout cho việc gửi message
+        props.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, "60000"); // Timeout cho các operation blocking
 
         return new KafkaProducer<>(props);
     }
 
-        public void createTopic(String topicName) {
-        // Logic để tạo topic trong Kafka
+    public void createTopic(String topicName) {
+        try {
+            // Kiểm tra xem topic đã tồn tại chưa
+            Set<String> existingTopics = adminClient.listTopics().names().get();
+            if (existingTopics.contains(topicName)) {
+                System.out.println("Topic " + topicName + " already exists");
+                return;
+            }
+
+            // Tạo cấu hình cho topic mới
+            org.apache.kafka.clients.admin.NewTopic newTopic = new org.apache.kafka.clients.admin.NewTopic(
+                topicName,
+                2,  // số partition
+                (short) 2  // replication factor
+            );
+
+            // Tạo topic
+            adminClient.createTopics(java.util.Collections.singleton(newTopic)).all().get();
+            System.out.println("Created topic " + topicName + " with 2 partitions and replication factor 2");
+        } catch (Exception e) {
+            System.err.println("Error creating topic " + topicName + ": " + e.getMessage());
+            throw new RuntimeException("Failed to create topic: " + topicName, e);
+        }
     }
 
     public long calculateTotalLag() {

@@ -23,5 +23,7 @@ scrape_configs:
 
   - job_name: 'kafka-exporter-source'
     static_configs:
-      - targets: ['kafka-exporter-source:9308']
+      - targets: 
+        - 'kafka-exporter-source:9308'
+        - 'kafka-exporter-source-2:9308'
     scrape_interval: 1s

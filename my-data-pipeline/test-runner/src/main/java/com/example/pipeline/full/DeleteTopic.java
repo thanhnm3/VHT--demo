@@ -79,10 +79,10 @@ public class DeleteTopic {
 
             logger.info("Topic {} da duoc xoa thanh cong.", topicName);
             
-            // Tạo lại topic mới
-            NewTopic newTopic = new NewTopic(topicName, 1, (short) 1);
+            // Tạo lại topic mới với 2 partitions và replication factor 2
+            NewTopic newTopic = new NewTopic(topicName, 2, (short) 2);
             adminClient.createTopics(Collections.singletonList(newTopic)).all().get(30, TimeUnit.SECONDS);
-            logger.info("Topic {} da duoc tao lai thanh cong.", topicName);
+            logger.info("Topic {} da duoc tao lai thanh cong voi 2 partitions va replication factor 2.", topicName);
             
         } catch (Exception e) {
             logger.error("Loi khi xoa/tao topic: {}", e.getMessage(), e);

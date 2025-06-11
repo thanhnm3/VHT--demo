@@ -58,7 +58,7 @@ public class AProducer {
             KafkaProducer<byte[], byte[]> kafkaProducer = null;
 
             try {
-                rateControlService = new RateControlService(5000.0, MAX_RATE, MIN_RATE, 
+                rateControlService = new RateControlService(15000.0, MAX_RATE, MIN_RATE, 
                                                           LAG_THRESHOLD, MONITORING_INTERVAL_SECONDS);
                 
                 // Tạo danh sách topic từ regionToTopicMap

@@ -34,7 +34,7 @@ public class AerospikeProducerService {
                                     int maxRetries) {
         ScanPolicy scanPolicy = new ScanPolicy();
         scanPolicy.concurrentNodes = false;
-        scanPolicy.maxConcurrentNodes = 2;
+        scanPolicy.maxConcurrentNodes = 1;
         scanPolicy.recordsPerSecond = (int) currentRate;
 
         RateLimiter rateLimiter = RateLimiter.create(currentRate);

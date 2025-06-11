@@ -1,6 +1,10 @@
-com/example/pipeline/AConsumer$ConsumerMetrics$1.class
-com/example/pipeline/AConsumer$ConsumerMetrics.class
-com/example/pipeline/AConsumer$1.class
-com/example/pipeline/CdcConsumer$1.class
-com/example/pipeline/AConsumer.class
-com/example/pipeline/CdcConsumer.class
+com\example\pipeline\service\CdcService.class
+com\example\pipeline\service\MessageService$1.class
+com\example\pipeline\AConsumer.class
+com\example\pipeline\CdcConsumer.class
+com\example\pipeline\service\MessageService$2.class
+com\example\pipeline\service\MessageService.class
+com\example\pipeline\service\CdcService$1.class
+com\example\pipeline\service\config\ConfigurationService.class
+com\example\pipeline\service\KafkaConsumerService.class
+com\example\pipeline\service\AerospikeService.class

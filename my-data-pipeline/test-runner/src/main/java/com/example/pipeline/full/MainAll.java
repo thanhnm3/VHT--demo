@@ -30,13 +30,11 @@ public class MainAll {
             }
 
             // Get Kafka configuration
-            String kafkaBrokerSource = config.getKafka().getBroker();
-            String kafkaBrokerTarget = config.getKafka().getBroker();
+            String kafkaBroker = config.getKafka().getBroker();
 
             // Delete and recreate topics before starting
             logger.info("Deleting all topics from Kafka...");
-            DeleteTopic.deleteAllTopics(kafkaBrokerSource);
-            DeleteTopic.deleteAllTopics(kafkaBrokerTarget);
+            DeleteTopic.deleteAllTopics(kafkaBroker);
 
             // Performance configuration
             int producerThreadPoolSize = config.getPerformance().getWorker_pool().getProducer();
@@ -49,8 +47,7 @@ public class MainAll {
             List<CountDownLatch> consumerLatches = new ArrayList<>();
 
             logger.info("=== Starting Pipeline ===");
-            logger.info("Kafka Broker Source: {}", kafkaBrokerSource);
-            logger.info("Kafka Broker Target: {}", kafkaBrokerTarget);
+            logger.info("Kafka Broker: {}", kafkaBroker);
             logger.info("Producer Thread Pool Size: {}", producerThreadPoolSize);
             logger.info("Consumer Thread Pool Size: {}", consumerThreadPoolSize);
             logger.info("Max Retries: {}", maxRetries);
@@ -80,7 +77,7 @@ public class MainAll {
             executor.submit(() -> {
                 try {
                     String[] producerArgs = new String[] {
-                        kafkaBrokerSource,           // kafkaBroker
+                        kafkaBroker,              // kafkaBroker
                         producer.getHost(),          // aerospikeHost
                         String.valueOf(producer.getPort()), // aerospikePort
                         producer.getNamespace(),     // namespace
@@ -131,7 +128,7 @@ public class MainAll {
                     executor.submit(() -> {
                         try {
                             String[] consumerArgs = new String[] {
-                                kafkaBrokerTarget,           // kafkaBroker
+                                kafkaBroker,              // kafkaBroker
                                 finalConsumerTopic,         // consumerTopic
                                 finalConsumerGroup,         // consumerGroup
                                 consumer.getHost(),         // aerospikeHost

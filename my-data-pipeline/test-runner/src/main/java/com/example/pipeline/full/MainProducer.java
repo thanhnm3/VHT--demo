@@ -56,8 +56,7 @@ public class MainProducer {
             Map<String, String> regionTopics = new HashMap<>();
             for (String region : config.getRegion_mapping().keySet()) {
                 String baseTopic = TopicGenerator.TopicNameGenerator.generateTopicName(producer.getName(), region);
-                String producerTopic = TopicGenerator.generateATopicName(baseTopic);
-                regionTopics.put(region, producerTopic);
+                regionTopics.put(region, baseTopic);
             }
 
             logger.info("Starting Producer with configuration:");

@@ -99,19 +99,19 @@ region_groups:
     - Kien Giang
 
 kafka:
-  broker: localhost:9092
+  broker: localhost:9092,localhost:9093
 
 performance:
-  max_messages_per_second: 4000
+  max_messages_per_second: 9000
   max_retries: 5
   worker_pool:
     producer: 2
     consumer: 4
   rate_control:
-    initial_rate: 5000.0
+    initial_rate: 9000.0
     max_rate: 10000.0
     min_rate: 1000.0
-    lag_threshold: 1000
+    lag_threshold: 3000
     monitoring_interval_seconds: 10
     rate_adjustment_steps: 5
     max_rate_change_percent: 0.2

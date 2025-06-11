@@ -1,2 +1,7 @@
-/workspaces/codespaces-blank/my-data-pipeline/producer-app/src/main/java/com/example/pipeline/AProducer.java
-/workspaces/codespaces-blank/my-data-pipeline/producer-app/src/main/java/com/example/pipeline/CdcProducer.java
+D:\VHT3\VHT--demo\my-data-pipeline\producer-app\src\main\java\com\example\pipeline\AProducer.java
+D:\VHT3\VHT--demo\my-data-pipeline\producer-app\src\main\java\com\example\pipeline\CdcProducer.java
+D:\VHT3\VHT--demo\my-data-pipeline\producer-app\src\main\java\com\example\pipeline\service\AerospikeProducerService.java
+D:\VHT3\VHT--demo\my-data-pipeline\producer-app\src\main\java\com\example\pipeline\service\CdcProducerService.java
+D:\VHT3\VHT--demo\my-data-pipeline\producer-app\src\main\java\com\example\pipeline\service\config\ConfigProducerService.java
+D:\VHT3\VHT--demo\my-data-pipeline\producer-app\src\main\java\com\example\pipeline\service\KafkaProducerService.java
+D:\VHT3\VHT--demo\my-data-pipeline\producer-app\src\main\java\com\example\pipeline\service\MessageProducerService.java

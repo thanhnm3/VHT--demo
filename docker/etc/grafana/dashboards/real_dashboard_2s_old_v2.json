@@ -274,8 +274,8 @@
                         "uid": "PBFA97CFB590B2093"
                     },
                     "editorMode": "code",
-                    "expr": "kafka_topic_partition_current_offset{topic=\"$topic\"}",
-                    "legendFormat": "Producer Total",
+                    "expr": "sum(max by (topic, partition) (kafka_topic_partition_current_offset))",
+                    "legendFormat": "Total Produced Messages (Unique)",
                     "range": true,
                     "refId": "A"
                 },
