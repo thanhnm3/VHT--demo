@@ -1,21 +1,15 @@
 package com.example.pipeline;
 
-import com.example.pipeline.service.config.Config;
+
 import com.example.pipeline.service.config.ConfigurationService;
 import com.example.pipeline.service.AerospikeService;
 import com.example.pipeline.service.KafkaConsumerService;
-import com.example.pipeline.service.CdcService;
-import com.example.pipeline.service.TopicGenerator;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
-import java.util.Map;
-import java.util.HashMap;
+import com.example.pipeline.service.MessageService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.util.concurrent.CountDownLatch;
 
 public class CdcConsumer {
     private static final Logger logger = LoggerFactory.getLogger(CdcConsumer.class);
@@ -33,9 +27,8 @@ public class CdcConsumer {
     private final ConfigurationService configService;
     private final AerospikeService aerospikeService;
     private final KafkaConsumerService kafkaService;
-    private final Map<String, CdcService> cdcServices;
-    private final Map<String, ExecutorService> workerPools;
-    private final ExecutorService scheduler;
+    private final MessageService messageService;
+    private final ExecutorService executorService;
 
     public CdcConsumer(String[] args) {
         if (args.length < 7) {
@@ -60,11 +53,18 @@ public class CdcConsumer {
 
         this.aerospikeService = new AerospikeService(destinationHost, destinationPort);
         this.kafkaService = new KafkaConsumerService(kafkaBroker, configService);
-        this.kafkaService.initializeConsumers(destinationNamespace, workerPoolSize);
         
-        this.cdcServices = new HashMap<>();
-        this.workerPools = new HashMap<>();
-        this.scheduler = Executors.newScheduledThreadPool(1);
+        // Initialize MessageService with Aerospike client and policy
+        this.messageService = new MessageService(
+            aerospikeService.getClient(),
+            aerospikeService.getWritePolicy(),
+            destinationNamespace,
+            consumerGroup.split("_")[1].split("-")[0], // Extract region from consumer group
+            consumerTopic,
+            workerPoolSize
+        );
+        
+        this.executorService = Executors.newFixedThreadPool(workerPoolSize);
     }
 
     public static void main(String[] args) {
@@ -82,89 +82,15 @@ public class CdcConsumer {
 
     private void start() {
         try {
-            Map<String, List<String>> regionMapping = configService.getRegionMappings();
-            Map<String, String> regionToTopicMap = kafkaService.getRegionToTopicMap();
-            
-            // Lấy region từ consumer group (ví dụ: từ "producer1_north-cdc-group" lấy "north")
-            String consumerGroupRegion = consumerGroup.split("_")[1].split("-")[0];
-            
-            // Chỉ xử lý region tương ứng với consumer group
-            List<String> consumerNames = regionMapping.get(consumerGroupRegion);
-            if (consumerNames == null || consumerNames.isEmpty()) {
-                logger.warn("No consumers found for region {}", consumerGroupRegion);
-                return;
-            }
+            logger.info("Starting CDC consumer with:");
+            logger.info("Topic: {}", consumerTopic);
+            logger.info("Consumer group: {}", consumerGroup);
+            logger.info("Worker pool size: {}", workerPoolSize);
+            logger.info("Aerospike namespace: {}", destinationNamespace);
 
-            String consumerName = consumerNames.get(0);
-            Config.Consumer consumer = configService.getConsumerConfig(consumerName);
-            if (consumer == null) {
-                logger.warn("No consumer config found for {}", consumerName);
-                return;
-            }
+            // Start consuming messages from the topic using MessageService
+            kafkaService.startConsuming(consumerTopic, consumerGroup, messageService);
 
-            String topic = regionToTopicMap.get(consumerGroupRegion);
-            if (topic == null) {
-                logger.warn("No topic found for region {}", consumerGroupRegion);
-                return;
-            }
-            
-            // Sử dụng TopicGenerator để tạo consumer group cho CDC
-            String topicConsumerGroup = TopicGenerator.generateCdcGroupName(topic);
-            
-            KafkaConsumer<byte[], byte[]> kafkaConsumer = kafkaService.createConsumer(
-                consumerTopic, topicConsumerGroup);
-            
-            CdcService cdcService = new CdcService(
-                aerospikeService.getClient(),
-                aerospikeService.getWritePolicy(),
-                consumer.getNamespace(),
-                consumer.getSet()
-            );
-            cdcServices.put(consumerGroupRegion, cdcService);
-            workerPools.put(consumerGroupRegion, Executors.newFixedThreadPool(workerPoolSize));
-            
-            final String currentRegion = consumerGroupRegion;
-            new Thread(() -> {
-                try {
-                    while (!Thread.currentThread().isInterrupted()) {
-                        var records = kafkaConsumer.poll(java.time.Duration.ofMillis(100));
-                        if (!records.isEmpty()) {
-                            // Tạo một CountDownLatch để đợi tất cả các record được xử lý
-                            CountDownLatch processingLatch = new CountDownLatch(records.count());
-                            
-                            for (var record : records) {
-                                workerPools.get(currentRegion).submit(() -> {
-                                    try {
-                                        cdcService.processRecord(record);
-                                    } catch (Exception e) {
-                                        logger.error("[{}] Error processing record: {}", 
-                                            currentRegion, e.getMessage(), e);
-                                    } finally {
-                                        processingLatch.countDown();
-                                    }
-                                });
-                            }
-                            
-                            // Đợi tất cả các record được xử lý
-                            try {
-                                processingLatch.await(30, TimeUnit.SECONDS);
-                                // Commit offset sau khi xử lý thành công
-                                kafkaConsumer.commitSync();
-                                logger.debug("[{}] Committed offset for {} records", 
-                                    currentRegion, records.count());
-                            } catch (InterruptedException e) {
-                                Thread.currentThread().interrupt();
-                                logger.error("[{}] Interrupted while waiting for records to process", 
-                                    currentRegion);
-                            }
-                        }
-                    }
-                } catch (Exception e) {
-                    logger.error("[{}] Error in CDC service: {}", 
-                        currentRegion, e.getMessage(), e);
-                }
-            }, currentRegion + "-cdc-service").start();
-            
         } catch (Exception e) {
             logger.error("Error starting CDC consumer: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to start CDC consumer", e);
@@ -173,22 +99,20 @@ public class CdcConsumer {
 
     public void shutdown() {
         logger.info("Starting graceful shutdown...");
-
-        // Shutdown worker pools
-        for (ExecutorService pool : workerPools.values()) {
-            pool.shutdown();
-            try {
-                if (!pool.awaitTermination(60, TimeUnit.SECONDS)) {
-                    pool.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                pool.shutdownNow();
-                Thread.currentThread().interrupt();
-            }
-        }
-
-        scheduler.shutdown();
+        
         kafkaService.shutdown();
+        messageService.shutdown();
+        executorService.shutdown();
+        
+        try {
+            if (!executorService.awaitTermination(60, TimeUnit.SECONDS)) {
+                executorService.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executorService.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+        
         aerospikeService.shutdown();
         
         logger.info("Shutdown completed successfully");

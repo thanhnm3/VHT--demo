@@ -48,7 +48,7 @@ public class RandomInsert {
             int numThreads = 16;
             ExecutorService executor = Executors.newFixedThreadPool(numThreads);
 
-            int maxRecordsPerRegion = 200_000; // So ban ghi moi mien 
+            int maxRecordsPerRegion = 100_000; // So ban ghi moi mien 
             Map<String, AtomicInteger> regionCounters = new ConcurrentHashMap<>();
             for (String region : REGIONS) {
                 regionCounters.put(region, new AtomicInteger(0));

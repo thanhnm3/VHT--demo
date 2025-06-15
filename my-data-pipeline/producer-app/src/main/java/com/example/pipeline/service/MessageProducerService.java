@@ -32,8 +32,8 @@ public class MessageProducerService {
     }
 
     public void initializeTopicMapping(Map<String, String> topicMapping) {
-        // Sử dụng TopicGenerator để tạo mapping
-        Map<String, String> generatedTopics = TopicGenerator.generateTopics();
+        // Sử dụng TopicGenerator để tạo mapping cho CDC topics
+        Map<String, String> generatedTopics = TopicGenerator.generateCdcTopics();
         this.regionToTopicMap.putAll(generatedTopics);
         // Chỉ log một lần khi khởi tạo mapping
         if (logger.isDebugEnabled()) {

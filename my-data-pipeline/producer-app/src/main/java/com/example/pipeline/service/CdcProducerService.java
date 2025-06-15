@@ -58,58 +58,40 @@ public class CdcProducerService {
                         Record record = records.getRecord();
                         
                         if (key != null && key.userKey != null) {
-                            long updateTime = record != null && record.getValue("lastUpdate") != null ? 
-                                (long) record.getValue("lastUpdate") : 
+                            long updateTime = record != null && record.getValue("last_updated") != null ? 
+                                (long) record.getValue("last_updated") : 
                                 System.currentTimeMillis();
                             
                             if (updateTime > windowStart) {
-                                // Lấy key dạng byte array
-                                byte[] keyBytes = (byte[]) key.userKey.getObject();
-                                if (keyBytes == null) {
-                                    logger.warn("Key is null");
-                                    continue;
-                                }
-
-                                // Lấy province từ key
-                                String province = extractProvince(keyBytes);
-                                if (province == null) {
-                                    logger.warn("Invalid key format: {}", new String(keyBytes));
-                                    continue;
-                                }
-
-                                // Lấy region từ province
-                                String region = messageService.getRegionOfProvince(province);
-                                if (region == null) {
-                                    logger.warn("No region found for province: {}", province);
-                                    continue;
-                                }
-
-                                // Lấy danh sách consumers cho region
-                                List<String> consumers = messageService.getConsumersForRegion(region);
-                                if (consumers == null || consumers.isEmpty()) {
-                                    logger.warn("No consumers found for region: {}", region);
-                                    continue;
-                                }
-
-                                ProducerRecord<byte[], byte[]> kafkaRecord = messageService.createKafkaRecord(key, record);
-                                if (kafkaRecord != null) {
-                                    executor.submit(() -> {
-                                        try {
-                                            producer.send(kafkaRecord, (metadata, exception) -> {
-                                                if (exception != null) {
-                                                    messageService.logFailedMessage(kafkaRecord, "Failed to send message", exception);
-                                                } else {
-                                                    messagesSentThisSecond.incrementAndGet();
-                                                    if (messagesSentThisSecond.get() % 1000 == 0) {
-                                                        logger.info("[{}] Sent {} messages to region {}", 
-                                                                 province, messagesSentThisSecond.get(), region);
+                                // Kiểm tra xem record có phải là delete không
+                                boolean isDeleted = isRecordDeleted(record);
+                                
+                                // Nếu là delete hoặc có region, xử lý record
+                                if (isDeleted || (record != null && record.getValue("region") != null)) {
+                                    // Sử dụng MessageProducerService để xử lý message
+                                    ProducerRecord<byte[], byte[]> kafkaRecord = messageService.createKafkaRecord(key, record);
+                                    if (kafkaRecord != null) {
+                                        executor.submit(() -> {
+                                            try {
+                                                producer.send(kafkaRecord, (metadata, exception) -> {
+                                                    if (exception != null) {
+                                                        messageService.logFailedMessage(kafkaRecord, "Failed to send message", exception);
+                                                    } else {
+                                                        messagesSentThisSecond.incrementAndGet();
+                                                        if (messagesSentThisSecond.get() % 1000 == 0) {
+                                                            String region = isDeleted ? "DELETED" : (String) record.getValue("region");
+                                                            logger.info("[CDC Producer] Sent {} messages for region {}", 
+                                                                messagesSentThisSecond.get(), region);
+                                                        }
                                                     }
-                                                }
-                                            });
-                                        } catch (Exception e) {
-                                            messageService.logFailedMessage(kafkaRecord, "Error sending message", e);
-                                        }
-                                    });
+                                                });
+                                            } catch (Exception e) {
+                                                messageService.logFailedMessage(kafkaRecord, "Error sending message", e);
+                                            }
+                                        });
+                                    }
+                                } else {
+                                    messageService.logSkippedMessage(key.userKey.toString(), "Invalid record state");
                                 }
                             }
                         } else {
@@ -134,11 +116,16 @@ public class CdcProducerService {
         }
     }
 
-    private String extractProvince(byte[] key) {
-        if (key == null || key.length < 3) {
-            return null;
-        }
-        return new String(key, 0, 3, StandardCharsets.UTF_8);
+    private boolean isRecordDeleted(Record record) {
+        if (record == null) return false;
+        
+        // Kiểm tra nếu tất cả các trường đều null trừ last_updated và region
+        return record.getValue("user_id") == null &&
+               record.getValue("phone") == null &&
+               record.getValue("service_type") == null &&
+               record.getValue("province") == null &&
+               record.getValue("notes") == null &&
+               record.getValue("last_updated") != null;
     }
 
     public void shutdown() {

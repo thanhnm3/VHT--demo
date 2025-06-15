@@ -9,7 +9,7 @@ import com.example.pipeline.service.config.Config.Producer;
 
 public class TopicGenerator {
 
-    // Phương thức trả về danh sách các topic
+    // Phương thức trả về danh sách các topic A
     public static Map<String, String> generateTopics() {
         Map<String, String> topicMap = new HashMap<>();
         try {
@@ -38,8 +38,41 @@ public class TopicGenerator {
         return topicMap;
     }
 
+    // Phương thức trả về danh sách các topic CDC
+    public static Map<String, String> generateCdcTopics() {
+        Map<String, String> topicMap = new HashMap<>();
+        try {
+            // Lấy đối tượng Config
+            Config config = ConfigLoader.getConfig();
+
+            // Lấy danh sách producers và region_mapping
+            List<Producer> producers = config.getProducers();
+            Map<String, List<String>> regionMapping = config.getRegion_mapping();
+
+            // Tạo tên topic từ danh sách producers và region_mapping
+            regionMapping.forEach((region, consumerNames) -> {
+                producers.forEach(producer -> {
+                    // Tạo tên topic
+                    String baseTopic = TopicNameGenerator.generateTopicName(producer.getName(), region);
+                    String topic = generateCdcTopicName(baseTopic);
+
+                    // Lưu tên topic vào Map
+                    topicMap.put(region, topic);
+                });
+            });
+        } catch (Exception e) {
+            System.err.println("Error generating CDC topics: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return topicMap;
+    }
+
     // Tạo tên topic cho CDC consumer
     public static String generateCdcTopicName(String baseTopic) {
+        // Nếu baseTopic đã có hậu tố -cdc thì không thêm nữa
+        if (baseTopic.endsWith("-cdc")) {
+            return baseTopic;
+        }
         return baseTopic + "-cdc";
     }
 
@@ -63,9 +96,7 @@ public class TopicGenerator {
         return baseTopic + "-a-group";
     }
 
-
     public static class TopicNameGenerator {
-
         public static String generateTopicName(String producerName, String region) {
             if (region == null || region.isEmpty()) {
                 throw new IllegalArgumentException("Invalid region: " + region);

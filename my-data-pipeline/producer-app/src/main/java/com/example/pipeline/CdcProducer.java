@@ -141,8 +141,8 @@ public class CdcProducer {
     }
 
     private static void initializeTopicMapping() {
-        // Sử dụng TopicGenerator để tạo mapping từ region sang topic
-        Map<String, String> generatedTopics = TopicGenerator.generateTopics();
+        // Sử dụng TopicGenerator để tạo mapping từ region sang topic cho CDC
+        Map<String, String> generatedTopics = TopicGenerator.generateCdcTopics();
         regionToTopicMap.putAll(generatedTopics);
         logger.info("Initialized region to topic mapping: {}", regionToTopicMap);
     }
@@ -154,7 +154,7 @@ public class CdcProducer {
             for (String topic : topics) {
                 try {
                     // Tạo CDC topic cho mỗi region
-                    String cdcTopic = TopicGenerator.generateCdcTopicName(topic);
+                    String cdcTopic = topic; // Sử dụng tên topic trực tiếp, không thêm hậu tố
                     kafkaService.createTopic(cdcTopic);
                     logger.info("Created/Verified topic: {}", cdcTopic);
                 } catch (Exception e) {

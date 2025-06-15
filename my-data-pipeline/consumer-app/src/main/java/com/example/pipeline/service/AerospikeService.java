@@ -1,6 +1,7 @@
 package com.example.pipeline.service;
 
 import com.aerospike.client.AerospikeClient;
+import com.aerospike.client.policy.ClientPolicy;
 import com.aerospike.client.policy.WritePolicy;
 
 public class AerospikeService {
@@ -8,7 +9,13 @@ public class AerospikeService {
     private final WritePolicy writePolicy;
 
     public AerospikeService(String host, int port) {
-        this.client = new AerospikeClient(host, port);
+        this(host, port, 300); // Default max connections per node
+    }
+
+    public AerospikeService(String host, int port, int maxConnsPerNode) {
+        ClientPolicy clientPolicy = new ClientPolicy();
+        clientPolicy.maxConnsPerNode = maxConnsPerNode;
+        this.client = new AerospikeClient(clientPolicy, host, port);
         this.writePolicy = createWritePolicy();
     }
 
