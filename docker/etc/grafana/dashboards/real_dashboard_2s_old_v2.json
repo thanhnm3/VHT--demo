@@ -274,7 +274,7 @@
                         "uid": "PBFA97CFB590B2093"
                     },
                     "editorMode": "code",
-                    "expr": "sum(max by (topic, partition) (kafka_topic_partition_current_offset))",
+                    "expr": "sum(kafka_topic_partition_current_offset{instance=~\"$instance\", topic=~\"$topic\"})",
                     "legendFormat": "Total Produced Messages (Unique)",
                     "range": true,
                     "refId": "A"
@@ -285,8 +285,8 @@
                         "uid": "PBFA97CFB590B2093"
                     },
                     "editorMode": "code",
-                    "expr": "kafka_consumergroup_current_offset{instance=~\"$instance\", topic=~\"$topic\"}",
-                    "legendFormat": "Consumer Total ({{consumergroup}})",
+                    "expr": "sum(kafka_consumergroup_current_offset{instance=~\"$instance\", topic=~\"$topic\"})",
+                    "legendFormat": "Total Consumer Messages",
                     "range": true,
                     "refId": "B"
                 }

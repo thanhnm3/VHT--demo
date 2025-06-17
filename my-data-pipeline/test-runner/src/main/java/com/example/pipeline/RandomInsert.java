@@ -54,7 +54,7 @@ public class RandomInsert {
             ExecutorService executor = Executors.newFixedThreadPool(numThreads);
             List<Future<?>> futures = new ArrayList<>();
 
-            int maxRecordsPerRegion = 1_000; // So ban ghi moi mien 
+            int maxRecordsPerRegion = 100_000; // So ban ghi moi mien 
             Map<String, AtomicInteger> regionCounters = new ConcurrentHashMap<>();
             for (String region : REGIONS) {
                 regionCounters.put(region, new AtomicInteger(0));
@@ -253,10 +253,6 @@ public class RandomInsert {
                                 subscriberData.put("cl", subscriber.getCellListList());
                                 subscriberData.put("li", subscriber.getLangId());
                                 
-                                // Debug log before adding region and province
-                                System.out.println("Debug - Region: " + region);
-                                System.out.println("Debug - Province: " + province);
-                                
                                 subscriberData.put("r", region);
                                 subscriberData.put("lu", System.currentTimeMillis());
                                 subscriberData.put("im", subscriber.getImsi());
@@ -272,8 +268,6 @@ public class RandomInsert {
                                 subscriberData.put("zl", subscriber.getZoneListList());
                                 subscriberData.put("p", province);
                                 
-                                // Debug log after adding all fields
-                                System.out.println("Debug - Subscriber data: " + subscriberData);
                                 bins.add(new Bin("sub", subscriberData));
 
                                 // Store balance data
