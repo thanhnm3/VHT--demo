@@ -4,3 +4,4 @@ my-data-pipeline/common/target/
 my-data-pipeline/consumer-app/target/
 my-data-pipeline/producer-app/target/
 my-data-pipeline/test-runner/target/
+my-data-pipeline/proto/target/
