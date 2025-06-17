@@ -7,6 +7,8 @@ import com.example.pipeline.proto.ProtoAcmBalance;
 import com.example.pipeline.proto.ProtoProduct;
 import com.example.pipeline.proto.ProtoCharacteristic;
 import com.example.pipeline.proto.ProtoHistory;
+import com.example.pipeline.service.config.Config;
+import com.example.pipeline.service.ConfigLoader;
 import org.apache.kafka.clients.admin.*;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.clients.producer.*;
@@ -24,16 +26,21 @@ public class KafkaProducerServiceTest {
     private static final String TOPIC = "performance-test";
     private static final String BOOTSTRAP_SERVERS = "localhost:9092,localhost:9093";
     private static final int NUM_MESSAGES = 1000000; // 1 million messages
-    private static final int NUM_CONSUMERS = 3;
-    private static final int NUM_PRODUCERS = 3;
+    private static final int NUM_CONSUMERS = 2;
+    private static final int NUM_PRODUCERS = 2;
     private static final int NUM_PARTITIONS = 2;
     private static final short REPLICATION_FACTOR = 2;
     private static final Random random = new Random();
-    private static final String[] REGIONS = {"NORTH", "SOUTH", "CENTRAL", "EAST", "WEST"};
-    private static final String[] PROVINCES = {"HANOI", "HCM", "DANANG", "HAIPHONG", "CANTHO"};
-    private static final String[] SERVICE_TYPES = {"SMS", "VOICE", "DATA", "VAS", "ROAMING"};
+    private static final String[] REGIONS = {"north", "central", "south"};
+    private static final String[] SERVICE_TYPES = {"MOBILE", "FIXED", "BROADBAND"};
 
     public static void main(String[] args) throws InterruptedException {
+        // Load configuration
+        Config config = ConfigLoader.getConfig();
+        if (config == null) {
+            throw new IllegalStateException("Cannot load configuration");
+        }
+
         // Setup topic
         setupTopic();
 
@@ -52,7 +59,7 @@ public class KafkaProducerServiceTest {
                     long produced = 0;
                     long bytesProduced = 0;
                     for (int j = 0; j < NUM_MESSAGES / NUM_PRODUCERS; j++) {
-                        ProducerRecord<byte[], byte[]> record = createKafkaRecord();
+                        ProducerRecord<byte[], byte[]> record = createKafkaRecord(config);
                         if (record != null) {
                             producer.send(record);
                             produced++;
@@ -107,9 +114,9 @@ public class KafkaProducerServiceTest {
                             
                             if (records.isEmpty()) {
                                 noNewMessagesCount++;
-                                if (noNewMessagesCount >= 5) { // 5 seconds without new messages
+                                if (noNewMessagesCount >= 5) {
                                     System.out.println("Consumer " + consumerId + " no new messages for 5 seconds, checking if we're done...");
-                                    if (consumed >= (NUM_MESSAGES / NUM_CONSUMERS) - 1000) { // Allow small difference
+                                    if (consumed >= (NUM_MESSAGES / NUM_CONSUMERS) - 1000) {
                                         System.out.println("Consumer " + consumerId + " close to target, considering complete");
                                         break;
                                     }
@@ -123,7 +130,6 @@ public class KafkaProducerServiceTest {
                                 bytesConsumed += record.value().length;
                             }
                             
-                            // Log progress every 5 seconds or when significant change
                             long currentTime = System.currentTimeMillis();
                             if (currentTime - lastLogTime > 5000 || (consumed - lastConsumedCount) > 10000) {
                                 System.out.printf("Consumer %d: Consumed %d/%d messages (%.2f MB)%n", 
@@ -168,11 +174,109 @@ public class KafkaProducerServiceTest {
         consumerExecutor.shutdown();
     }
 
-    private static ProducerRecord<byte[], byte[]> createKafkaRecord() {
+    private static ProducerRecord<byte[], byte[]> createKafkaRecord(Config config) {
         try {
+            // Random region
+            String region = REGIONS[random.nextInt(REGIONS.length)];
+            List<String> provinces = config.getRegion_groups().getProvincesByRegion(region);
+            if (provinces == null || provinces.isEmpty()) {
+                System.out.println("Warning: No provinces found for region " + region);
+                return null;
+            }
+
+            // Random province from region
+            String province = provinces.get(random.nextInt(provinces.size()));
+            
+            // Random phone number
+            String phoneNumber = String.format("09%d", random.nextInt(10000000, 100000000));
+            
+            // Random service type
+            String serviceType = SERVICE_TYPES[random.nextInt(SERVICE_TYPES.length)];
+
+            // Create ProtoBalance
+            ProtoBalance balance = ProtoBalance.newBuilder()
+                .setId(random.nextLong())
+                .setGross(random.nextLong())
+                .setConsume(random.nextLong())
+                .setReserve(random.nextLong())
+                .setBalType(random.nextLong())
+                .setQuotaMax(random.nextLong())
+                .setRecurringDay(random.nextLong())
+                .setOwnerValue("OWNER" + random.nextInt(1000000))
+                .setEffDate(System.currentTimeMillis())
+                .setExpDate(System.currentTimeMillis() + (365 * 24 * 60 * 60 * 1000L))
+                .setUpdateDate(System.currentTimeMillis())
+                .setState(1)
+                .addAllCharIdList(Arrays.asList(random.nextLong(), random.nextLong()))
+                .setLevel(random.nextInt(5))
+                .setOf(random.nextLong())
+                .build();
+
+            // Create ProtoAcmBalance
+            ProtoAcmBalance acmBalance = ProtoAcmBalance.newBuilder()
+                .setId(random.nextLong())
+                .setValue(random.nextLong())
+                .setReserve(random.nextLong())
+                .setBalType(random.nextLong())
+                .setBillingCycleId(random.nextLong())
+                .setLimit(random.nextLong())
+                .setEffDate(System.currentTimeMillis())
+                .setExpDate(System.currentTimeMillis() + (365 * 24 * 60 * 60 * 1000L))
+                .setUpdateDate(System.currentTimeMillis())
+                .setState(1)
+                .addAllCharIdList(Arrays.asList(random.nextLong(), random.nextLong()))
+                .setLevel(random.nextInt(5))
+                .setOf(random.nextLong())
+                .build();
+
+            // Create ProtoProduct
+            ProtoProduct product = ProtoProduct.newBuilder()
+                .setId(random.nextLong())
+                .setProductOfferingId(random.nextLong())
+                .addAllMemberList(Arrays.asList("MEMBER1", "MEMBER2"))
+                .setRecurringDay(random.nextLong())
+                .setEffDate(System.currentTimeMillis())
+                .setExpDate(System.currentTimeMillis() + (365 * 24 * 60 * 60 * 1000L))
+                .setUpdateDate(System.currentTimeMillis())
+                .setState(1)
+                .addAllCharIdList(Arrays.asList(random.nextLong(), random.nextLong()))
+                .setLevel(random.nextInt(5))
+                .setOf(random.nextLong())
+                .build();
+
+            // Create ProtoCharacteristic
+            ProtoCharacteristic characteristic = ProtoCharacteristic.newBuilder()
+                .setId(random.nextLong())
+                .setCharSpecId(random.nextLong())
+                .setBillingCycleId(random.nextLong())
+                .setValue("VALUE" + random.nextInt(1000000))
+                .setLongValue(random.nextLong())
+                .setEffDate(System.currentTimeMillis())
+                .setExpDate(System.currentTimeMillis() + (365 * 24 * 60 * 60 * 1000L))
+                .setUpdateDate(System.currentTimeMillis())
+                .setState(1)
+                .addAllCharIdList(Arrays.asList(random.nextLong(), random.nextLong()))
+                .setLevel(random.nextInt(5))
+                .setOf(random.nextLong())
+                .build();
+
+            // Create ProtoHistory
+            ProtoHistory history = ProtoHistory.newBuilder()
+                .setId(random.nextLong())
+                .setType(random.nextInt(5))
+                .setEffDate(System.currentTimeMillis())
+                .setExpDate(System.currentTimeMillis() + (365 * 24 * 60 * 60 * 1000L))
+                .setUpdateDate(System.currentTimeMillis())
+                .setState(1)
+                .addAllCharIdList(Arrays.asList(random.nextLong(), random.nextLong()))
+                .setLevel(random.nextInt(5))
+                .setOf(random.nextLong())
+                .setContent("History content " + random.nextInt(1000000))
+                .build();
+
             // Create ProtoSubscriber
             ProtoSubscriber subscriber = ProtoSubscriber.newBuilder()
-                .setMsisdn("09" + String.format("%08d", random.nextInt(100000000)))
+                .setMsisdn(phoneNumber)
                 .setSubId(random.nextLong())
                 .setCustId(random.nextLong())
                 .setIsDefault(random.nextBoolean())
@@ -189,21 +293,20 @@ public class KafkaProducerServiceTest {
                 .setMainProductId(random.nextLong())
                 .addAllCellList(Arrays.asList("CELL1", "CELL2"))
                 .setLangId(random.nextInt(3))
-                .setRegion(REGIONS[random.nextInt(REGIONS.length)])
+                .setRegion(region)
                 .setLastUpdate(System.currentTimeMillis())
                 .setImsi("IMSI" + random.nextInt(1000000))
                 .setIccid("ICCID" + random.nextInt(1000000))
                 .setPassword("PASS" + random.nextInt(1000000))
                 .setBccsSubId("BCCS" + random.nextInt(1000000))
                 .setBccsCustId("CUST" + random.nextInt(1000000))
-                .setBccsAcctId("ACCT" + random.nextInt(1000000))
                 .setRegType("PREPAID")
                 .setSubcategory("INDIVIDUAL")
                 .setContractId("CONT" + random.nextInt(1000000))
                 .setCustType("RESIDENTIAL")
                 .setCustVip("NORMAL")
                 .addAllZoneList(Arrays.asList("ZONE1", "ZONE2"))
-                .setProvince(PROVINCES[random.nextInt(PROVINCES.length)])
+                .setProvince(province)
                 .setEmail("user" + random.nextInt(1000000) + "@example.com")
                 .setAddress("Address " + random.nextInt(1000))
                 .setFirstName("First" + random.nextInt(1000))
@@ -223,97 +326,9 @@ public class KafkaProducerServiceTest {
                 .addAllCharIdList(Arrays.asList(random.nextLong(), random.nextLong()))
                 .setLevel(random.nextInt(5))
                 .setOf(random.nextLong())
-                .putMapExtProp("key1", "value1")
-                .putMapExtProp("key2", "value2")
                 .build();
 
-            // Create ProtoBalance
-            ProtoBalance balance = ProtoBalance.newBuilder()
-                .setId(random.nextLong())
-                .setGross(random.nextLong())
-                .setConsume(random.nextLong())
-                .setReserve(random.nextLong())
-                .setBalType(random.nextLong())
-                .setQuotaMax(random.nextLong())
-                .setRecurringDay(random.nextLong())
-                .setOwnerValue("OWNER" + random.nextInt(1000000))
-                .setEffDate(System.currentTimeMillis())
-                .setExpDate(System.currentTimeMillis() + (365 * 24 * 60 * 60 * 1000L))
-                .setUpdateDate(System.currentTimeMillis())
-                .setState(1)
-                .addAllCharIdList(Arrays.asList(random.nextLong(), random.nextLong()))
-                .setLevel(random.nextInt(5))
-                .setOf(random.nextLong())
-                .putMapExtProp("key1", "value1")
-                .build();
-
-            // Create ProtoAcmBalance
-            ProtoAcmBalance acmBalance = ProtoAcmBalance.newBuilder()
-                .setId(random.nextLong())
-                .setValue(random.nextLong())
-                .setReserve(random.nextLong())
-                .setBalType(random.nextLong())
-                .setBillingCycleId(random.nextLong())
-                .setLimit(random.nextLong())
-                .setEffDate(System.currentTimeMillis())
-                .setExpDate(System.currentTimeMillis() + (365 * 24 * 60 * 60 * 1000L))
-                .setUpdateDate(System.currentTimeMillis())
-                .setState(1)
-                .addAllCharIdList(Arrays.asList(random.nextLong(), random.nextLong()))
-                .setLevel(random.nextInt(5))
-                .setOf(random.nextLong())
-                .putMapExtProp("key1", "value1")
-                .build();
-
-            // Create ProtoProduct
-            ProtoProduct product = ProtoProduct.newBuilder()
-                .setId(random.nextLong())
-                .setProductOfferingId(random.nextLong())
-                .addAllMemberList(Arrays.asList("MEMBER1", "MEMBER2"))
-                .setRecurringDay(random.nextLong())
-                .setEffDate(System.currentTimeMillis())
-                .setExpDate(System.currentTimeMillis() + (365 * 24 * 60 * 60 * 1000L))
-                .setUpdateDate(System.currentTimeMillis())
-                .setState(1)
-                .addAllCharIdList(Arrays.asList(random.nextLong(), random.nextLong()))
-                .setLevel(random.nextInt(5))
-                .setOf(random.nextLong())
-                .putMapExtProp("key1", "value1")
-                .build();
-
-            // Create ProtoCharacteristic
-            ProtoCharacteristic characteristic = ProtoCharacteristic.newBuilder()
-                .setId(random.nextLong())
-                .setCharSpecId(random.nextLong())
-                .setBillingCycleId(random.nextLong())
-                .setValue("VALUE" + random.nextInt(1000000))
-                .setLongValue(random.nextLong())
-                .setEffDate(System.currentTimeMillis())
-                .setExpDate(System.currentTimeMillis() + (365 * 24 * 60 * 60 * 1000L))
-                .setUpdateDate(System.currentTimeMillis())
-                .setState(1)
-                .addAllCharIdList(Arrays.asList(random.nextLong(), random.nextLong()))
-                .setLevel(random.nextInt(5))
-                .setOf(random.nextLong())
-                .putMapExtProp("key1", "value1")
-                .build();
-
-            // Create ProtoHistory
-            ProtoHistory history = ProtoHistory.newBuilder()
-                .setId(random.nextLong())
-                .setType(random.nextInt(5))
-                .setEffDate(System.currentTimeMillis())
-                .setExpDate(System.currentTimeMillis() + (365 * 24 * 60 * 60 * 1000L))
-                .setUpdateDate(System.currentTimeMillis())
-                .setState(1)
-                .addAllCharIdList(Arrays.asList(random.nextLong(), random.nextLong()))
-                .setLevel(random.nextInt(5))
-                .setOf(random.nextLong())
-                .putMapExtProp("key1", "value1")
-                .setContent("History content " + random.nextInt(1000000))
-                .build();
-
-            // Create ProtoSubscriberInfo
+            // Create ProtoSubscriberInfo with all related objects
             ProtoSubscriberInfo subscriberInfo = ProtoSubscriberInfo.newBuilder()
                 .setSubscriber(subscriber)
                 .putBalance(random.nextLong(), balance)
@@ -325,13 +340,51 @@ public class KafkaProducerServiceTest {
                 .build();
 
             // Serialize to bytes
-            byte[] keyBytes = subscriber.getMsisdn().getBytes();
+            byte[] keyBytes = phoneNumber.getBytes();
             byte[] valueBytes = subscriberInfo.toByteArray();
 
             return new ProducerRecord<>(TOPIC, keyBytes, valueBytes);
         } catch (Exception e) {
             e.printStackTrace();
             return null;
+        }
+    }
+
+    private static void setupTopic() {
+        Properties props = new Properties();
+        props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
+        
+        try (AdminClient admin = AdminClient.create(props)) {
+            // Delete topic if exists
+            try {
+                System.out.println("Deleting existing topic: " + TOPIC);
+                admin.deleteTopics(Collections.singletonList(TOPIC)).all().get();
+                System.out.println("Topic deleted successfully");
+                // Wait for 2 seconds to ensure topic is completely deleted
+                System.out.println("Waiting for 2 seconds before creating new topic...");
+                Thread.sleep(2000);
+            } catch (Exception e) {
+                if (e.getCause() instanceof UnknownTopicOrPartitionException) {
+                    System.out.println("Topic does not exist, proceeding with creation");
+                } else {
+                    System.err.println("Error deleting topic: " + e.getMessage());
+                    throw e;
+                }
+            }
+
+            // Create new topic
+            System.out.println("Creating new topic: " + TOPIC);
+            NewTopic newTopic = new NewTopic(TOPIC, NUM_PARTITIONS, REPLICATION_FACTOR);
+            admin.createTopics(Collections.singletonList(newTopic)).all().get();
+            System.out.println("Topic created successfully with " + NUM_PARTITIONS + " partitions and " + REPLICATION_FACTOR + " replicas");
+
+            // Wait for topic to be ready
+            System.out.println("Waiting for topic to be ready...");
+            Thread.sleep(5000); // Wait for 5 seconds to ensure topic is ready
+        } catch (Exception e) {
+            System.err.println("Error setting up topic: " + e.getMessage());
+            e.printStackTrace();
+            System.exit(1);
         }
     }
 
@@ -356,40 +409,5 @@ public class KafkaProducerServiceTest {
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 50000);
         return new KafkaConsumer<>(props);
-    }
-
-    private static void setupTopic() {
-        Properties props = new Properties();
-        props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
-        
-        try (AdminClient admin = AdminClient.create(props)) {
-            // Delete topic if exists
-            try {
-                System.out.println("Deleting existing topic: " + TOPIC);
-                admin.deleteTopics(Collections.singletonList(TOPIC)).all().get();
-                System.out.println("Topic deleted successfully");
-            } catch (Exception e) {
-                if (e.getCause() instanceof UnknownTopicOrPartitionException) {
-                    System.out.println("Topic does not exist, proceeding with creation");
-                } else {
-                    System.err.println("Error deleting topic: " + e.getMessage());
-                    throw e;
-                }
-            }
-
-            // Create new topic
-            System.out.println("Creating new topic: " + TOPIC);
-            NewTopic newTopic = new NewTopic(TOPIC, NUM_PARTITIONS, REPLICATION_FACTOR);
-            admin.createTopics(Collections.singletonList(newTopic)).all().get();
-            System.out.println("Topic created successfully with " + NUM_PARTITIONS + " partitions and " + REPLICATION_FACTOR + " replicas");
-
-            // Wait for topic to be ready
-            System.out.println("Waiting for topic to be ready...");
-            Thread.sleep(5000); // Wait for 5 seconds to ensure topic is ready
-        } catch (Exception e) {
-            System.err.println("Error setting up topic: " + e.getMessage());
-            e.printStackTrace();
-            System.exit(1);
-        }
     }
 } 
