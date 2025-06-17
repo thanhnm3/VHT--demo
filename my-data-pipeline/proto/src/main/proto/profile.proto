@@ -1,0 +1,151 @@
+syntax = "proto3";
+
+package com.example.pipeline.proto;
+
+option java_multiple_files = true;
+
+message ProtoSubscriberInfo {
+  ProtoSubscriber subscriber = 1;
+  map<int64, ProtoBalance> balance = 2;
+  map<int64, ProtoAcmBalance> acmBalance = 3;
+  map<int64, ProtoProduct> product = 4;
+  map<int64, ProtoCharacteristic> characteristic = 7;
+  map<int64, ProtoHistory> history = 8;
+  int32 generation = 10;
+}
+
+message ProtoSubscriber {
+  string msisdn = 1;
+  int64 subId = 2;
+  int64 custId = 3;
+  bool isDefault = 4;
+  int32 subType = 5;
+  string stateSet = 6;
+  int64 precharge = 7;
+  repeated int64 balanceIdList = 8;
+  repeated int64 acmBalanceIdList = 9;
+  repeated int64 productIdList = 10;
+  repeated int64 groupIdList = 11;
+  repeated int64 membershipIdList = 12;
+  repeated string vpnGroupNameList = 13;
+  map<int32, string> mapSessionTypeLastest = 14;
+  int64 mainProductId = 15;
+  repeated string cellList = 16;
+  int32 langId = 17;
+  string region = 18;
+  int64 last_update = 19;
+  int64 effDate = 20;
+  int64 expDate = 21;
+  int64 updateDate = 22;
+  int64 state = 23;
+  repeated int64 charIdList = 24;
+  int32 level = 25;
+  int64 of = 26;
+  map<string, string> mapExtProp = 27;
+  string imsi = 31;
+  string iccid = 32;
+  string password = 33;
+  string bccsSubId = 34;
+  string bccsCustId = 35;
+  string bccsAcctId = 36;
+  string regType = 37;
+  string subcategory = 38;
+  string contractId = 39;
+  string custType = 40;
+  string custVip = 41;
+  repeated string zoneList = 42;
+  string province = 43;
+  string email = 44;
+  string address = 45;
+  string firstName = 46;
+  string lastName = 47;
+  int64 completeDate = 51;
+  int64 birthDay = 52;
+  int64 startNotifyTime = 53;
+  int64 endNotifyTime = 54;
+  int64 countTopupTotal = 55;
+  int64 countTopupFailure = 56;
+  int64 countTopupSuccess = 57;
+  int32 sex = 58;
+}
+
+message ProtoBalance {
+  int64 id = 1;
+  int64 gross = 2;
+  int64 consume = 3;
+  int64 reserve = 4;
+  int64 balType = 5;
+  int64 quotaMax = 6;
+  int64 recurringDay = 7;
+  string ownerValue = 8;
+  int64 effDate = 20;
+  int64 expDate = 21;
+  int64 updateDate = 22;
+  int64 state = 23;
+  repeated int64 charIdList = 24;
+  int32 level = 25;
+  int64 of = 26;
+  map<string, string> mapExtProp = 27;
+}
+
+message ProtoAcmBalance {
+  int64 id = 1;
+  int64 value = 2;
+  int64 reserve = 3;
+  int64 balType = 4;
+  int64 billingCycleId = 5;
+  int64 limit = 6;
+  int64 effDate = 20;
+  int64 expDate = 21;
+  int64 updateDate = 22;
+  int64 state = 23;
+  repeated int64 charIdList = 24;
+  int32 level = 25;
+  int64 of = 26;
+  map<string, string> mapExtProp = 27;
+}
+
+message ProtoProduct {
+  int64 id = 1;
+  int64 productOfferingId = 2;
+  repeated string memberList = 3;
+  int64 recurringDay = 4;
+  int64 effDate = 20;
+  int64 expDate = 21;
+  int64 updateDate = 22;
+  int64 state = 23;
+  repeated int64 charIdList = 24;
+  int32 level = 25;
+  int64 of = 26;
+  map<string, string> mapExtProp = 27;
+}
+
+message ProtoHistory {
+  int64 id = 1;
+  int32 type = 2;
+  int64 effDate = 20;
+  int64 expDate = 21;
+  int64 updateDate = 22;
+  int64 state = 23;
+  repeated int64 charIdList = 24;
+  int32 level = 25;
+  int64 of = 26;
+  map<string, string> mapExtProp = 27;
+  string content = 28;
+}
+
+message ProtoCharacteristic {
+  int64 id = 1;
+  int64 charSpecId = 2;
+  int64 billingCycleId = 3;
+  string value = 4;
+  int64 longValue = 5;
+  int64 effDate = 20;
+  int64 expDate = 21;
+  int64 updateDate = 22;
+  int64 state = 23;
+  repeated int64 charIdList = 24;
+  int32 level = 25;
+  int64 of = 26;
+  map<string, string> mapExtProp = 27;
+}

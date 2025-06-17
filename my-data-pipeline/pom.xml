@@ -17,6 +17,8 @@
     <maven.compiler.target>21</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <protobuf.version>3.24.0</protobuf.version>
+    <grpc.version>1.58.0</grpc.version>
   </properties>
 
   <modules>
@@ -24,7 +26,16 @@
     <module>producer-app</module>
     <module>consumer-app</module>
     <module>test-runner</module>
+    <module>proto</module>
   </modules>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.google.protobuf</groupId>
+      <artifactId>protobuf-java</artifactId>
+      <version>${protobuf.version}</version>
+    </dependency>
+  </dependencies>
 
   <build>
     <pluginManagement>
@@ -56,6 +67,13 @@
         </plugin>
       </plugins>
     </pluginManagement>
+    <extensions>
+      <extension>
+        <groupId>kr.motd.maven</groupId>
+        <artifactId>os-maven-plugin</artifactId>
+        <version>1.7.1</version>
+      </extension>
+    </extensions>
   </build>
 
 </project>
