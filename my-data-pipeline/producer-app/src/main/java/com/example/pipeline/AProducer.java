@@ -17,12 +17,13 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class AProducer {
     private static final Logger logger = LoggerFactory.getLogger(AProducer.class);
     private static ExecutorService executor;
-    private static volatile double currentRate = 5000.0;
-    private static final double MAX_RATE = 100000.0;
+    private static volatile double currentRate = 20000.0;
+    private static final double MAX_RATE = 50000.0;
     private static final double MIN_RATE = 1000.0;
     private static final int LAG_THRESHOLD = 1000;
     private static AdminClient adminClient;
@@ -33,6 +34,8 @@ public class AProducer {
     private static KafkaProducerService kafkaService;
     private static MessageProducerService messageService;
     private static AerospikeProducerService aerospikeService;
+    private static final AtomicBoolean isProcessingComplete = new AtomicBoolean(false);
+    private static final CountDownLatch processingLatch = new CountDownLatch(1);
 
     private static final Map<String, String> regionToTopicMap = new ConcurrentHashMap<>();
     private static String sourceNamespace;
@@ -48,6 +51,7 @@ public class AProducer {
             int maxRetries = Integer.parseInt(args[5]);
             String topics = args[6]; // Comma-separated list of topics
             int workerPoolSize = Integer.parseInt(args[7]);
+            consumerGroup = args[8]; // Comma-separated list of consumer groups
 
             AProducer.sourceNamespace = namespace;
             
@@ -58,7 +62,7 @@ public class AProducer {
             KafkaProducer<byte[], byte[]> kafkaProducer = null;
 
             try {
-                rateControlService = new RateControlService(15000.0, MAX_RATE, MIN_RATE, 
+                rateControlService = new RateControlService(20000.0, MAX_RATE, MIN_RATE,
                                                           LAG_THRESHOLD, MONITORING_INTERVAL_SECONDS);
                 
                 // Tạo danh sách topic từ regionToTopicMap
@@ -70,9 +74,11 @@ public class AProducer {
                 ClientPolicy clientPolicy = new ClientPolicy();
                 clientPolicy.timeout = 5000;
                 clientPolicy.maxConnsPerNode = 300;
-                aerospikeClient = new AerospikeClient(clientPolicy, aerospikeHost, aerospikePort);
+                final AerospikeClient finalAerospikeClient = new AerospikeClient(clientPolicy, aerospikeHost, aerospikePort);
+                aerospikeClient = finalAerospikeClient;
 
-                kafkaProducer = kafkaService.createProducer(maxRetries);
+                final KafkaProducer<byte[], byte[]> finalKafkaProducer = kafkaService.createProducer(maxRetries);
+                kafkaProducer = finalKafkaProducer;
 
                 Properties adminProps = new Properties();
                 adminProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBroker);
@@ -82,7 +88,7 @@ public class AProducer {
 
                 // Khôi phục monitoring thread
                 Thread monitorThread = new Thread(() -> {
-                    while (!Thread.currentThread().isInterrupted()) {
+                    while (!Thread.currentThread().isInterrupted() && !isProcessingComplete.get()) {
                         try {
                             if (rateControlService.shouldCheckRateAdjustment()) {
                                 monitorAndAdjustLag();
@@ -116,14 +122,37 @@ public class AProducer {
                 logger.info("  Set: {}", setName);
                 logger.info("  Topics: {}", regionToTopicMap);
                 logger.info("  Worker pool size: {}", workerPoolSize);
+                logger.info("  Initial rate: {}", currentRate);
+                logger.info("  Max rate: {}", MAX_RATE);
+                logger.info("  Consumer groups: {}", consumerGroup);
 
-                aerospikeService.readDataFromAerospike(
-                    aerospikeClient,
-                    kafkaProducer,
-                    currentRate,
-                    setName,
-                    maxRetries
-                );
+                // Start processing in a separate thread
+                executor.submit(() -> {
+                    try {
+                        aerospikeService.readDataFromAerospike(
+                            finalAerospikeClient,
+                            finalKafkaProducer,
+                            currentRate,
+                            setName,
+                            maxRetries
+                        );
+                        isProcessingComplete.set(true);
+                        processingLatch.countDown();
+                    } catch (Exception e) {
+                        logger.error("Error processing data: {}", e.getMessage(), e);
+                        processingLatch.countDown();
+                    }
+                });
+
+                // Wait for processing to complete
+                try {
+                    if (!processingLatch.await(30, TimeUnit.MINUTES)) {
+                        logger.error("Processing did not complete in time");
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    logger.error("Processing interrupted");
+                }
 
                 monitorThread.interrupt();
 
@@ -150,9 +179,9 @@ public class AProducer {
             
             for (String topic : topics) {
                 try {
-                    // Tạo topic A cho mỗi region
-                    String topicA = TopicGenerator.generateATopicName(topic);
-                    kafkaService.createTopic(topicA);
+                    // Tạo topic trực tiếp, không thêm hậu tố -a vì đã có trong regionToTopicMap
+                    kafkaService.createTopic(topic);
+                    logger.info("Created/Verified topic: {}", topic);
                 } catch (Exception e) {
                     logger.error("Error creating topic {}: {}", topic, e.getMessage());
                 }
@@ -164,8 +193,8 @@ public class AProducer {
 
     private static void monitorAndAdjustLag() {
         try {
-            if (consumerGroup == null) {
-                logger.warn("Consumer group is not set, skipping lag monitoring");
+            if (consumerGroup == null || consumerGroup.trim().isEmpty()) {
+                logger.warn("Consumer group is not set or empty, skipping lag monitoring");
                 return;
             }
 
@@ -175,6 +204,7 @@ public class AProducer {
             
             // Tách consumer groups thành mảng
             String[] consumerGroups = consumerGroup.split(",");
+            logger.info("Monitoring lag for consumer groups: {}", Arrays.toString(consumerGroups));
             
             // Tạo map từ region sang topic và consumer group
             Map<String, String> regionToTopicMap = new HashMap<>();
@@ -182,11 +212,33 @@ public class AProducer {
             
             for (String group : consumerGroups) {
                 group = group.trim();
-                // Lấy region từ consumer group (ví dụ: từ "producer1_north-a-group" lấy "north")
-                String region = group.split("_")[1].split("-")[0];
-                String topic = "producer1_" + region;
-                regionToTopicMap.put(region, topic);
-                regionToGroupMap.put(region, group);
+                if (group.isEmpty()) {
+                    logger.warn("Empty consumer group found, skipping");
+                    continue;
+                }
+                
+                try {
+                    // Validate consumer group format
+                    String[] parts = group.split("_");
+                    if (parts.length < 2) {
+                        logger.warn("Invalid consumer group format: {}, expected format: producer_region-group", group);
+                        continue;
+                    }
+                    
+                    String region = parts[1].split("-")[0];
+                    String topic = "producer1_" + region;
+                    regionToTopicMap.put(region, topic);
+                    regionToGroupMap.put(region, group);
+                    logger.debug("Mapped region {} to topic {} with consumer group {}", region, topic, group);
+                } catch (Exception e) {
+                    logger.warn("Error parsing consumer group {}: {}", group, e.getMessage());
+                    continue;
+                }
+            }
+            
+            if (regionToTopicMap.isEmpty()) {
+                logger.warn("No valid consumer groups found for monitoring");
+                return;
             }
             
             // Tính tổng lag cho mỗi cặp topic-group tương ứng
@@ -204,6 +256,9 @@ public class AProducer {
                         hasValidLag = true;
                         logger.info("Topic {} has lag: {} for consumer group: {}", 
                                   topicA, topicLag, group);
+                    } else {
+                        logger.warn("Invalid lag value {} for topic {} with consumer group {}", 
+                                  topicLag, topic, group);
                     }
                 } catch (Exception e) {
                     logger.warn("Error calculating lag for topic {} with consumer group {}: {}", 
@@ -230,6 +285,17 @@ public class AProducer {
 
     private static void shutdownGracefully(AerospikeClient aerospikeClient, 
                                          KafkaProducer<byte[], byte[]> kafkaProducer) {
+        // Wait for processing to complete if not already done
+        if (!isProcessingComplete.get()) {
+            try {
+                if (!processingLatch.await(5, TimeUnit.MINUTES)) {
+                    logger.error("Processing did not complete before shutdown");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
         if (executor != null) {
             executor.shutdown();
             try {

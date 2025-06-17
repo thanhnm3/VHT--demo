@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.ArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.HashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.example.pipeline.AConsumer;
 import com.example.pipeline.AProducer;
@@ -20,6 +21,7 @@ import org.slf4j.LoggerFactory;
 
 public class MainAll {
     private static final Logger logger = LoggerFactory.getLogger(MainAll.class);
+    private static final AtomicBoolean isShuttingDown = new AtomicBoolean(false);
 
     public static void main(String[] args) {
         try {
@@ -35,6 +37,7 @@ public class MainAll {
             // Delete and recreate topics before starting
             logger.info("Deleting all topics from Kafka...");
             DeleteTopic.deleteAllTopics(kafkaBroker);
+            Thread.sleep(2000);
 
             // Performance configuration
             int producerThreadPoolSize = config.getPerformance().getWorker_pool().getProducer();
@@ -58,13 +61,22 @@ public class MainAll {
             CountDownLatch producerDone = new CountDownLatch(1);
             producerLatches.add(producerDone);
 
-            // Create topics for each region
+            // Create topics and consumer groups for each region
             Map<String, String> regionTopics = new HashMap<>();
+            Map<String, String> regionToConsumerGroup = new HashMap<>();
+            
             for (String region : config.getRegion_mapping().keySet()) {
                 String baseTopic = TopicGenerator.TopicNameGenerator.generateTopicName(producer.getName(), region);
                 String producerTopic = TopicGenerator.generateATopicName(baseTopic);
                 regionTopics.put(region, producerTopic);
+                
+                // Generate consumer group for this region
+                String consumerGroup = generateConsumerGroup(producer.getName(), region);
+                regionToConsumerGroup.put(region, consumerGroup);
             }
+
+            // Collect all consumer groups for producer
+            String allConsumerGroups = String.join(",", regionToConsumerGroup.values());
 
             logger.info("[PRODUCER] Starting with configuration:");
             logger.info("[PRODUCER] - Host: {}", producer.getHost());
@@ -72,6 +84,7 @@ public class MainAll {
             logger.info("[PRODUCER] - Namespace: {}", producer.getNamespace());
             logger.info("[PRODUCER] - Set: {}", producer.getSet());
             logger.info("[PRODUCER] - Region Topics: {}", regionTopics);
+            logger.info("[PRODUCER] - Consumer Groups: {}", allConsumerGroups);
 
             // Start Producer
             executor.submit(() -> {
@@ -84,7 +97,8 @@ public class MainAll {
                         producer.getSet(),           // setName
                         String.valueOf(maxRetries),  // maxRetries
                         String.join(",", regionTopics.values()), // topics (comma-separated list)
-                        String.valueOf(producerThreadPoolSize) // workerPoolSize
+                        String.valueOf(producerThreadPoolSize), // workerPoolSize
+                        allConsumerGroups // consumerGroups (comma-separated list)
                     };
                     
                     AProducer.main(producerArgs);
@@ -100,10 +114,10 @@ public class MainAll {
                 String region = entry.getKey();
                 List<String> consumerNames = entry.getValue();
 
-                // Create topic and consumer group for this region
+                // Get topic and consumer group for this region
                 String baseTopic = TopicGenerator.TopicNameGenerator.generateTopicName(producer.getName(), region);
                 String consumerTopic = TopicGenerator.generateATopicName(baseTopic);
-                final String consumerGroup = generateConsumerGroup(producer.getName(), region);
+                final String consumerGroup = regionToConsumerGroup.get(region);
 
                 logger.info("[CONSUMER] Starting consumers for region {}: {}", region, consumerNames);
 
@@ -156,23 +170,22 @@ public class MainAll {
 
             // Add shutdown hook to handle program termination
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                logger.info("[MAIN] Shutting down pipeline...");
-                executor.shutdown();
-                try {
-                    if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
+                if (isShuttingDown.compareAndSet(false, true)) {
+                    logger.info("[MAIN] Shutting down pipeline...");
+                    executor.shutdown();
+                    try {
+                        if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
+                            executor.shutdownNow();
+                        }
+                    } catch (InterruptedException e) {
                         executor.shutdownNow();
+                        Thread.currentThread().interrupt();
                     }
-                } catch (InterruptedException e) {
-                    executor.shutdownNow();
-                    Thread.currentThread().interrupt();
                 }
             }));
 
-            // Wait for all producers and consumers to finish
+            // Wait for all consumers to finish
             try {
-                for (CountDownLatch latch : producerLatches) {
-                    latch.await();
-                }
                 for (CountDownLatch latch : consumerLatches) {
                     latch.await();
                 }

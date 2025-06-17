@@ -28,67 +28,83 @@ public class MainProducer {
                 throw new IllegalStateException("Failed to load configuration");
             }
 
-            // Lấy cấu hình Kafka
-            String kafkaBrokerSource = config.getKafka().getBroker();
+            // Get Kafka configuration
+            String kafkaBroker = config.getKafka().getBroker();
 
-            // Cấu hình performance
-            int producerThreadPoolSize = config.getPerformance().getWorker_pool().getProducer(); // Số thread cho Producer
+            // Delete and recreate topics before starting
+            logger.info("Deleting all topics from Kafka...");
+            DeleteTopic.deleteAllTopics(kafkaBroker);
+
+            // Performance configuration
+            int producerThreadPoolSize = config.getPerformance().getWorker_pool().getProducer();
             int maxRetries = config.getPerformance().getMax_retries();
 
-            // Tạo thread pool cho Producer
+            // Create thread pool for Producer
             ExecutorService executor = Executors.newCachedThreadPool();
             List<CountDownLatch> producerLatches = new ArrayList<>();
 
-            logger.info("=== Starting Producers Only ===");
-            logger.info("Kafka Broker Source: {}", kafkaBrokerSource);
+            logger.info("=== Starting Producer Only ===");
+            logger.info("Kafka Broker: {}", kafkaBroker);
             logger.info("Producer Thread Pool Size: {}", producerThreadPoolSize);
             logger.info("Max Retries: {}", maxRetries);
             logger.info("===========================");
 
-            // Khởi động một Producer duy nhất
-            Config.Producer producer = config.getProducers().get(0); // Lấy producer đầu tiên
+            // Initialize producer
+            Config.Producer producer = config.getProducers().get(0);
             CountDownLatch producerDone = new CountDownLatch(1);
             producerLatches.add(producerDone);
 
-            // Tạo topic cho mỗi region
+            // Create topics and consumer groups for each region
             Map<String, String> regionTopics = new HashMap<>();
+            Map<String, String> regionToConsumerGroup = new HashMap<>();
+            
             for (String region : config.getRegion_mapping().keySet()) {
                 String baseTopic = TopicGenerator.TopicNameGenerator.generateTopicName(producer.getName(), region);
-                regionTopics.put(region, baseTopic);
+                String producerTopic = TopicGenerator.generateATopicName(baseTopic);
+                regionTopics.put(region, producerTopic);
+                
+                // Generate consumer group for this region
+                String consumerGroup = generateConsumerGroup(producer.getName(), region);
+                regionToConsumerGroup.put(region, consumerGroup);
             }
 
-            logger.info("Starting Producer with configuration:");
-            logger.info("  Host: {}", producer.getHost());
-            logger.info("  Port: {}", producer.getPort());
-            logger.info("  Namespace: {}", producer.getNamespace());
-            logger.info("  Set: {}", producer.getSet());
-            logger.info("  Region Topics: {}", regionTopics);
+            // Collect all consumer groups for producer
+            String allConsumerGroups = String.join(",", regionToConsumerGroup.values());
 
+            logger.info("[PRODUCER] Starting with configuration:");
+            logger.info("[PRODUCER] - Host: {}", producer.getHost());
+            logger.info("[PRODUCER] - Port: {}", producer.getPort());
+            logger.info("[PRODUCER] - Namespace: {}", producer.getNamespace());
+            logger.info("[PRODUCER] - Set: {}", producer.getSet());
+            logger.info("[PRODUCER] - Region Topics: {}", regionTopics);
+            logger.info("[PRODUCER] - Consumer Groups: {}", allConsumerGroups);
+
+            // Start Producer
             executor.submit(() -> {
                 try {
-                    // Tạo mảng args mới với các tham số cần thiết
                     String[] producerArgs = new String[] {
-                        kafkaBrokerSource,           // kafkaBroker
+                        kafkaBroker,              // kafkaBroker
                         producer.getHost(),          // aerospikeHost
                         String.valueOf(producer.getPort()), // aerospikePort
                         producer.getNamespace(),     // namespace
                         producer.getSet(),           // setName
                         String.valueOf(maxRetries),  // maxRetries
                         String.join(",", regionTopics.values()), // topics (comma-separated list)
-                        String.valueOf(producerThreadPoolSize) // workerPoolSize
+                        String.valueOf(producerThreadPoolSize), // workerPoolSize
+                        allConsumerGroups // consumerGroups (comma-separated list)
                     };
                     
                     AProducer.main(producerArgs);
                 } catch (Exception e) {
-                    logger.error("Error in Producer: {}", e.getMessage(), e);
+                    logger.error("[PRODUCER] Failed: {}", e.getMessage(), e);
                 } finally {
                     producerDone.countDown();
                 }
             });
 
-            // Thêm shutdown hook để xử lý khi chương trình bị tắt
+            // Add shutdown hook to handle program termination
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                logger.info("Dang tat chuong trinh...");
+                logger.info("[MAIN] Shutting down producer...");
                 executor.shutdown();
                 try {
                     if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
@@ -100,19 +116,24 @@ public class MainProducer {
                 }
             }));
 
-            // Chờ producer kết thúc
+            // Wait for producer to finish
             try {
                 for (CountDownLatch latch : producerLatches) {
                     latch.await();
                 }
                 executor.shutdown();
-                logger.info("Chuong trinh da ket thuc.");
+                logger.info("[MAIN] Producer completed successfully.");
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                logger.error("Chuong trinh bi gian doan.");
+                logger.error("[MAIN] Producer interrupted.");
             }
         } catch (Exception e) {
-            logger.error("Loi nghiem trong: {}", e.getMessage(), e);
+            logger.error("Serious error: {}", e.getMessage(), e);
         }
+    }
+
+    // Common method to generate consumer group
+    private static String generateConsumerGroup(String producerName, String region) {
+        return TopicGenerator.generateAGroupName(producerName + "_" + region);
     }
 } 

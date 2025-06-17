@@ -2,6 +2,7 @@ com\example\pipeline\test\KafkaPerformanceTest.class
 com\example\pipeline\full\DataVerifier.class
 com\example\pipeline\full\MainConsumer.class
 com\example\pipeline\cdc\KafkaTopicManager.class
+com\example\pipeline\ReadSubscriber.class
 com\example\pipeline\cdc\RunRandomOperations.class
 com\example\pipeline\full\MainAll.class
 com\example\pipeline\full\DataVerifier$RegionStats.class

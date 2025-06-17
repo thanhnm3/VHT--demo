@@ -26,7 +26,6 @@ public class KafkaConsumerService {
     private final AtomicLong currentOffset;
     private final Map<String, String> regionToTopicMap;
     private final ConfigurationService configService;
-    private volatile boolean isRunning = true;
     private KafkaConsumer<byte[], byte[]> consumer;
 
     public KafkaConsumerService(String kafkaBroker, ConfigurationService configService) {
@@ -172,7 +171,6 @@ public class KafkaConsumerService {
     }
 
     public void shutdown() {
-        isRunning = false;
         if (adminClient != null) {
             adminClient.close(Duration.ofSeconds(5));
         }

@@ -92,7 +92,10 @@ public class AConsumer {
             logger.info("Aerospike namespace: {}", aerospikeNamespace);
             logger.info("Aerospike set name: {}", aerospikeSetName);
 
-            // Start consuming messages from the topic
+            // Initialize consumers with namespace and worker pool size
+            kafkaConsumerService.initializeConsumers(aerospikeNamespace, workerPoolSize);
+
+            // Start consuming messages from the topic using existing method
             kafkaConsumerService.startConsuming(consumerTopic, consumerGroup, messageService);
 
         } catch (Exception e) {

@@ -17,12 +17,12 @@
     </appender>
 
     <!-- Root Logger -->
-    <root level="WARN">
+    <root level="INFO">
         <appender-ref ref="ASYNC" />
     </root>
 
     <!-- Application Logger -->
-    <logger name="com.example.pipeline" level="INFO" additivity="false">
+    <logger name="com.example.pipeline" level="DEBUG" additivity="false">
         <appender-ref ref="ASYNC" />
     </logger>
 

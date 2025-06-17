@@ -42,27 +42,53 @@ public class AerospikeProducerService {
         Object batchLock = new Object();
         final AtomicLong lastBatchTime = new AtomicLong(System.currentTimeMillis());
         final long BATCH_INTERVAL_MS = 1000;
+        final AtomicLong totalRecords = new AtomicLong(0);
+        final AtomicLong processedRecords = new AtomicLong(0);
+        final AtomicLong skippedRecords = new AtomicLong(0);
+        final AtomicLong failedRecords = new AtomicLong(0);
 
         try {
             logger.info("Starting to read data from Aerospike namespace: {}", sourceNamespace);
+            logger.info("Scan policy: concurrentNodes={}, maxConcurrentNodes={}, recordsPerSecond={}", 
+                scanPolicy.concurrentNodes, scanPolicy.maxConcurrentNodes, scanPolicy.recordsPerSecond);
+            
             client.scanAll(scanPolicy, sourceNamespace, setName, (key, record) -> {
                 rateLimiter.acquire();
+                totalRecords.incrementAndGet();
 
                 executor.submit(() -> {
                     try {
                         if (record == null) {
+                            logger.warn("Skipped null record for key: {}", key);
+                            skippedRecords.incrementAndGet();
                             return;
                         }
 
-                        // Lấy region từ record
-                        String recordRegion = record.getString("region");
+                        // Lấy subscriber data từ bin "sub"
+                        Object subValue = record.getValue("sub");
+                        if (!(subValue instanceof Map)) {
+                            logger.warn("Skipped record - Invalid subscriber data format for key: {}", key.userKey);
+                            skippedRecords.incrementAndGet();
+                            return;
+                        }
+
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> subscriberData = (Map<String, Object>) subValue;
+                        
+                        // Lấy region từ trường "r" trong subscriber data
+                        String recordRegion = (String) subscriberData.get("r");
                         if (recordRegion == null) {
+                            logger.warn("Skipped record - No region found in subscriber data for key: {}", key.userKey);
+                            skippedRecords.incrementAndGet();
                             return;
                         }
 
                         // Kiểm tra consumers cho region này
                         List<String> consumers = messageService.getConsumersForRegion(recordRegion);
                         if (consumers == null || consumers.isEmpty()) {
+                            logger.warn("Skipped record - No consumers found for region: {}, key: {}", 
+                                recordRegion, key.userKey);
+                            skippedRecords.incrementAndGet();
                             return;
                         }
 
@@ -71,6 +97,7 @@ public class AerospikeProducerService {
                         if (kafkaRecord != null) {
                             synchronized (batchLock) {
                                 batch.add(kafkaRecord);
+                                processedRecords.incrementAndGet();
 
                                 long currentTime = System.currentTimeMillis();
                                 if (batch.size() >= 100 || 
@@ -80,6 +107,9 @@ public class AerospikeProducerService {
                                     lastBatchTime.set(currentTime);
                                 }
                             }
+                        } else {
+                            logger.warn("Failed to create Kafka record for key: {}", key.userKey);
+                            failedRecords.incrementAndGet();
                         }
 
                         if (messageService.hasPendingProducerMessages()) {
@@ -87,7 +117,8 @@ public class AerospikeProducerService {
                         }
 
                     } catch (Exception e) {
-                        logger.error("Error processing record: {}", e.getMessage());
+                        logger.error("Error processing record for key {}: {}", key.userKey, e.getMessage(), e);
+                        failedRecords.incrementAndGet();
                         messageService.logFailedMessage(messageService.createKafkaRecord(key, record), 
                                                       "Processing error", e);
                     }
@@ -108,8 +139,10 @@ public class AerospikeProducerService {
             // Ensure all messages are sent before finishing
             producer.flush();
             logger.info("Finished scanning data from Aerospike namespace: {}", sourceNamespace);
+            logger.info("Statistics - Total records: {}, Processed: {}, Skipped: {}, Failed: {}", 
+                totalRecords.get(), processedRecords.get(), skippedRecords.get(), failedRecords.get());
         } catch (Exception e) {
-            logger.error("Error scanning data from Aerospike: {}", e.getMessage());
+            logger.error("Error scanning data from Aerospike: {}", e.getMessage(), e);
         }
     }
 
