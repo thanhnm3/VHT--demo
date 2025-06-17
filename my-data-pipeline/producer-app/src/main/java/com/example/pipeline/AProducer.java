@@ -11,6 +11,7 @@ import com.example.pipeline.service.MessageProducerService;
 import com.example.pipeline.service.AerospikeProducerService;
 import com.example.pipeline.service.KafkaLagMonitor;
 import com.example.pipeline.service.TopicGenerator;
+import com.example.pipeline.service.config.ConfigProducerService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,13 +23,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class AProducer {
     private static final Logger logger = LoggerFactory.getLogger(AProducer.class);
     private static ExecutorService executor;
-    private static volatile double currentRate = 20000.0;
-    private static final double MAX_RATE = 50000.0;
-    private static final double MIN_RATE = 1000.0;
-    private static final int LAG_THRESHOLD = 1000;
+    private static volatile double currentRate;
+    private static double MAX_RATE;
+    private static double MIN_RATE;
+    private static int LAG_THRESHOLD;
     private static AdminClient adminClient;
     private static String consumerGroup;
-    private static final int MONITORING_INTERVAL_SECONDS = 10;
+    private static int MONITORING_INTERVAL_SECONDS;
     private static final ScheduledExecutorService rateAdjustmentExecutor = Executors.newSingleThreadScheduledExecutor();
     private static RateControlService rateControlService;
     private static KafkaProducerService kafkaService;
@@ -62,7 +63,15 @@ public class AProducer {
             KafkaProducer<byte[], byte[]> kafkaProducer = null;
 
             try {
-                rateControlService = new RateControlService(20000.0, MAX_RATE, MIN_RATE,
+                // Lấy cấu hình rate control từ ConfigProducerService
+                ConfigProducerService configService = ConfigProducerService.getInstance();
+                currentRate = configService.getInitialRate();
+                MAX_RATE = configService.getMaxRate();
+                MIN_RATE = configService.getMinRate();
+                LAG_THRESHOLD = configService.getLagThreshold();
+                MONITORING_INTERVAL_SECONDS = configService.getMonitoringIntervalSeconds();
+
+                rateControlService = new RateControlService(currentRate, MAX_RATE, MIN_RATE,
                                                           LAG_THRESHOLD, MONITORING_INTERVAL_SECONDS);
                 
                 // Tạo danh sách topic từ regionToTopicMap
@@ -124,6 +133,9 @@ public class AProducer {
                 logger.info("  Worker pool size: {}", workerPoolSize);
                 logger.info("  Initial rate: {}", currentRate);
                 logger.info("  Max rate: {}", MAX_RATE);
+                logger.info("  Min rate: {}", MIN_RATE);
+                logger.info("  Lag threshold: {}", LAG_THRESHOLD);
+                logger.info("  Monitoring interval: {} seconds", MONITORING_INTERVAL_SECONDS);
                 logger.info("  Consumer groups: {}", consumerGroup);
 
                 // Start processing in a separate thread
