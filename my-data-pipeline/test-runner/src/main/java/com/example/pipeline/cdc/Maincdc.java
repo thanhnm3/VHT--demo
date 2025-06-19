@@ -49,7 +49,7 @@ public class Maincdc {
             // Cấu hình performance
             int producerThreadPoolSize = config.getPerformance().getWorker_pool().getProducer();
             int consumerThreadPoolSize = config.getPerformance().getWorker_pool().getConsumer();
-            int maxMessagesPerSecond = config.getPerformance().getMax_messages_per_second();
+            int maxMessagesPerSecond = (int) config.getPerformance().getRate_control().getMax_rate();
             int maxRetries = config.getPerformance().getMax_retries();
 
             // Tạo thread pool cho Producer, Consumer và Random Operations
@@ -177,20 +177,9 @@ public class Maincdc {
                 }
             }));
 
-            // Chờ tất cả producer, consumer kết thúc
-            try {
-                for (CountDownLatch latch : producerLatches) {
-                    latch.await();
-                }
-                for (CountDownLatch latch : consumerLatches) {
-                    latch.await();
-                }
-                executor.shutdown();
-                logger.info("[MAIN] CDC Pipeline completed successfully.");
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                logger.error("[MAIN] CDC Pipeline interrupted.");
-            }
+            // Chờ mãi cho đến khi người dùng dừng bằng tay
+            logger.info("[MAIN] CDC Pipeline is running. Press Ctrl+C to stop.");
+            new java.util.concurrent.CountDownLatch(1).await();
         } catch (Exception e) {
             logger.error("Critical error: {}", e.getMessage(), e);
         }

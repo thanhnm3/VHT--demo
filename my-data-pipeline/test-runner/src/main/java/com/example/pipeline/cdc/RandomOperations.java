@@ -239,7 +239,6 @@ public class RandomOperations {
 
         // Random phone number
         String phoneNumber = String.format("09%d", ThreadLocalRandom.current().nextInt(10000000, 100000000));
-
         // Random province from this region
         List<String> provinces = config.getRegion_groups().getProvincesByRegion(region);
         String province = provinces.get(random.nextInt(provinces.size()));
@@ -247,8 +246,8 @@ public class RandomOperations {
         // Build sub map giống RandomInsert
         Map<String, Object> sub = new HashMap<>();
         sub.put("m", phoneNumber);
-        sub.put("si", userId);
-        sub.put("ci", UUID.randomUUID().toString());
+        sub.put("si", random.nextLong());
+        sub.put("ci", random.nextLong());
         sub.put("df", false);
         sub.put("st", random.nextInt(5));
         sub.put("ss", "ACTIVE");
@@ -298,8 +297,39 @@ public class RandomOperations {
         sub.put("of", random.nextLong());
 
         Bin subBin = new Bin("sub", sub);
+
+        // Build bal bin (random 2 balances)
+        Map<String, Map<String, Object>> bal = new HashMap<>();
+        for (int i = 0; i < 2; i++) {
+            Map<String, Object> balEntry = new HashMap<>();
+            balEntry.put("i", random.nextLong());
+            balEntry.put("g", random.nextLong());
+            balEntry.put("c", random.nextLong());
+            balEntry.put("r", random.nextLong());
+            balEntry.put("t", random.nextLong());
+            balEntry.put("q", random.nextLong());
+            balEntry.put("d", random.nextLong());
+            balEntry.put("o", "OWNER" + random.nextInt(1000000));
+            balEntry.put("e", System.currentTimeMillis());
+            balEntry.put("x", System.currentTimeMillis() + (365 * 24 * 60 * 60 * 1000L));
+            balEntry.put("u", System.currentTimeMillis());
+            balEntry.put("s", 1);
+            balEntry.put("l", List.of(random.nextLong(), random.nextLong()));
+            balEntry.put("v", random.nextInt(5));
+            balEntry.put("f", random.nextLong());
+            bal.put("b" + i, balEntry);
+        }
+        Bin balBin = new Bin("bal", bal);
+
+        // Các bin khác (acm, prd, chr, his, gen) có thể random đơn giản hoặc để rỗng
+        Bin acmBin = new Bin("acm", new HashMap<>());
+        Bin prdBin = new Bin("prd", new HashMap<>());
+        Bin chrBin = new Bin("chr", new HashMap<>());
+        Bin hisBin = new Bin("his", new HashMap<>());
+        Bin genBin = new Bin("gen", random.nextInt(10));
+
         try {
-            client.put(writePolicy, key, subBin);
+            client.put(writePolicy, key, subBin, balBin, acmBin, prdBin, chrBin, hisBin, genBin);
             return true;
         } catch (AerospikeException e) {
             System.err.println("Error inserting record with key: " + key.userKey + " (error: " + e.getMessage() + ")");
@@ -324,10 +354,11 @@ public class RandomOperations {
             // Lấy record và chỉ kiểm tra region
             Record record = client.get(readPolicy, randomKey);
             String recordRegion = null;
+            Map<String, Object> sub = null;
             if (record != null) {
                 Object subObj = record.getValue("sub");
                 if (subObj instanceof Map) {
-                    Map<String, Object> sub = (Map<String, Object>) subObj;
+                    sub = (Map<String, Object>) subObj;
                     recordRegion = (String) sub.get("r");
                 }
             }
@@ -336,23 +367,40 @@ public class RandomOperations {
                 return false;
             }
 
-            // Random service type
-            String serviceType = SERVICE_TYPES[random.nextInt(SERVICE_TYPES.length)];
-            // Random province from this region
-            List<String> provinces = config.getRegion_groups().getProvincesByRegion(region);
-            String province = provinces.get(random.nextInt(provinces.size()));
-
-            // Update trường trong sub
-            if (record != null && record.getValue("sub") instanceof Map) {
-                Map<String, Object> sub = (Map<String, Object>) record.getValue("sub");
-                sub.put("st", random.nextInt(5));
-                sub.put("p", province);
+            // Update lại trường 'lu' trong bin sub
+            if (sub != null) {
                 sub.put("lu", System.currentTimeMillis());
-                Bin subBin = new Bin("sub", sub);
-                client.put(writePolicy, randomKey, subBin);
-                return true;
             }
-            return false;
+
+            // Update chỉ bin bal (random lại dữ liệu bal)
+            Map<String, Map<String, Object>> bal = new HashMap<>();
+            for (int i = 0; i < 2; i++) {
+                Map<String, Object> balEntry = new HashMap<>();
+                balEntry.put("i", random.nextLong());
+                balEntry.put("g", random.nextLong());
+                balEntry.put("c", random.nextLong());
+                balEntry.put("r", random.nextLong());
+                balEntry.put("t", random.nextLong());
+                balEntry.put("q", random.nextLong());
+                balEntry.put("d", random.nextLong());
+                balEntry.put("o", "OWNER" + random.nextInt(1000000));
+                balEntry.put("e", System.currentTimeMillis());
+                balEntry.put("x", System.currentTimeMillis() + (365 * 24 * 60 * 60 * 1000L));
+                balEntry.put("u", System.currentTimeMillis());
+                balEntry.put("s", 1);
+                balEntry.put("l", List.of(random.nextLong(), random.nextLong()));
+                balEntry.put("v", random.nextInt(5));
+                balEntry.put("f", random.nextLong());
+                bal.put("b" + i, balEntry);
+            }
+            Bin balBin = new Bin("bal", bal);
+            Bin subBin = sub != null ? new Bin("sub", sub) : null;
+            if (subBin != null) {
+                client.put(writePolicy, randomKey, subBin, balBin);
+            } else {
+                client.put(writePolicy, randomKey, balBin);
+            }
+            return true;
         } catch (AerospikeException e) {
             System.err.println("Error updating record with key: " + randomKey.userKey + " (error: " + e.getMessage() + ")");
         } finally {
@@ -395,6 +443,9 @@ public class RandomOperations {
                 return false;
             }
 
+            // Cập nhật lại trường 'lu' trong bin sub
+            sub.put("lu", System.currentTimeMillis());
+
             // Giữ lại toàn bộ bin sub, xoá các bin khác
             Bin subBin = new Bin("sub", sub);
             Bin balBin = Bin.asNull("bal");
@@ -412,12 +463,7 @@ public class RandomOperations {
         return false;
     }
 
-    private static byte[] generateRandomBytes(int minSize, int maxSize) {
-        int size = ThreadLocalRandom.current().nextInt(minSize, maxSize + 1);
-        byte[] bytes = new byte[size];
-        ThreadLocalRandom.current().nextBytes(bytes);
-        return bytes;
-    }
+
 
     private static ConcurrentLinkedQueue<Key> getRandomKeysFromDatabase(AerospikeClient client, String namespace,
             String setName, int limit) {

@@ -127,7 +127,8 @@ public class CdcProducer {
                     maxRetries
                 );
 
-                monitorThread.interrupt();
+                // Chờ mãi cho đến khi người dùng dừng bằng tay
+                Thread.currentThread().join();
 
             } catch (Exception e) {
                 logger.error("Critical error: {}", e.getMessage());

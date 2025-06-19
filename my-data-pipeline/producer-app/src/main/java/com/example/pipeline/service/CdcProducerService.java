@@ -9,6 +9,7 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -57,36 +58,48 @@ public class CdcProducerService {
                         Record record = records.getRecord();
                         
                         if (key != null && key.userKey != null) {
-                            long updateTime = System.currentTimeMillis();
-                            if (record != null && record.getValue("sub") instanceof Map) {
-                                Map<String, Object> sub = (Map<String, Object>) record.getValue("sub");
+                            Object subObj = record.getValue("sub");
+                            Map<String, Object> sub = null;
+                            if (subObj instanceof Map) {
+                                sub = (Map<String, Object>) subObj;
+                            } else if (subObj instanceof String) {
+                                try {
+                                    sub = new ObjectMapper().readValue((String) subObj, Map.class);
+                                } catch (Exception e) {
+                                    logger.warn("Failed to parse sub bin as JSON: {}", e.getMessage());
+                                }
+                            }
+                            if (sub != null) {
+                                long updateTime = System.currentTimeMillis();
                                 if (sub.get("lu") instanceof Number) {
                                     updateTime = ((Number) sub.get("lu")).longValue();
                                 }
-                                String region = (String) sub.get("r");
-                                if (updateTime > windowStart && region != null) {
-                                    ProducerRecord<byte[], byte[]> kafkaRecord = messageService.createKafkaRecord(key, record);
-                                    if (kafkaRecord != null) {
-                                        executor.submit(() -> {
-                                            try {
-                                                producer.send(kafkaRecord, (metadata, exception) -> {
-                                                    if (exception != null) {
-                                                        messageService.logFailedMessage(kafkaRecord, "Failed to send message", exception);
-                                                    } else {
-                                                        messagesSentThisSecond.incrementAndGet();
-                                                        if (messagesSentThisSecond.get() % 1000 == 0) {
-                                                            logger.info("[CDC Producer] Sent {} messages for region {}", 
-                                                                messagesSentThisSecond.get(), region);
+                                if (updateTime > windowStart) {
+                                    String region = (String) sub.get("r");
+                                    if (region != null) {
+                                        ProducerRecord<byte[], byte[]> kafkaRecord = messageService.createKafkaRecord(key, record);
+                                        if (kafkaRecord != null) {
+                                            executor.submit(() -> {
+                                                try {
+                                                    producer.send(kafkaRecord, (metadata, exception) -> {
+                                                        if (exception != null) {
+                                                            messageService.logFailedMessage(kafkaRecord, "Failed to send message", exception);
+                                                        } else {
+                                                            messagesSentThisSecond.incrementAndGet();
+                                                            if (messagesSentThisSecond.get() % 1000 == 0) {
+                                                                logger.info("[CDC Producer] Sent {} messages for region {}", 
+                                                                    messagesSentThisSecond.get(), region);
+                                                            }
                                                         }
-                                                    }
-                                                });
-                                            } catch (Exception e) {
-                                                messageService.logFailedMessage(kafkaRecord, "Error sending message", e);
-                                            }
-                                        });
+                                                    });
+                                                } catch (Exception e) {
+                                                    messageService.logFailedMessage(kafkaRecord, "Error sending message", e);
+                                                }
+                                            });
+                                        }
+                                    } else {
+                                        messageService.logSkippedMessage(key.userKey.toString(), "Invalid or missing region in sub bin");
                                     }
-                                } else {
-                                    messageService.logSkippedMessage(key.userKey.toString(), "Invalid or missing region in sub bin");
                                 }
                             } else {
                                 messageService.logSkippedMessage(key.userKey.toString(), "Missing or invalid sub bin");

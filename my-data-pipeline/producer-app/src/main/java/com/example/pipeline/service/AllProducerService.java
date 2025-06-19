@@ -208,11 +208,20 @@ public class AllProducerService {
             String[] numericFields = {"si", "ci", "st", "lu"};
             for (String field : numericFields) {
                 Object value = subscriberData.get(field);
-                if (!(value instanceof Number)) {
-                    logSkippedMessage(key, "Invalid numeric field: " + field + ", value type: " + 
-                        (value != null ? value.getClass().getName() : "null"));
-                    return false;
+                if (value instanceof Number) {
+                    continue;
                 }
+                if (value instanceof String) {
+                    try {
+                        Long.parseLong((String) value);
+                        continue;
+                    } catch (NumberFormatException e) {
+                        // fall through to log error
+                    }
+                }
+                logSkippedMessage(key, "Invalid numeric field: " + field + ", value type: " + 
+                    (value != null ? value.getClass().getName() : "null"));
+                return false;
             }
 
             // Validate string fields

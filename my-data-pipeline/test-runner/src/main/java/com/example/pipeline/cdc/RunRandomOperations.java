@@ -19,7 +19,7 @@ public class RunRandomOperations {
             String producerSetName = config.getProducers().get(0).getSet();
 
             // Cau hinh performance
-            int randomOperationsThreadPoolSize = 4; // So thread cho RandomOperations
+            int randomOperationsThreadPoolSize = 1; // So thread cho RandomOperations
             int operationsPerSecond = 2000; // So luong thao tac moi giay cho RandomOperations
 
             System.out.println("=== Bat dau Random Operations ===");
