@@ -20,8 +20,8 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 
-public class AllProducerService {
-    private static final Logger logger = LoggerFactory.getLogger(AllProducerService.class);
+public class MessageProducerService {
+    private static final Logger logger = LoggerFactory.getLogger(MessageProducerService.class);
     private final Map<String, String> regionToTopicMap;
     private final Queue<ProducerRecord<byte[], byte[]>> pendingMessages;
     private final Object pendingMessagesLock;
@@ -33,7 +33,7 @@ public class AllProducerService {
     private final AtomicLong totalMessagesFailed = new AtomicLong(0);
     private final ScheduledExecutorService messageRateMonitor;
 
-    public AllProducerService() {
+    public MessageProducerService() {
         this.regionToTopicMap = new ConcurrentHashMap<>();
         this.pendingMessages = new ConcurrentLinkedQueue<>();
         this.pendingMessagesLock = new Object();
@@ -97,6 +97,14 @@ public class AllProducerService {
         }
     }
 
+    public void initializeCdcTopicMapping() {
+        this.regionToTopicMap.clear();
+        this.regionToTopicMap.putAll(TopicGenerator.generateCdcTopics());
+        if (logger.isDebugEnabled()) {
+            logger.debug("Initialized CDC region to topic mapping: {}", regionToTopicMap);
+        }
+    }
+
     public boolean isValidRecord(Record record) {
         return record != null && record.bins != null && !record.bins.isEmpty();
     }
@@ -126,10 +134,10 @@ public class AllProducerService {
             @SuppressWarnings("unchecked")
             Map<String, Object> subscriberData = (Map<String, Object>) subValue;
 
-            // Validate subscriber data
-            if (!validateSubscriberData(subscriberData, key.userKey.toString())) {
-                return null;
-            }
+            // // Validate subscriber data
+            // if (!validateSubscriberData(subscriberData, key.userKey.toString())) {
+            //     return null;
+            // }
 
             String region = (String) subscriberData.get("r");
             if (region == null) {
@@ -183,65 +191,38 @@ public class AllProducerService {
         }
     }
 
-    private boolean validateSubscriberData(Map<String, Object> subscriberData, String key) {
-        // Check required fields
-        String[] requiredFields = {"m", "si", "ci", "ct", "rt", "ss", "st", "lu"};
-        for (String field : requiredFields) {
-            if (!subscriberData.containsKey(field)) {
-                logSkippedMessage(key, "Missing required field: " + field);
-                logger.debug("[Validation] Missing field {} in subscriber data. Available fields: {}", 
-                    field, subscriberData.keySet());
-                return false;
-            }
-        }
+    // private boolean validateSubscriberData(Map<String, Object> subscriberData, String key) {
+    //     // Check required fields
+    //     String[] requiredFields = {"m", "si", "ci", "ct", "rt", "ss", "st", "lu"};
+    //     for (String field : requiredFields) {
+    //         if (!subscriberData.containsKey(field)) {
+    //             logSkippedMessage(key, "Missing required field: " + field);
+    //             logger.debug("[Validation] Missing field {} in subscriber data. Available fields: {}", 
+    //                 field, subscriberData.keySet());
+    //             return false;
+    //         }
+    //     }
 
-        // Validate field types
-        try {
-            // Validate MSISDN
-            Object msisdn = subscriberData.get("m");
-            if (!(msisdn instanceof String) || ((String) msisdn).isEmpty()) {
-                logSkippedMessage(key, "Invalid MSISDN format: " + (msisdn != null ? msisdn.getClass().getName() : "null"));
-                return false;
-            }
+    //     // Validate field types
+    //     try {
+    //         // Validate MSISDN
+    //         Object msisdn = subscriberData.get("m");
+    //         if (!(msisdn instanceof String) || ((String) msisdn).isEmpty()) {
+    //             logSkippedMessage(key, "Invalid MSISDN format: " + (msisdn != null ? msisdn.getClass().getName() : "null"));
+    //             return false;
+    //         }
 
-            // Validate numeric fields
-            String[] numericFields = {"si", "ci", "st", "lu"};
-            for (String field : numericFields) {
-                Object value = subscriberData.get(field);
-                if (value instanceof Number) {
-                    continue;
-                }
-                if (value instanceof String) {
-                    try {
-                        Long.parseLong((String) value);
-                        continue;
-                    } catch (NumberFormatException e) {
-                        // fall through to log error
-                    }
-                }
-                logSkippedMessage(key, "Invalid numeric field: " + field + ", value type: " + 
-                    (value != null ? value.getClass().getName() : "null"));
-                return false;
-            }
 
-            // Validate string fields
-            String[] stringFields = {"ct", "rt", "ss"};
-            for (String field : stringFields) {
-                Object value = subscriberData.get(field);
-                if (!(value instanceof String) || ((String) value).isEmpty()) {
-                    logSkippedMessage(key, "Invalid string field: " + field + ", value type: " + 
-                        (value != null ? value.getClass().getName() : "null"));
-                    return false;
-                }
-            }
 
-            return true;
-        } catch (Exception e) {
-            logSkippedMessage(key, "Error validating subscriber data: " + e.getMessage());
-            logger.error("[Validation] Exception during validation: ", e);
-            return false;
-        }
-    }
+ 
+
+    //         return true;
+    //     } catch (Exception e) {
+    //         logSkippedMessage(key, "Error validating subscriber data: " + e.getMessage());
+    //         logger.error("[Validation] Exception during validation: ", e);
+    //         return false;
+    //     }
+    // }
 
 
     private String getStringValue(Map<String, Object> data, String key) {

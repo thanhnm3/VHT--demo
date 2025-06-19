@@ -17,7 +17,7 @@ import java.util.Map;
 
 public class CdcProducerService {
     private final ExecutorService executor;
-    private final AllProducerService messageService;
+    private final MessageProducerService messageService;
     private final String sourceNamespace;
     private long lastPolledTime;
     private final AtomicInteger messagesSentThisSecond;
@@ -25,7 +25,7 @@ public class CdcProducerService {
     private static final Logger logger = LoggerFactory.getLogger(CdcProducerService.class);
 
     public CdcProducerService(ExecutorService executor,
-                            AllProducerService messageService,
+                            MessageProducerService messageService,
                             String sourceNamespace) {
         this.executor = executor;
         this.messageService = messageService;

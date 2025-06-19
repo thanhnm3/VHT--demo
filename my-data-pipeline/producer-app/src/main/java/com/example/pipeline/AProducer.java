@@ -7,7 +7,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.admin.AdminClient;
 import com.example.pipeline.service.RateControlService;
 import com.example.pipeline.service.KafkaProducerService;
-import com.example.pipeline.service.AllProducerService;
+import com.example.pipeline.service.MessageProducerService;
 import com.example.pipeline.service.AerospikeProducerService;
 import com.example.pipeline.service.KafkaLagMonitor;
 import com.example.pipeline.service.TopicGenerator;
@@ -33,7 +33,7 @@ public class AProducer {
     private static final ScheduledExecutorService rateAdjustmentExecutor = Executors.newSingleThreadScheduledExecutor();
     private static RateControlService rateControlService;
     private static KafkaProducerService kafkaService;
-    private static AllProducerService messageService;
+    private static MessageProducerService messageService;
     private static AerospikeProducerService aerospikeService;
     private static final AtomicBoolean isProcessingComplete = new AtomicBoolean(false);
     private static final CountDownLatch processingLatch = new CountDownLatch(1);
@@ -77,7 +77,7 @@ public class AProducer {
                 // Tạo danh sách topic từ regionToTopicMap
                 kafkaService = new KafkaProducerService(kafkaBroker, topics, null);
                 
-                messageService = new AllProducerService();
+                messageService = new MessageProducerService();
                 messageService.initializeTopicMapping(regionToTopicMap);  
 
                 ClientPolicy clientPolicy = new ClientPolicy();
