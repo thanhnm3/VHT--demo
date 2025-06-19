@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.UUID;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.ScheduledExecutorService;
 
 public class RandomOperations {
     private static final String[] SERVICE_TYPES = {
@@ -32,9 +33,9 @@ public class RandomOperations {
         "north", "central", "south"
     };
 
-    private static final int MAX_RECORDS_PER_REGION = 200_000;
-    private static final int KEY_LIMIT = 30_000;
-    private static final int OPERATIONS_PER_SECOND_PER_REGION = 100;
+
+    private static final int KEY_LIMIT = 40_000;
+    private static final int OPERATIONS_PER_SECOND_PER_REGION = 500;
     private static final Map<String, Integer> REGION_LIMITS = Map.of(
         "north", 1_000,
         "central", 1_000,
@@ -78,6 +79,32 @@ public class RandomOperations {
         AtomicInteger totalUpdateCount = new AtomicInteger(0);
         AtomicInteger totalDeleteCount = new AtomicInteger(0);
 
+        // Tính tổng số thao tác tối đa
+        int totalMaxOps = REGION_LIMITS.values().stream().mapToInt(Integer::intValue).sum() * 3;
+
+        // Thêm biến đếm thao tác mỗi giây
+        AtomicInteger opsThisSecond = new AtomicInteger(0);
+        // Thêm biến đếm thao tác mỗi giây cho từng loại thao tác và từng region
+        Map<String, AtomicInteger> insertThisSecond = new HashMap<>();
+        Map<String, AtomicInteger> updateThisSecond = new HashMap<>();
+        Map<String, AtomicInteger> deleteThisSecond = new HashMap<>();
+        for (String region : REGIONS) {
+            insertThisSecond.put(region, new AtomicInteger(0));
+            updateThisSecond.put(region, new AtomicInteger(0));
+            deleteThisSecond.put(region, new AtomicInteger(0));
+        }
+        ScheduledExecutorService statsLogger = Executors.newSingleThreadScheduledExecutor();
+        statsLogger.scheduleAtFixedRate(() -> {
+            int totalOps = totalInsertCount.get() + totalUpdateCount.get() + totalDeleteCount.get();
+            for (String region : REGIONS) {
+                int ins = insertThisSecond.get(region).getAndSet(0);
+                int upd = updateThisSecond.get(region).getAndSet(0);
+                int del = deleteThisSecond.get(region).getAndSet(0);
+                System.out.println("[RandomOps] Miền " + region + ": Insert=" + ins + ", Update=" + upd + ", Delete=" + del);
+            }
+            System.out.println("[RandomOps] Đã thực hiện: " + totalOps + " / " + totalMaxOps);
+        }, 1, 1, TimeUnit.SECONDS);
+
         // Lấy danh sách key từ database
         ConcurrentLinkedQueue<Key> randomKeys = getRandomKeysFromDatabase(client, namespace, setName, KEY_LIMIT);
         System.out.println("Retrieved " + randomKeys.size() + " keys from database");
@@ -115,6 +142,8 @@ public class RandomOperations {
                         if (operationPerformed) {
                             totalInsertCount.incrementAndGet();
                             OPERATION_COUNTERS.get(region).get("insert").incrementAndGet();
+                            opsThisSecond.incrementAndGet();
+                            insertThisSecond.get(region).incrementAndGet();
                         }
                         break;
                     case 1: // Update
@@ -122,6 +151,8 @@ public class RandomOperations {
                         if (operationPerformed) {
                             totalUpdateCount.incrementAndGet();
                             OPERATION_COUNTERS.get(region).get("update").incrementAndGet();
+                            opsThisSecond.incrementAndGet();
+                            updateThisSecond.get(region).incrementAndGet();
                         }
                         break;
                     case 2: // Delete
@@ -129,6 +160,8 @@ public class RandomOperations {
                         if (operationPerformed) {
                             totalDeleteCount.incrementAndGet();
                             OPERATION_COUNTERS.get(region).get("delete").incrementAndGet();
+                            opsThisSecond.incrementAndGet();
+                            deleteThisSecond.get(region).incrementAndGet();
                         }
                         break;
                 }
@@ -155,6 +188,9 @@ public class RandomOperations {
         } catch (InterruptedException e) {
             System.err.println("Thread interrupted: " + e.getMessage());
         }
+
+        // Shutdown statsLogger
+        statsLogger.shutdown();
 
         System.out.println("\n=== Operation Results ===");
         System.out.println("Total operations:");
@@ -203,29 +239,67 @@ public class RandomOperations {
 
         // Random phone number
         String phoneNumber = String.format("09%d", ThreadLocalRandom.current().nextInt(10000000, 100000000));
-        
-        // Random service type
-        String serviceType = SERVICE_TYPES[random.nextInt(SERVICE_TYPES.length)];
-        
+
         // Random province from this region
         List<String> provinces = config.getRegion_groups().getProvincesByRegion(region);
         String province = provinces.get(random.nextInt(provinces.size()));
 
-        // Generate random notes
-        byte[] notes = generateRandomBytes(100, 1_000);
+        // Build sub map giống RandomInsert
+        Map<String, Object> sub = new HashMap<>();
+        sub.put("m", phoneNumber);
+        sub.put("si", userId);
+        sub.put("ci", UUID.randomUUID().toString());
+        sub.put("df", false);
+        sub.put("st", random.nextInt(5));
+        sub.put("ss", "ACTIVE");
+        sub.put("pc", random.nextLong());
+        sub.put("bl", List.of(random.nextLong(), random.nextLong()));
+        sub.put("al", List.of(random.nextLong(), random.nextLong()));
+        sub.put("pl", List.of(random.nextLong(), random.nextLong()));
+        sub.put("gl", List.of(random.nextLong(), random.nextLong()));
+        sub.put("ml", List.of(random.nextLong(), random.nextLong()));
+        sub.put("vl", List.of("VPN1", "VPN2"));
+        sub.put("ms", Map.of(1, "LAST_SESSION"));
+        sub.put("mp", random.nextLong());
+        sub.put("cl", List.of("CELL1", "CELL2"));
+        sub.put("li", random.nextInt(3));
+        sub.put("r", region);
+        sub.put("lu", System.currentTimeMillis());
+        sub.put("im", "IMSI" + random.nextInt(1000000));
+        sub.put("ic", "ICCID" + random.nextInt(1000000));
+        sub.put("pw", "PASS" + random.nextInt(1000000));
+        sub.put("bs", "BCCS" + random.nextInt(1000000));
+        sub.put("bc", "CUST" + random.nextInt(1000000));
+        sub.put("rt", "PREPAID");
+        sub.put("sc", "INDIVIDUAL");
+        sub.put("ct", "CONT" + random.nextInt(1000000));
+        sub.put("ct", "RESIDENTIAL");
+        sub.put("cv", "NORMAL");
+        sub.put("zl", List.of("ZONE1", "ZONE2"));
+        sub.put("p", province);
+        sub.put("email", "user" + random.nextInt(1000000) + "@example.com");
+        sub.put("address", "Address " + random.nextInt(1000));
+        sub.put("firstName", "First" + random.nextInt(1000));
+        sub.put("lastName", "Last" + random.nextInt(1000));
+        sub.put("completeDate", System.currentTimeMillis());
+        sub.put("birthDay", System.currentTimeMillis() - (random.nextInt(365) * 24 * 60 * 60 * 1000L));
+        sub.put("startNotifyTime", System.currentTimeMillis());
+        sub.put("endNotifyTime", System.currentTimeMillis() + (random.nextInt(365) * 24 * 60 * 60 * 1000L));
+        sub.put("countTopupTotal", random.nextLong());
+        sub.put("countTopupFailure", random.nextLong());
+        sub.put("countTopupSuccess", random.nextLong());
+        sub.put("sex", random.nextInt(2));
+        sub.put("effDate", System.currentTimeMillis());
+        sub.put("expDate", System.currentTimeMillis() + (365 * 24 * 60 * 60 * 1000L));
+        sub.put("updateDate", System.currentTimeMillis());
+        sub.put("state", 1);
+        sub.put("charIdList", List.of(random.nextLong(), random.nextLong()));
+        sub.put("level", random.nextInt(5));
+        sub.put("of", random.nextLong());
 
-        // Create bins with natural data types
-        Bin userIdBin = new Bin("user_id", userId);
-        Bin phoneBin = new Bin("phone", phoneNumber);
-        Bin serviceTypeBin = new Bin("service_type", serviceType);
-        Bin provinceBin = new Bin("province", province);
-        Bin regionBin = new Bin("region", region);
-        Bin lastUpdateBin = new Bin("last_updated", System.currentTimeMillis());
-        Bin notesBin = new Bin("notes", notes);
-
+        Bin subBin = new Bin("sub", sub);
         try {
-            client.put(writePolicy, key, userIdBin, phoneBin, serviceTypeBin, 
-                      provinceBin, regionBin, lastUpdateBin, notesBin);
+            client.put(writePolicy, key, subBin);
             return true;
         } catch (AerospikeException e) {
             System.err.println("Error inserting record with key: " + key.userKey + " (error: " + e.getMessage() + ")");
@@ -247,15 +321,16 @@ public class RandomOperations {
         }
 
         try {
-            // Kiểm tra xem bản ghi có tồn tại không
+            // Lấy record và chỉ kiểm tra region
             Record record = client.get(readPolicy, randomKey);
-            if (record == null) {
-                randomKeys.offer(randomKey);
-                return false;
+            String recordRegion = null;
+            if (record != null) {
+                Object subObj = record.getValue("sub");
+                if (subObj instanceof Map) {
+                    Map<String, Object> sub = (Map<String, Object>) subObj;
+                    recordRegion = (String) sub.get("r");
+                }
             }
-
-            // Kiểm tra region của record
-            String recordRegion = (String) record.getValue("region");
             if (!region.equals(recordRegion)) {
                 randomKeys.offer(randomKey);
                 return false;
@@ -263,22 +338,21 @@ public class RandomOperations {
 
             // Random service type
             String serviceType = SERVICE_TYPES[random.nextInt(SERVICE_TYPES.length)];
-            
             // Random province from this region
             List<String> provinces = config.getRegion_groups().getProvincesByRegion(region);
             String province = provinces.get(random.nextInt(provinces.size()));
 
-            // Generate new random notes
-            byte[] notes = generateRandomBytes(100, 1_000);
-
-            // Update bins
-            Bin serviceTypeBin = new Bin("service_type", serviceType);
-            Bin provinceBin = new Bin("province", province);
-            Bin lastUpdateBin = new Bin("last_updated", System.currentTimeMillis());
-            Bin notesBin = new Bin("notes", notes);
-
-            client.put(writePolicy, randomKey, serviceTypeBin, provinceBin, lastUpdateBin, notesBin);
-            return true;
+            // Update trường trong sub
+            if (record != null && record.getValue("sub") instanceof Map) {
+                Map<String, Object> sub = (Map<String, Object>) record.getValue("sub");
+                sub.put("st", random.nextInt(5));
+                sub.put("p", province);
+                sub.put("lu", System.currentTimeMillis());
+                Bin subBin = new Bin("sub", sub);
+                client.put(writePolicy, randomKey, subBin);
+                return true;
+            }
+            return false;
         } catch (AerospikeException e) {
             System.err.println("Error updating record with key: " + randomKey.userKey + " (error: " + e.getMessage() + ")");
         } finally {
@@ -309,23 +383,28 @@ public class RandomOperations {
             }
 
             // Kiểm tra region của record
-            String recordRegion = (String) record.getValue("region");
+            Object subObj = record.getValue("sub");
+            if (!(subObj instanceof Map)) {
+                randomKeys.offer(randomKey);
+                return false;
+            }
+            Map<String, Object> sub = (Map<String, Object>) subObj;
+            String recordRegion = (String) sub.get("r");
             if (!region.equals(recordRegion)) {
                 randomKeys.offer(randomKey);
                 return false;
             }
 
-            // Set all bins to null except region and last_updated
-            Bin userIdBin = Bin.asNull("user_id");
-            Bin phoneBin = Bin.asNull("phone");
-            Bin serviceTypeBin = Bin.asNull("service_type");
-            Bin provinceBin = Bin.asNull("province");
-            Bin regionBin = new Bin("region", region);  // Giữ lại region
-            Bin lastUpdateBin = new Bin("last_updated", System.currentTimeMillis());
-            Bin notesBin = Bin.asNull("notes");
+            // Giữ lại toàn bộ bin sub, xoá các bin khác
+            Bin subBin = new Bin("sub", sub);
+            Bin balBin = Bin.asNull("bal");
+            Bin acmBin = Bin.asNull("acm");
+            Bin prdBin = Bin.asNull("prd");
+            Bin chrBin = Bin.asNull("chr");
+            Bin hisBin = Bin.asNull("his");
+            Bin genBin = Bin.asNull("gen");
 
-            client.put(null, randomKey, userIdBin, phoneBin, serviceTypeBin, 
-                      provinceBin, regionBin, lastUpdateBin, notesBin);
+            client.put(null, randomKey, subBin, balBin, acmBin, prdBin, chrBin, hisBin, genBin);
             return true;
         } catch (AerospikeException e) {
             System.err.println("Error deleting record with key: " + randomKey.userKey + " (error: " + e.getMessage() + ")");

@@ -1,4 +1,4 @@
-package com.example.pipeline;
+package com.example.pipeline.test;
 
 import com.aerospike.client.*;
 import com.aerospike.client.policy.ScanPolicy;

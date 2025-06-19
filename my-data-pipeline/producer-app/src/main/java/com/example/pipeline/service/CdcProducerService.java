@@ -10,14 +10,13 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
 public class CdcProducerService {
     private final ExecutorService executor;
-    private final MessageProducerService messageService;
+    private final AllProducerService messageService;
     private final String sourceNamespace;
     private long lastPolledTime;
     private final AtomicInteger messagesSentThisSecond;
@@ -25,12 +24,12 @@ public class CdcProducerService {
     private static final Logger logger = LoggerFactory.getLogger(CdcProducerService.class);
 
     public CdcProducerService(ExecutorService executor,
-                            MessageProducerService messageService,
+                            AllProducerService messageService,
                             String sourceNamespace) {
         this.executor = executor;
         this.messageService = messageService;
         this.sourceNamespace = sourceNamespace;
-        this.lastPolledTime = System.currentTimeMillis() - 10_000;
+        this.lastPolledTime = System.currentTimeMillis() - 10;
         this.messagesSentThisSecond = new AtomicInteger(0);
         this.scheduler = Executors.newSingleThreadScheduledExecutor();
     }
@@ -58,17 +57,14 @@ public class CdcProducerService {
                         Record record = records.getRecord();
                         
                         if (key != null && key.userKey != null) {
-                            long updateTime = record != null && record.getValue("last_updated") != null ? 
-                                (long) record.getValue("last_updated") : 
-                                System.currentTimeMillis();
-                            
-                            if (updateTime > windowStart) {
-                                // Kiểm tra xem record có phải là delete không
-                                boolean isDeleted = isRecordDeleted(record);
-                                
-                                // Nếu là delete hoặc có region, xử lý record
-                                if (isDeleted || (record != null && record.getValue("region") != null)) {
-                                    // Sử dụng MessageProducerService để xử lý message
+                            long updateTime = System.currentTimeMillis();
+                            if (record != null && record.getValue("sub") instanceof Map) {
+                                Map<String, Object> sub = (Map<String, Object>) record.getValue("sub");
+                                if (sub.get("lu") instanceof Number) {
+                                    updateTime = ((Number) sub.get("lu")).longValue();
+                                }
+                                String region = (String) sub.get("r");
+                                if (updateTime > windowStart && region != null) {
                                     ProducerRecord<byte[], byte[]> kafkaRecord = messageService.createKafkaRecord(key, record);
                                     if (kafkaRecord != null) {
                                         executor.submit(() -> {
@@ -79,7 +75,6 @@ public class CdcProducerService {
                                                     } else {
                                                         messagesSentThisSecond.incrementAndGet();
                                                         if (messagesSentThisSecond.get() % 1000 == 0) {
-                                                            String region = isDeleted ? "DELETED" : (String) record.getValue("region");
                                                             logger.info("[CDC Producer] Sent {} messages for region {}", 
                                                                 messagesSentThisSecond.get(), region);
                                                         }
@@ -91,8 +86,10 @@ public class CdcProducerService {
                                         });
                                     }
                                 } else {
-                                    messageService.logSkippedMessage(key.userKey.toString(), "Invalid record state");
+                                    messageService.logSkippedMessage(key.userKey.toString(), "Invalid or missing region in sub bin");
                                 }
+                            } else {
+                                messageService.logSkippedMessage(key.userKey.toString(), "Missing or invalid sub bin");
                             }
                         } else {
                             messageService.logSkippedMessage("null", "Invalid key");
@@ -114,18 +111,6 @@ public class CdcProducerService {
                 e.printStackTrace();
             }
         }
-    }
-
-    private boolean isRecordDeleted(Record record) {
-        if (record == null) return false;
-        
-        // Kiểm tra nếu tất cả các trường đều null trừ last_updated và region
-        return record.getValue("user_id") == null &&
-               record.getValue("phone") == null &&
-               record.getValue("service_type") == null &&
-               record.getValue("province") == null &&
-               record.getValue("notes") == null &&
-               record.getValue("last_updated") != null;
     }
 
     public void shutdown() {

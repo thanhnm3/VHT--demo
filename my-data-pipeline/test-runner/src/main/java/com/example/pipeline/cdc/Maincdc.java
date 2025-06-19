@@ -56,7 +56,6 @@ public class Maincdc {
             ExecutorService executor = Executors.newCachedThreadPool();
             List<CountDownLatch> producerLatches = new ArrayList<>();
             List<CountDownLatch> consumerLatches = new ArrayList<>();
-            List<CountDownLatch> randomOpLatches = new ArrayList<>();
 
             // Khởi tạo producer một lần duy nhất
             Config.Producer producer = config.getProducers().get(0);
@@ -162,31 +161,6 @@ public class Maincdc {
                         consumerDone.countDown();
                     }
                 });
-
-                // Khởi động Random Operations cho mỗi region
-                CountDownLatch randomOpDone = new CountDownLatch(1);
-                randomOpLatches.add(randomOpDone);
-
-                executor.submit(() -> {
-                    try {
-                        logger.info("[RANDOM OPERATIONS] Starting for region {}:", region);
-                        logger.info("[RANDOM OPERATIONS] - Source Namespace: {}", producer.getNamespace());
-                        logger.info("[RANDOM OPERATIONS] - Source Set: {}", producer.getSet());
-                        
-                        RandomOperations.main(
-                            producer.getHost(),
-                            producer.getPort(),
-                            producer.getNamespace(),
-                            producer.getSet(),
-                            maxMessagesPerSecond,
-                            producerThreadPoolSize
-                        );
-                    } catch (Exception e) {
-                        logger.error("[RANDOM OPERATIONS] Failed for region {}: {}", region, e.getMessage(), e);
-                    } finally {
-                        randomOpDone.countDown();
-                    }
-                });
             }
 
             // Thêm shutdown hook để xử lý khi chương trình bị tắt
@@ -203,15 +177,12 @@ public class Maincdc {
                 }
             }));
 
-            // Chờ tất cả producer, consumer và random operations kết thúc
+            // Chờ tất cả producer, consumer kết thúc
             try {
                 for (CountDownLatch latch : producerLatches) {
                     latch.await();
                 }
                 for (CountDownLatch latch : consumerLatches) {
-                    latch.await();
-                }
-                for (CountDownLatch latch : randomOpLatches) {
                     latch.await();
                 }
                 executor.shutdown();

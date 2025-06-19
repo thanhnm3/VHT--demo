@@ -7,7 +7,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.admin.AdminClient;
 import com.example.pipeline.service.RateControlService;
 import com.example.pipeline.service.KafkaProducerService;
-import com.example.pipeline.service.MessageProducerService;
+import com.example.pipeline.service.AllProducerService;
 import com.example.pipeline.service.CdcProducerService;
 import com.example.pipeline.service.KafkaLagMonitor;
 import com.example.pipeline.service.TopicGenerator;
@@ -31,7 +31,7 @@ public class CdcProducer {
     private static final ScheduledExecutorService rateAdjustmentExecutor = Executors.newSingleThreadScheduledExecutor();
     private static RateControlService rateControlService;
     private static KafkaProducerService kafkaService;
-    private static MessageProducerService messageService;
+    private static AllProducerService messageService;
     private static CdcProducerService cdcProducerService;
     private static int maxMessagesPerSecond;
 
@@ -66,7 +66,7 @@ public class CdcProducer {
                 rateControlService = new RateControlService(maxMessagesPerSecond, MAX_RATE, MIN_RATE, 
                                                           LAG_THRESHOLD, MONITORING_INTERVAL_SECONDS);
                 kafkaService = new KafkaProducerService(kafkaBroker, null, consumerGroup);
-                messageService = new MessageProducerService();
+                messageService = new AllProducerService();
                 messageService.initializeTopicMapping(regionToTopicMap);
 
                 ClientPolicy clientPolicy = new ClientPolicy();

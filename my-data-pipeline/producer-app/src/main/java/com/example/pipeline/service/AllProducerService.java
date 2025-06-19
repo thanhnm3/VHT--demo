@@ -8,7 +8,6 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import com.example.pipeline.proto.ProtoSubscriberInfo;
 import com.example.pipeline.proto.ProtoSubscriber;
 import com.example.pipeline.proto.ProtoBalance;
@@ -16,14 +15,13 @@ import com.example.pipeline.proto.ProtoAcmBalance;
 import com.example.pipeline.proto.ProtoProduct;
 import com.example.pipeline.proto.ProtoCharacteristic;
 import com.example.pipeline.proto.ProtoHistory;
-import com.google.protobuf.Message;
 
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 
-public class MessageProducerService {
-    private static final Logger logger = LoggerFactory.getLogger(MessageProducerService.class);
+public class AllProducerService {
+    private static final Logger logger = LoggerFactory.getLogger(AllProducerService.class);
     private final Map<String, String> regionToTopicMap;
     private final Queue<ProducerRecord<byte[], byte[]>> pendingMessages;
     private final Object pendingMessagesLock;
@@ -35,7 +33,7 @@ public class MessageProducerService {
     private final AtomicLong totalMessagesFailed = new AtomicLong(0);
     private final ScheduledExecutorService messageRateMonitor;
 
-    public MessageProducerService() {
+    public AllProducerService() {
         this.regionToTopicMap = new ConcurrentHashMap<>();
         this.pendingMessages = new ConcurrentLinkedQueue<>();
         this.pendingMessagesLock = new Object();
@@ -236,43 +234,6 @@ public class MessageProducerService {
         }
     }
 
-    private byte[] serializeRecord(Record record) {
-        try {
-            ObjectMapper mapper = new ObjectMapper();
-            // Cấu hình Jackson để bỏ qua các trường gây ra tham chiếu vòng tròn
-            mapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
-            mapper.configure(SerializationFeature.WRITE_SELF_REFERENCES_AS_NULL, true);
-            
-            // Tạo một Map để chứa dữ liệu cần serialize
-            Map<String, Object> dataToSerialize = new HashMap<>();
-            
-            // Lấy dữ liệu từ các bin
-            for (Map.Entry<String, Object> entry : record.bins.entrySet()) {
-                String binName = entry.getKey();
-                Object value = entry.getValue();
-                
-                // Nếu là đối tượng Protocol Buffer, chuyển đổi thành Map
-                if (value instanceof Message) {
-                    Message protoMessage = (Message) value;
-                    Map<String, Object> protoMap = new HashMap<>();
-                    protoMessage.getAllFields().forEach((field, fieldValue) -> {
-                        protoMap.put(field.getName(), fieldValue);
-                    });
-                    dataToSerialize.put(binName, protoMap);
-                } else {
-                    dataToSerialize.put(binName, value);
-                }
-            }
-            
-            // Thêm generation
-            dataToSerialize.put("generation", record.generation);
-            
-            return mapper.writeValueAsBytes(dataToSerialize);
-        } catch (Exception e) {
-            logger.error("[Serialization Error] Failed to serialize record: {}", e.getMessage(), e);
-            return null;
-        }
-    }
 
     private String getStringValue(Map<String, Object> data, String key) {
         Object value = data.get(key);

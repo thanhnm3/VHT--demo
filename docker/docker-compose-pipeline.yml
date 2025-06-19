@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  data-pipeline:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: vht-data-pipeline
+    environment:
+      - JAVA_OPTS=-Xms1g -Xmx3g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication
+      - CONFIG_FILE=config-docker.yaml
+    volumes:
+      - ../my-data-pipeline/common/src/main/resources/config-docker.yaml:/app/config-docker.yaml
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+    networks:
+      - kafka-platform
+
+networks:
+  kafka-platform:
+    external: true
+    name: kafka-platform

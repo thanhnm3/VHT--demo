@@ -1,25 +1,25 @@
 ---
 producers:
   - name: producer1
-    host: 127.0.0.1
+    host: aerospike
     port: 3000
     namespace: producer
     set: users
 
 consumers:
   - name: consumer1
-    host: 127.0.0.1
-    port: 4000
+    host: aerospike2
+    port: 3000
     namespace: consumer_north
     set: users
   - name: consumer2
-    host: 127.0.0.1
-    port: 4000
+    host: aerospike2
+    port: 3000
     namespace: consumer_central_and_south
     set: users_central
   - name: consumer3
-    host: 127.0.0.1
-    port: 4000
+    host: aerospike2
+    port: 3000
     namespace: consumer_central_and_south
     set: users_south
 
@@ -99,7 +99,7 @@ region_groups:
     - Kien Giang
 
 kafka:
-  broker: localhost:9092,localhost:9093
+  broker: source-kafka:29092,source-kafka-2:29092
 
 performance:
   max_retries: 5
@@ -113,4 +113,4 @@ performance:
     lag_threshold: 3000
     monitoring_interval_seconds: 10
     rate_adjustment_steps: 5
-    max_rate_change_percent: 20.0
+    max_rate_change_percent: 20.0 

@@ -15,12 +15,12 @@ import java.util.concurrent.atomic.AtomicLong;
 public class AerospikeProducerService {
     private static final Logger logger = LoggerFactory.getLogger(AerospikeProducerService.class);
     private final ExecutorService executor;
-    private final MessageProducerService messageService;
+    private final AllProducerService messageService;
     private final String sourceNamespace;
 
 
     public AerospikeProducerService(ExecutorService executor, 
-                                  MessageProducerService messageService,
+                                  AllProducerService messageService,
                                   String sourceNamespace) {
         this.executor = executor;
         this.messageService = messageService;
