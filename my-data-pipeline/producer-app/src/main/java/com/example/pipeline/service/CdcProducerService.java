@@ -74,7 +74,7 @@ public class CdcProducerService {
                                 if (sub.get("lu") instanceof Number) {
                                     updateTime = ((Number) sub.get("lu")).longValue();
                                 }
-                                if (updateTime > windowStart) {
+                                if (updateTime >= windowStart && updateTime < windowEnd) {
                                     String region = (String) sub.get("r");
                                     if (region != null) {
                                         ProducerRecord<byte[], byte[]> kafkaRecord = messageService.createKafkaRecord(key, record);
@@ -116,8 +116,8 @@ public class CdcProducerService {
                 lastPolledTime = windowEnd;
                 logger.info("[CDC Producer] Window done. Next start = {}", lastPolledTime);
                 
-                // Đợi một khoảng thời gian trước khi quét tiếp
-                Thread.sleep((long) (1000 / currentRate));
+                // // Đợi một khoảng thời gian trước khi quét tiếp
+                // Thread.sleep((long) (1000 / currentRate));
                 
             } catch (Exception e) {
                 logger.error("[CDC Producer] Error during scan, retrying same window: {}", e.getMessage());
