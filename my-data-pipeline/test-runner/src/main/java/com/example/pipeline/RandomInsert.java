@@ -54,7 +54,7 @@ public class RandomInsert {
             ExecutorService executor = Executors.newFixedThreadPool(numThreads);
             List<Future<?>> futures = new ArrayList<>();
 
-            int maxRecordsPerRegion = 100_000; // So ban ghi moi mien 
+            int maxRecordsPerRegion = 400_000; // So ban ghi moi mien 
             Map<String, AtomicInteger> regionCounters = new ConcurrentHashMap<>();
             for (String region : REGIONS) {
                 regionCounters.put(region, new AtomicInteger(0));

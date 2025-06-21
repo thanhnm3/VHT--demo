@@ -43,9 +43,7 @@ public class AerospikeProducerService {
         final AtomicLong lastBatchTime = new AtomicLong(System.currentTimeMillis());
         final long BATCH_INTERVAL_MS = 1000;
         final AtomicLong totalRecords = new AtomicLong(0);
-        final AtomicLong processedRecords = new AtomicLong(0);
-        final AtomicLong skippedRecords = new AtomicLong(0);
-        final AtomicLong failedRecords = new AtomicLong(0);
+
 
         try {
             logger.info("Starting to read data from Aerospike namespace: {}", sourceNamespace);
@@ -60,7 +58,6 @@ public class AerospikeProducerService {
                     try {
                         if (record == null) {
                             logger.warn("Skipped null record for key: {}", key);
-                            skippedRecords.incrementAndGet();
                             return;
                         }
 
@@ -68,7 +65,6 @@ public class AerospikeProducerService {
                         Object subValue = record.getValue("sub");
                         if (!(subValue instanceof Map)) {
                             logger.warn("Skipped record - Invalid subscriber data format for key: {}", key.userKey);
-                            skippedRecords.incrementAndGet();
                             return;
                         }
 
@@ -79,7 +75,6 @@ public class AerospikeProducerService {
                         String recordRegion = (String) subscriberData.get("r");
                         if (recordRegion == null) {
                             logger.warn("Skipped record - No region found in subscriber data for key: {}", key.userKey);
-                            skippedRecords.incrementAndGet();
                             return;
                         }
 
@@ -88,7 +83,6 @@ public class AerospikeProducerService {
                         if (consumers == null || consumers.isEmpty()) {
                             logger.warn("Skipped record - No consumers found for region: {}, key: {}", 
                                 recordRegion, key.userKey);
-                            skippedRecords.incrementAndGet();
                             return;
                         }
 
@@ -97,7 +91,6 @@ public class AerospikeProducerService {
                         if (kafkaRecord != null) {
                             synchronized (batchLock) {
                                 batch.add(kafkaRecord);
-                                processedRecords.incrementAndGet();
 
                                 long currentTime = System.currentTimeMillis();
                                 if (batch.size() >= 100 || 
@@ -109,7 +102,6 @@ public class AerospikeProducerService {
                             }
                         } else {
                             logger.warn("Failed to create Kafka record for key: {}", key.userKey);
-                            failedRecords.incrementAndGet();
                         }
 
                         if (messageService.hasPendingProducerMessages()) {
@@ -118,7 +110,6 @@ public class AerospikeProducerService {
 
                     } catch (Exception e) {
                         logger.error("Error processing record for key {}: {}", key.userKey, e.getMessage(), e);
-                        failedRecords.incrementAndGet();
                         messageService.logFailedMessage(messageService.createKafkaRecord(key, record), 
                                                       "Processing error", e);
                     }
@@ -139,8 +130,8 @@ public class AerospikeProducerService {
             // Ensure all messages are sent before finishing
             producer.flush();
             logger.info("Finished scanning data from Aerospike namespace: {}", sourceNamespace);
-            logger.info("Statistics - Total records: {}, Processed: {}, Skipped: {}, Failed: {}", 
-                totalRecords.get(), processedRecords.get(), skippedRecords.get(), failedRecords.get());
+            logger.info("Statistics - Total records: {}", 
+                totalRecords.get());
         } catch (Exception e) {
             logger.error("Error scanning data from Aerospike: {}", e.getMessage(), e);
         }
