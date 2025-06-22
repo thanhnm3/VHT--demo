@@ -216,7 +216,7 @@ public class AProducer {
             
             // Tách consumer groups thành mảng
             String[] consumerGroups = consumerGroup.split(",");
-            logger.info("Monitoring lag for consumer groups: {}", Arrays.toString(consumerGroups));
+            logger.debug("Monitoring lag for consumer groups: {}", Arrays.toString(consumerGroups));
             
             // Tạo map từ region sang topic và consumer group
             Map<String, String> regionToTopicMap = new HashMap<>();
@@ -266,7 +266,7 @@ public class AProducer {
                     if (topicLag >= 0) {
                         totalLag += topicLag;
                         hasValidLag = true;
-                        logger.info("Topic {} has lag: {} for consumer group: {}", 
+                        logger.debug("Topic {} has lag: {} for consumer group: {}", 
                                   topicA, topicLag, group);
                     } else {
                         logger.warn("Invalid lag value {} for topic {} with consumer group {}", 

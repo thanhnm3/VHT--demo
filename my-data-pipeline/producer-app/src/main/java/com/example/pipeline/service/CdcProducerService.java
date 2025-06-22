@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.Map;
 
 public class CdcProducerService {
@@ -21,6 +22,7 @@ public class CdcProducerService {
     private final String sourceNamespace;
     private long lastPolledTime;
     private final AtomicInteger messagesSentThisSecond;
+    private final AtomicLong totalRecords;
     private final ScheduledExecutorService scheduler;
     private static final Logger logger = LoggerFactory.getLogger(CdcProducerService.class);
 
@@ -32,6 +34,7 @@ public class CdcProducerService {
         this.sourceNamespace = sourceNamespace;
         this.lastPolledTime = System.currentTimeMillis() - 10;
         this.messagesSentThisSecond = new AtomicInteger(0);
+        this.totalRecords = new AtomicLong(0);
         this.scheduler = Executors.newSingleThreadScheduledExecutor();
     }
 
@@ -40,12 +43,15 @@ public class CdcProducerService {
                                     double currentRate,
                                     String setName,
                                     int maxRetries) {
+        logger.info("Starting CDC data reading from Aerospike namespace: {}", sourceNamespace);
+        logger.info("CDC scan policy: currentRate={} messages/second", currentRate);
+        
         while (!Thread.currentThread().isInterrupted()) {
             try {
                 long windowStart = lastPolledTime;
                 long windowEnd = System.currentTimeMillis();
                 
-                logger.info("[CDC Producer] Scanning window [{} ==> {}]", windowStart, windowEnd);
+                logger.debug("[CDC Producer] Scanning window [{} ==> {}]", windowStart, windowEnd);
                 
                 Statement stmt = new Statement();
                 stmt.setNamespace(sourceNamespace);
@@ -79,6 +85,7 @@ public class CdcProducerService {
                                     if (region != null) {
                                         ProducerRecord<byte[], byte[]> kafkaRecord = messageService.createKafkaRecord(key, record);
                                         if (kafkaRecord != null) {
+                                            totalRecords.incrementAndGet();
                                             executor.submit(() -> {
                                                 try {
                                                     producer.send(kafkaRecord, (metadata, exception) -> {
@@ -86,10 +93,6 @@ public class CdcProducerService {
                                                             messageService.logFailedMessage(kafkaRecord, "Failed to send message", exception);
                                                         } else {
                                                             messagesSentThisSecond.incrementAndGet();
-                                                            if (messagesSentThisSecond.get() % 1000 == 0) {
-                                                                logger.info("[CDC Producer] Sent {} messages for region {}", 
-                                                                    messagesSentThisSecond.get(), region);
-                                                            }
                                                         }
                                                     });
                                                 } catch (Exception e) {
@@ -114,7 +117,7 @@ public class CdcProducerService {
                 
                 // Nếu query thành công, cập nhật lastPolledTime
                 lastPolledTime = windowEnd;
-                logger.info("[CDC Producer] Window done. Next start = {}", lastPolledTime);
+                logger.debug("[CDC Producer] Window done. Next start = {}", lastPolledTime);
                 
                 // // Đợi một khoảng thời gian trước khi quét tiếp
                 // Thread.sleep((long) (1000 / currentRate));
@@ -124,6 +127,10 @@ public class CdcProducerService {
                 e.printStackTrace();
             }
         }
+        
+        // Log final statistics
+        logger.info("Finished CDC data reading from Aerospike namespace: {}", sourceNamespace);
+        logger.info("CDC Statistics - Total records processed: {}", totalRecords.get());
     }
 
     public void shutdown() {

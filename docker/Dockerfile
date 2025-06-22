@@ -16,5 +16,5 @@ COPY --from=build /app/test-runner/target/test-runner-1.0-SNAPSHOT.jar app.jar
 # Set JVM options for 4GB RAM limit
 ENV JAVA_OPTS="-Xms1g -Xmx3g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication"
 
-# Run MainAll directly with fat JAR
-CMD ["sh", "-c", "java $JAVA_OPTS -jar app.jar"] 
+# Run Main class with MODE environment variable
+CMD ["sh", "-c", "java $JAVA_OPTS -cp app.jar com.example.pipeline.Main $MODE"] 

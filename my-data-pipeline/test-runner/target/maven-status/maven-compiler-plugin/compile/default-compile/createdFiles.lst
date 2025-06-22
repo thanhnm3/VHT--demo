@@ -6,6 +6,7 @@ com\example\pipeline\cdc\RunRandomOperations.class
 com\example\pipeline\full\MainAll.class
 com\example\pipeline\full\DataVerifier$RegionStats.class
 com\example\pipeline\full\DeleteTopic.class
+com\example\pipeline\Main.class
 com\example\pipeline\cdc\RandomOperations.class
 com\example\pipeline\test\KafkaProducerServiceTest.class
 com\example\pipeline\RandomInsert.class

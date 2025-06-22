@@ -180,6 +180,7 @@ public class CdcProducer {
             
             // Tách consumer groups thành mảng
             String[] consumerGroups = consumerGroup.split(",");
+            logger.debug("Monitoring lag for consumer groups: {}", Arrays.toString(consumerGroups));
             
             // Tạo map từ region sang topic và consumer group
             Map<String, String> regionToTopicMap = new HashMap<>();
@@ -207,7 +208,7 @@ public class CdcProducer {
                     if (topicLag >= 0) {
                         totalLag += topicLag;
                         hasValidLag = true;
-                        logger.info("Topic {} has lag: {} for consumer group: {}", 
+                        logger.debug("Topic {} has lag: {} for consumer group: {}", 
                                   cdcTopic, topicLag, group);
                     }
                 } catch (Exception e) {
@@ -220,14 +221,14 @@ public class CdcProducer {
                 if (totalLag <= LAG_THRESHOLD) {
                     // Nếu lag nhỏ hơn hoặc bằng ngưỡng, giữ nguyên maxMessagesPerSecond
                     currentRate = maxMessagesPerSecond;
-                    logger.info("[Producer] Lag is within threshold ({}), maintaining max rate: {} messages/second", 
+                    logger.info("[CDC Producer] Lag is within threshold ({}), maintaining max rate: {} messages/second", 
                               LAG_THRESHOLD, currentRate);
                 } else {
                     // Nếu lag vượt ngưỡng, điều chỉnh rate
                     double newRate = rateControlService.calculateNewRateForProducer(totalLag);
                     rateControlService.updateRate(newRate);
                     currentRate = rateControlService.getCurrentRate();
-                    logger.info("[Producer] Adjusted rate to {} messages/second based on total lag: {} for consumer groups: {}", 
+                    logger.info("[CDC Producer] Adjusted rate to {} messages/second based on total lag: {} for consumer groups: {}", 
                               String.format("%.2f", currentRate), totalLag, consumerGroup);
                 }
             } else {
