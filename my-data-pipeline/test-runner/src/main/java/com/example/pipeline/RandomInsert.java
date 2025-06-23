@@ -54,7 +54,7 @@ public class RandomInsert {
             ExecutorService executor = Executors.newFixedThreadPool(numThreads);
             List<Future<?>> futures = new ArrayList<>();
 
-            int maxRecordsPerRegion = 400_000; // So ban ghi moi mien 
+            int maxRecordsPerRegion = 100_000; // So ban ghi moi mien 
             Map<String, AtomicInteger> regionCounters = new ConcurrentHashMap<>();
             for (String region : REGIONS) {
                 regionCounters.put(region, new AtomicInteger(0));
@@ -375,9 +375,6 @@ public class RandomInsert {
                                     historyData.put("h" + entry.getKey(), histData);
                                 }
                                 bins.add(new Bin("his", historyData));
-
-                                // Store generation
-                                bins.add(new Bin("gen", subscriberInfo.getGeneration()));
 
                                 // Write all bins to Aerospike
                                 client.put(policy, key, bins.toArray(new Bin[0]));

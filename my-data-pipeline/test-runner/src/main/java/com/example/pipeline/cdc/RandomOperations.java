@@ -23,11 +23,10 @@ import java.util.UUID;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.Arrays;
+import java.util.ArrayList;
 
 public class RandomOperations {
-    private static final String[] SERVICE_TYPES = {
-        "MOBILE", "FIXED", "BROADBAND"
-    };
 
     private static final String[] REGIONS = {
         "north", "central", "south"
@@ -43,6 +42,13 @@ public class RandomOperations {
     );
     private static final Map<String, Map<String, AtomicInteger>> OPERATION_COUNTERS = new HashMap<>();
     private static final Map<String, RateLimiter> REGION_RATE_LIMITERS = new HashMap<>();
+    private static boolean loggedInsert = false;
+    private static boolean loggedUpdate = false;
+    private static boolean loggedDelete = false;
+
+    // Lưu 3 key miền north để query sau
+    private static final List<byte[]> northKeysToQuery = new ArrayList<>();
+    private static int northKeyCount = 0;
 
     public static void main(String aeroHost, int aeroPort, String namespace, String setName, int operationsPerSecond,
             int threadPoolSize) {
@@ -100,9 +106,9 @@ public class RandomOperations {
                 int ins = insertThisSecond.get(region).getAndSet(0);
                 int upd = updateThisSecond.get(region).getAndSet(0);
                 int del = deleteThisSecond.get(region).getAndSet(0);
-                System.out.println("[RandomOps] Miền " + region + ": Insert=" + ins + ", Update=" + upd + ", Delete=" + del);
+                System.out.println("[RandomOps] Mien " + region + ": Insert=" + ins + ", Update=" + upd + ", Delete=" + del);
             }
-            System.out.println("[RandomOps] Đã thực hiện: " + totalOps + " / " + totalMaxOps);
+            System.out.println("[RandomOps] Da thuc hien: " + totalOps + " / " + totalMaxOps);
         }, 1, 1, TimeUnit.SECONDS);
 
         // Lấy danh sách key từ database
@@ -212,6 +218,42 @@ public class RandomOperations {
         System.out.println("================================");
 
         client.close();
+
+        // === Sau khi kết thúc, chờ 10s rồi query 3 key miền north ===
+        try {
+            System.out.println("\n[INFO] Sleeping 20s before querying keys...");
+            Thread.sleep(20000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        // Query từ Aerospike nguồn
+        System.out.println("\n[INFO] Querying 3 keys from source Aerospike:");
+        try (AerospikeClient srcClient = new AerospikeClient(aeroHost, aeroPort)) {
+            for (byte[] keyBytes : northKeysToQuery) {
+                Key key = new Key(namespace, setName, keyBytes);
+                Record rec = srcClient.get(null, key);
+                System.out.println("[SOURCE] Key: " + bytesToHex(keyBytes));
+                if (rec != null) {
+                    System.out.println("  bins: " + rec.bins);
+                } else {
+                    System.out.println("  Record not found.");
+                }
+            }
+        }
+        // Query từ Aerospike đích
+        System.out.println("\n[INFO] Querying 3 keys from destination Aerospike:");
+        try (AerospikeClient destClient = new AerospikeClient("localhost", 4000)) {
+            for (byte[] keyBytes : northKeysToQuery) {
+                Key key = new Key("consumer_north", "users", keyBytes);
+                Record rec = destClient.get(null, key);
+                System.out.println("[DEST] Key: " + bytesToHex(keyBytes));
+                if (rec != null) {
+                    System.out.println("  bins: " + rec.bins);
+                } else {
+                    System.out.println("  Record not found.");
+                }
+            }
+        }
     }
 
     private static boolean performInsert(AerospikeClient client, WritePolicy writePolicy, String namespace, String setName,
@@ -224,9 +266,8 @@ public class RandomOperations {
         // Generate UUID for user_id
         String userId = UUID.randomUUID().toString();
         byte[] userIdBytes = userId.getBytes();
-
         Key key = new Key(namespace, setName, userIdBytes);
-        
+
         // Kiểm tra xem key đã tồn tại chưa
         try {
             Record existingRecord = client.get(null, key);
@@ -243,12 +284,13 @@ public class RandomOperations {
         List<String> provinces = config.getRegion_groups().getProvincesByRegion(region);
         String province = provinces.get(random.nextInt(provinces.size()));
 
-        // Build sub map giống RandomInsert
+        // === Sinh map cho từng bin giống RandomInsert ===
+        // sub
         Map<String, Object> sub = new HashMap<>();
         sub.put("m", phoneNumber);
         sub.put("si", random.nextLong());
         sub.put("ci", random.nextLong());
-        sub.put("df", false);
+        sub.put("df", random.nextBoolean());
         sub.put("st", random.nextInt(5));
         sub.put("ss", "ACTIVE");
         sub.put("pc", random.nextLong());
@@ -295,10 +337,9 @@ public class RandomOperations {
         sub.put("charIdList", List.of(random.nextLong(), random.nextLong()));
         sub.put("level", random.nextInt(5));
         sub.put("of", random.nextLong());
-
         Bin subBin = new Bin("sub", sub);
 
-        // Build bal bin (random 2 balances)
+        // bal
         Map<String, Map<String, Object>> bal = new HashMap<>();
         for (int i = 0; i < 2; i++) {
             Map<String, Object> balEntry = new HashMap<>();
@@ -321,15 +362,102 @@ public class RandomOperations {
         }
         Bin balBin = new Bin("bal", bal);
 
-        // Các bin khác (acm, prd, chr, his, gen) có thể random đơn giản hoặc để rỗng
-        Bin acmBin = new Bin("acm", new HashMap<>());
-        Bin prdBin = new Bin("prd", new HashMap<>());
-        Bin chrBin = new Bin("chr", new HashMap<>());
-        Bin hisBin = new Bin("his", new HashMap<>());
+        // acm
+        Map<String, Map<String, Object>> acm = new HashMap<>();
+        for (int i = 0; i < 2; i++) {
+            Map<String, Object> acmEntry = new HashMap<>();
+            acmEntry.put("i", random.nextLong());
+            acmEntry.put("v", random.nextLong());
+            acmEntry.put("r", random.nextLong());
+            acmEntry.put("t", random.nextLong());
+            acmEntry.put("b", random.nextLong());
+            acmEntry.put("l", random.nextLong());
+            acmEntry.put("e", System.currentTimeMillis());
+            acmEntry.put("x", System.currentTimeMillis() + (365 * 24 * 60 * 60 * 1000L));
+            acmEntry.put("u", System.currentTimeMillis());
+            acmEntry.put("s", 1);
+            acmEntry.put("c", List.of(random.nextLong(), random.nextLong()));
+            acmEntry.put("l", random.nextInt(5));
+            acmEntry.put("f", random.nextLong());
+            acm.put("a" + i, acmEntry);
+        }
+        Bin acmBin = new Bin("acm", acm);
+
+        // prd
+        Map<String, Map<String, Object>> prd = new HashMap<>();
+        for (int i = 0; i < 2; i++) {
+            Map<String, Object> prdEntry = new HashMap<>();
+            prdEntry.put("i", random.nextLong());
+            prdEntry.put("o", random.nextLong());
+            prdEntry.put("m", List.of("MEMBER1", "MEMBER2"));
+            prdEntry.put("d", random.nextLong());
+            prdEntry.put("e", System.currentTimeMillis());
+            prdEntry.put("x", System.currentTimeMillis() + (365 * 24 * 60 * 60 * 1000L));
+            prdEntry.put("u", System.currentTimeMillis());
+            prdEntry.put("s", 1);
+            prdEntry.put("c", List.of(random.nextLong(), random.nextLong()));
+            prdEntry.put("l", random.nextInt(5));
+            prdEntry.put("f", random.nextLong());
+            prd.put("p" + i, prdEntry);
+        }
+        Bin prdBin = new Bin("prd", prd);
+
+        // chr
+        Map<String, Map<String, Object>> chr = new HashMap<>();
+        for (int i = 0; i < 2; i++) {
+            Map<String, Object> chrEntry = new HashMap<>();
+            chrEntry.put("i", random.nextLong());
+            chrEntry.put("s", random.nextLong());
+            chrEntry.put("b", random.nextLong());
+            chrEntry.put("v", "VALUE" + random.nextInt(1000000));
+            chrEntry.put("l", random.nextLong());
+            chrEntry.put("e", System.currentTimeMillis());
+            chrEntry.put("x", System.currentTimeMillis() + (365 * 24 * 60 * 60 * 1000L));
+            chrEntry.put("u", System.currentTimeMillis());
+            chrEntry.put("s", 1);
+            chrEntry.put("c", List.of(random.nextLong(), random.nextLong()));
+            chrEntry.put("l", random.nextInt(5));
+            chrEntry.put("f", random.nextLong());
+            chr.put("c" + i, chrEntry);
+        }
+        Bin chrBin = new Bin("chr", chr);
+
+        // his
+        Map<String, Map<String, Object>> his = new HashMap<>();
+        for (int i = 0; i < 2; i++) {
+            Map<String, Object> hisEntry = new HashMap<>();
+            hisEntry.put("i", random.nextLong());
+            hisEntry.put("t", random.nextInt(5));
+            hisEntry.put("e", System.currentTimeMillis());
+            hisEntry.put("x", System.currentTimeMillis() + (365 * 24 * 60 * 60 * 1000L));
+            hisEntry.put("u", System.currentTimeMillis());
+            hisEntry.put("s", 1);
+            hisEntry.put("c", List.of(random.nextLong(), random.nextLong()));
+            hisEntry.put("l", random.nextInt(5));
+            hisEntry.put("f", random.nextLong());
+            hisEntry.put("n", "History content " + random.nextInt(1000000));
+            his.put("h" + i, hisEntry);
+        }
+        Bin hisBin = new Bin("his", his);
+
+        // gen
         Bin genBin = new Bin("gen", random.nextInt(10));
 
         try {
             client.put(writePolicy, key, subBin, balBin, acmBin, prdBin, chrBin, hisBin, genBin);
+            if ("north".equals(region) && northKeyCount < 3) {
+                Object keyObj = key.userKey != null ? key.userKey.getObject() : null;
+                if (keyObj instanceof byte[]) {
+                    northKeysToQuery.add((byte[]) keyObj);
+                    northKeyCount++;
+                }
+            }
+            if (!loggedInsert) {
+                Object keyObj = key.userKey != null ? key.userKey.getObject() : null;
+                String keyStr = keyObj instanceof byte[] ? bytesToHex((byte[]) keyObj) : String.valueOf(keyObj);
+                System.out.println("[INSERT] Key: " + keyStr);
+                loggedInsert = true;
+            }
             return true;
         } catch (AerospikeException e) {
             System.err.println("Error inserting record with key: " + key.userKey + " (error: " + e.getMessage() + ")");
@@ -367,12 +495,12 @@ public class RandomOperations {
                 return false;
             }
 
-            // Update lại trường 'lu' trong bin sub
+            // Cập nhật lại trường 'lu' trong bin sub
             if (sub != null) {
                 sub.put("lu", System.currentTimeMillis());
             }
 
-            // Update chỉ bin bal (random lại dữ liệu bal)
+            // Update lại dữ liệu bal
             Map<String, Map<String, Object>> bal = new HashMap<>();
             for (int i = 0; i < 2; i++) {
                 Map<String, Object> balEntry = new HashMap<>();
@@ -395,10 +523,19 @@ public class RandomOperations {
             }
             Bin balBin = new Bin("bal", bal);
             Bin subBin = sub != null ? new Bin("sub", sub) : null;
+
+            // Ghi lại cả bin sub và bal
             if (subBin != null) {
                 client.put(writePolicy, randomKey, subBin, balBin);
             } else {
                 client.put(writePolicy, randomKey, balBin);
+            }
+
+            if (!loggedUpdate) {
+                Object keyObj = randomKey.userKey != null ? randomKey.userKey.getObject() : null;
+                String keyStr = keyObj instanceof byte[] ? bytesToHex((byte[]) keyObj) : String.valueOf(keyObj);
+                System.out.println("[UPDATE] Key: " + keyStr);
+                loggedUpdate = true;
             }
             return true;
         } catch (AerospikeException e) {
@@ -443,7 +580,7 @@ public class RandomOperations {
                 return false;
             }
 
-            // Cập nhật lại trường 'lu' trong bin sub
+            // Cập nhật lại trường 'lu' trong bin sub, giữ nguyên các trường khác
             sub.put("lu", System.currentTimeMillis());
 
             // Giữ lại toàn bộ bin sub, xoá các bin khác
@@ -456,6 +593,12 @@ public class RandomOperations {
             Bin genBin = Bin.asNull("gen");
 
             client.put(null, randomKey, subBin, balBin, acmBin, prdBin, chrBin, hisBin, genBin);
+            if (!loggedDelete) {
+                Object keyObj = randomKey.userKey != null ? randomKey.userKey.getObject() : null;
+                String keyStr = keyObj instanceof byte[] ? bytesToHex((byte[]) keyObj) : String.valueOf(keyObj);
+                System.out.println("[DELETE] Key: " + keyStr);
+                loggedDelete = true;
+            }
             return true;
         } catch (AerospikeException e) {
             System.err.println("Error deleting record with key: " + randomKey.userKey + " (error: " + e.getMessage() + ")");
@@ -463,7 +606,13 @@ public class RandomOperations {
         return false;
     }
 
-
+    private static String bytesToHex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) {
+            sb.append(String.format("%02x", b));
+        }
+        return sb.toString();
+    }
 
     private static ConcurrentLinkedQueue<Key> getRandomKeysFromDatabase(AerospikeClient client, String namespace,
             String setName, int limit) {

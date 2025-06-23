@@ -2,9 +2,11 @@ package com.example.pipeline;
 
 
 import com.example.pipeline.service.config.ConfigurationService;
-import com.example.pipeline.service.AerospikeService;
 import com.example.pipeline.service.KafkaConsumerService;
 import com.example.pipeline.service.MessageService;
+import com.aerospike.client.AerospikeClient;
+import com.aerospike.client.policy.ClientPolicy;
+import com.aerospike.client.policy.WritePolicy;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -22,18 +24,18 @@ public class CdcConsumer {
     private final int destinationPort;
     private final String destinationNamespace;
     private final int workerPoolSize;
+    private final String setName;
     
     // Instance services
     private final ConfigurationService configService;
-    private final AerospikeService aerospikeService;
+    private final AerospikeClient aerospikeClient;
     private final KafkaConsumerService kafkaService;
     private final MessageService messageService;
     private final ExecutorService executorService;
 
     public CdcConsumer(String[] args) {
-        if (args.length < 7) {
-            throw new IllegalArgumentException("Usage: java CdcConsumer <kafkaBroker> <consumerTopic> <consumerGroup> " +
-                             "<destinationHost> <destinationPort> <destinationNamespace> <workerPoolSize>");
+        if (args.length < 8) {
+            throw new IllegalArgumentException("Usage: java CdcConsumer <kafkaBroker> <consumerTopic> <consumerGroup> <destinationHost> <destinationPort> <destinationNamespace> <workerPoolSize> <setName>");
         }
 
         // Initialize configuration
@@ -44,6 +46,7 @@ public class CdcConsumer {
         this.destinationPort = Integer.parseInt(args[4]);
         this.destinationNamespace = args[5];
         this.workerPoolSize = Integer.parseInt(args[6]);
+        this.setName = args[7];
         
         // Initialize services
         this.configService = ConfigurationService.getInstance();
@@ -51,15 +54,24 @@ public class CdcConsumer {
             throw new IllegalStateException("Cannot initialize configuration service");
         }
 
-        this.aerospikeService = new AerospikeService(destinationHost, destinationPort);
+        // Initialize Aerospike client - đồng bộ với AConsumer
+        ClientPolicy clientPolicy = new ClientPolicy();
+        clientPolicy.maxConnsPerNode = 300;
+        this.aerospikeClient = new AerospikeClient(clientPolicy, destinationHost, destinationPort);
+        
+        // Initialize WritePolicy - đồng bộ với AConsumer
+        WritePolicy writePolicy = new WritePolicy();
+        writePolicy.sendKey = true;  // Ensure key is stored
+        writePolicy.totalTimeout = 5000;
+        
         this.kafkaService = new KafkaConsumerService(kafkaBroker, configService);
         
-        // Initialize MessageService with Aerospike client and policy
+        // Initialize MessageService - đồng bộ với AConsumer
         this.messageService = new MessageService(
-            aerospikeService.getClient(),
-            aerospikeService.getWritePolicy(),
+            aerospikeClient,
+            writePolicy,
             destinationNamespace,
-            consumerGroup.split("_")[1].split("-")[0], // Extract region from consumer group
+            setName,
             consumerTopic,
             workerPoolSize
         );
@@ -113,7 +125,10 @@ public class CdcConsumer {
             Thread.currentThread().interrupt();
         }
         
-        aerospikeService.shutdown();
+        // Close Aerospike client - đồng bộ với AConsumer
+        if (aerospikeClient != null) {
+            aerospikeClient.close();
+        }
         
         logger.info("Shutdown completed successfully");
     }

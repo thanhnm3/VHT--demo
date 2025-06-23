@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Random;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 
 public class DataVerifier {
     private static final int SAMPLE_SIZE = 16547; // Số lượng key cần kiểm tra
@@ -64,9 +66,13 @@ public class DataVerifier {
 
             AtomicInteger totalVerified = new AtomicInteger(0);
             AtomicInteger mismatches = new AtomicInteger(0);
+            AtomicInteger duplicates = new AtomicInteger(0);
             
             // Track results by region
             Map<String, RegionStats> regionStats = new HashMap<>();
+            
+            // Track duplicate keys
+            Set<String> processedKeys = new HashSet<>();
 
             // Lay danh sach key tu DB1
             List<Key> randomKeys = getRandomKeys(sourceClient, producerNamespace, producerSetName, SAMPLE_SIZE);
@@ -75,6 +81,15 @@ public class DataVerifier {
             // Kiem tra tung key
             for (int i = 0; i < randomKeys.size(); i++) {
                 Key sourceKey = randomKeys.get(i);
+                String keyString = new String((byte[])sourceKey.userKey.getObject());
+                
+                // Check for duplicates
+                if (processedKeys.contains(keyString)) {
+                    duplicates.incrementAndGet();
+                    System.out.printf("Duplicate key found: %s%n", keyString);
+                    continue;
+                }
+                processedKeys.add(keyString);
                 
                 // Sleep sau moi SLEEP_INTERVAL record
                 if (i > 0 && i % SLEEP_INTERVAL == 0) {
@@ -122,7 +137,7 @@ public class DataVerifier {
 
                 if (destRecord == null) {
                     System.out.printf("Mismatch: Key %s khong ton tai trong DB dich (region: %s, namespace: %s)%n",
-                        new String((byte[])sourceKey.userKey.getObject()), region, consumer.getNamespace());
+                        keyString, region, consumer.getNamespace());
                     mismatches.incrementAndGet();
                     stats.mismatches++;
                 } else {
@@ -132,9 +147,17 @@ public class DataVerifier {
 
                     if (sourceProvince != null && destProvince != null && !sourceProvince.equals(destProvince)) {
                         System.out.printf("Mismatch: Key %s co province khac nhau (DB1: %s, DB2: %s, region: %s)%n",
-                            new String((byte[])sourceKey.userKey.getObject()), sourceProvince, destProvince, region);
+                            keyString, sourceProvince, destProvince, region);
                         mismatches.incrementAndGet();
                         stats.mismatches++;
+                    }
+                    
+                    // Check generation
+                    int sourceGen = sourceRecord.generation;
+                    int destGen = destRecord.generation;
+                    if (sourceGen != destGen) {
+                        System.out.printf("Generation mismatch: Key %s (DB1: %d, DB2: %d, region: %s)%n",
+                            keyString, sourceGen, destGen, region);
                     }
                 }
 
@@ -145,6 +168,7 @@ public class DataVerifier {
             System.out.println("\n=== Verification Results ===");
             System.out.println("Total records verified: " + totalVerified.get());
             System.out.println("Total mismatches found: " + mismatches.get());
+            System.out.println("Total duplicates found: " + duplicates.get());
             System.out.println("Overall verification accuracy: " + 
                 String.format("%.2f%%", (totalVerified.get() - mismatches.get()) * 100.0 / totalVerified.get()));
 

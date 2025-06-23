@@ -145,7 +145,8 @@ public class Maincdc {
                             consumer.getHost(),         // destinationHost
                             String.valueOf(consumer.getPort()), // destinationPort
                             consumer.getNamespace(),    // destinationNamespace
-                            String.valueOf(consumerThreadPoolSize) // workerPoolSize
+                            String.valueOf(consumerThreadPoolSize), // workerPoolSize
+                            consumer.getSet()           // setName
                         };
                         
                         logger.info("[CDC CONSUMER] Starting {} for region {}:", consumerName, region);

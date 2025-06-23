@@ -22,7 +22,7 @@
     </root>
 
     <!-- Application Logger -->
-    <logger name="com.example.pipeline" level="INFO" additivity="false">
+    <logger name="com.example.pipeline" level="DEBUG" additivity="false">
         <appender-ref ref="ASYNC" />
     </logger>
 

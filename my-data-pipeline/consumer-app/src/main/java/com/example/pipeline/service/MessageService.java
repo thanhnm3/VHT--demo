@@ -145,7 +145,7 @@ public class MessageService {
             subscriberData.put("bc", subscriber.getBccsCustId());
             subscriberData.put("rt", subscriber.getRegType());
             subscriberData.put("sc", subscriber.getSubcategory());
-            subscriberData.put("ct", subscriber.getContractId());
+            subscriberData.put("cid", subscriber.getContractId());
             subscriberData.put("ct", subscriber.getCustType());
             subscriberData.put("cv", subscriber.getCustVip());
             subscriberData.put("zl", subscriber.getZoneListList());
@@ -258,11 +258,16 @@ public class MessageService {
             }
             bins.add(new Bin("his", historyData));
 
-            // Add generation
-            bins.add(new Bin("gen", subscriberInfo.getGeneration()));
-
-            // Write all bins to Aerospike
-            destinationClient.put(writePolicy, key, bins.toArray(new Bin[0]));
+            // Write all bins to Aerospike without generation checking
+            writePolicy.generationPolicy = com.aerospike.client.policy.GenerationPolicy.NONE;
+            
+            try {
+                destinationClient.put(writePolicy, key, bins.toArray(new Bin[0]));
+            } catch (com.aerospike.client.AerospikeException e) {
+                logger.error("[{}] Error writing to Aerospike for key: {}, error: {}", 
+                           region, new String((byte[])key.userKey.getObject()), e.getMessage());
+                throw e;
+            }
             
         } catch (Exception e) {
             logger.error("[{}] Error processing record: {}", region, e.getMessage(), e);

@@ -15,6 +15,7 @@ import com.example.pipeline.proto.ProtoAcmBalance;
 import com.example.pipeline.proto.ProtoProduct;
 import com.example.pipeline.proto.ProtoCharacteristic;
 import com.example.pipeline.proto.ProtoHistory;
+import java.nio.charset.StandardCharsets;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -134,11 +135,6 @@ public class MessageProducerService {
             @SuppressWarnings("unchecked")
             Map<String, Object> subscriberData = (Map<String, Object>) subValue;
 
-            // // Validate subscriber data
-            // if (!validateSubscriberData(subscriberData, key.userKey.toString())) {
-            //     return null;
-            // }
-
             String region = (String) subscriberData.get("r");
             if (region == null) {
                 logger.warn("[Validation] No region found for key: {}", key.userKey);
@@ -183,47 +179,23 @@ public class MessageProducerService {
             ProtoSubscriberInfo protoMessage = builder.build();
             byte[] value = protoMessage.toByteArray();
 
-            return new ProducerRecord<>(topic, key.userKey.toString().getBytes(), value);
+            // === Sửa đoạn này: lấy đúng key byte[] gốc ===
+            Object userKeyObj = key.userKey != null ? key.userKey.getObject() : null;
+            byte[] keyBytes;
+            if (userKeyObj instanceof byte[]) {
+                keyBytes = (byte[]) userKeyObj;
+            } else if (userKeyObj instanceof String) {
+                keyBytes = ((String) userKeyObj).getBytes(StandardCharsets.UTF_8);
+            } else {
+                keyBytes = key.userKey.toString().getBytes(StandardCharsets.UTF_8);
+            }
+            return new ProducerRecord<>(topic, keyBytes, value);
         } catch (Exception e) {
             logger.error("[Processing Error] Failed to create Kafka record: {}", e.getMessage());
             totalMessagesFailed.incrementAndGet();
             return null;
         }
     }
-
-    // private boolean validateSubscriberData(Map<String, Object> subscriberData, String key) {
-    //     // Check required fields
-    //     String[] requiredFields = {"m", "si", "ci", "ct", "rt", "ss", "st", "lu"};
-    //     for (String field : requiredFields) {
-    //         if (!subscriberData.containsKey(field)) {
-    //             logSkippedMessage(key, "Missing required field: " + field);
-    //             logger.debug("[Validation] Missing field {} in subscriber data. Available fields: {}", 
-    //                 field, subscriberData.keySet());
-    //             return false;
-    //         }
-    //     }
-
-    //     // Validate field types
-    //     try {
-    //         // Validate MSISDN
-    //         Object msisdn = subscriberData.get("m");
-    //         if (!(msisdn instanceof String) || ((String) msisdn).isEmpty()) {
-    //             logSkippedMessage(key, "Invalid MSISDN format: " + (msisdn != null ? msisdn.getClass().getName() : "null"));
-    //             return false;
-    //         }
-
-
-
- 
-
-    //         return true;
-    //     } catch (Exception e) {
-    //         logSkippedMessage(key, "Error validating subscriber data: " + e.getMessage());
-    //         logger.error("[Validation] Exception during validation: ", e);
-    //         return false;
-    //     }
-    // }
-
 
     private String getStringValue(Map<String, Object> data, String key) {
         Object value = data.get(key);
@@ -245,7 +217,6 @@ public class MessageProducerService {
         }
         return 0;
     }
-
 
     private void processBalanceData(Record record, ProtoSubscriberInfo.Builder builder) {
         Object balValue = record.getValue("bal");

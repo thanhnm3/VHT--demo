@@ -9,7 +9,6 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -51,7 +50,7 @@ public class CdcProducerService {
                 long windowStart = lastPolledTime;
                 long windowEnd = System.currentTimeMillis();
                 
-                logger.debug("[CDC Producer] Scanning window [{} ==> {}]", windowStart, windowEnd);
+                logger.info("[CDC Producer] Scanning window [{} ==> {}]", windowStart, windowEnd);
                 
                 Statement stmt = new Statement();
                 stmt.setNamespace(sourceNamespace);
@@ -68,12 +67,6 @@ public class CdcProducerService {
                             Map<String, Object> sub = null;
                             if (subObj instanceof Map) {
                                 sub = (Map<String, Object>) subObj;
-                            } else if (subObj instanceof String) {
-                                try {
-                                    sub = new ObjectMapper().readValue((String) subObj, Map.class);
-                                } catch (Exception e) {
-                                    logger.warn("Failed to parse sub bin as JSON: {}", e.getMessage());
-                                }
                             }
                             if (sub != null) {
                                 long updateTime = System.currentTimeMillis();
