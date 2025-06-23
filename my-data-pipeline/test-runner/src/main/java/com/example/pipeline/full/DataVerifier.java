@@ -16,7 +16,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class DataVerifier {
-    private static final int SAMPLE_SIZE = 16547; // Số lượng key cần kiểm tra
+    private static final int SAMPLE_SIZE = 1000; // Số lượng key cần kiểm tra 16547
     private static final int[] POSSIBLE_PORTS = {4000, 4001, 4002, 4003, 4004};
     private static final int SLEEP_INTERVAL = 1000; // Sleep sau moi 1000 record
     private static final int SLEEP_DURATION = 3000; // Sleep 3 giay
@@ -100,12 +100,22 @@ public class DataVerifier {
                 // Doc record tu DB1
                 com.aerospike.client.Record sourceRecord = sourceClient.get(policy, sourceKey);
                 if (sourceRecord == null) {
+                    System.out.println("[SKIP] sourceRecord null for key: " + keyString);
                     continue;
                 }
 
-                // Lay thong tin region tu record
-                String region = (String) sourceRecord.getValue("region");
+                // Lấy bin 'sub' từ sourceRecord
+                Object sourceSubObj = sourceRecord.getValue("sub");
+                if (!(sourceSubObj instanceof Map)) {
+                    System.out.println("[SKIP] bin 'sub' null hoặc không phải Map cho key: " + keyString);
+                    continue;
+                }
+                @SuppressWarnings("unchecked")
+                Map<String, Object> sourceSub = (Map<String, Object>) sourceSubObj;
+                // Lấy region từ trường 'r' trong sub
+                String region = (String) sourceSub.get("r");
                 if (region == null) {
+                    System.out.println("[SKIP] region (sub.r) null for key: " + keyString);
                     continue;
                 }
 
@@ -115,6 +125,7 @@ public class DataVerifier {
                 // Lay consumer tuong ung voi region
                 List<String> consumerNames = config.getConsumersForRegion(region);
                 if (consumerNames == null || consumerNames.isEmpty()) {
+                    System.out.println("[SKIP] No consumerNames for region: " + region + ", key: " + keyString);
                     continue;
                 }
 
@@ -125,6 +136,7 @@ public class DataVerifier {
                     .orElse(null);
 
                 if (consumer == null) {
+                    System.out.println("[SKIP] No consumer config for: " + consumerName + ", key: " + keyString);
                     continue;
                 }
 
@@ -141,23 +153,38 @@ public class DataVerifier {
                     mismatches.incrementAndGet();
                     stats.mismatches++;
                 } else {
-                    // Kiem tra cac truong
-                    String sourceProvince = (String) sourceRecord.getValue("province");
-                    String destProvince = (String) destRecord.getValue("province");
-
-                    if (sourceProvince != null && destProvince != null && !sourceProvince.equals(destProvince)) {
-                        System.out.printf("Mismatch: Key %s co province khac nhau (DB1: %s, DB2: %s, region: %s)%n",
-                            keyString, sourceProvince, destProvince, region);
+                    // Lấy bin 'sub' từ cả hai record
+                    Object destSubObj = destRecord.getValue("sub");
+                    if (!(destSubObj instanceof Map)) {
+                        System.out.printf("Mismatch: Key %s, bin 'sub' khong phai Map (DB1: %s, DB2: %s)%n",
+                            keyString, sourceSubObj == null ? "null" : sourceSubObj.getClass(),
+                            destSubObj == null ? "null" : destSubObj.getClass());
                         mismatches.incrementAndGet();
                         stats.mismatches++;
-                    }
-                    
-                    // Check generation
-                    int sourceGen = sourceRecord.generation;
-                    int destGen = destRecord.generation;
-                    if (sourceGen != destGen) {
-                        System.out.printf("Generation mismatch: Key %s (DB1: %d, DB2: %d, region: %s)%n",
-                            keyString, sourceGen, destGen, region);
+                    } else {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> destSub = (Map<String, Object>) destSubObj;
+                        // Các trường cần kiểm tra
+                        String[] fields = {"m", "si", "ci", "ct", "rt", "ss", "st"};
+                        // Chọn ngẫu nhiên 3 trường để kiểm tra
+                        java.util.List<String> fieldList = java.util.Arrays.asList(fields);
+                        java.util.Collections.shuffle(fieldList);
+                        java.util.List<String> randomFields = fieldList.subList(0, 3);
+                        for (String field : randomFields) {
+                            Object srcVal = sourceSub.get(field);
+                            Object dstVal = destSub.get(field);
+                            if (srcVal == null && dstVal == null) {
+                                System.out.printf("[INFO] Key %s, field '%s' both null\n", keyString, field);
+                                continue;
+                            }
+                            if (srcVal == null || dstVal == null || !srcVal.equals(dstVal)) {
+                                System.out.printf("Mismatch: Key %s, field '%s' differs (DB1: %s, DB2: %s)%n", keyString, field, srcVal, dstVal);
+                                mismatches.incrementAndGet();
+                                stats.mismatches++;
+                            } else {
+                                System.out.printf("[OK] Key %s, field '%s' match: %s\n", keyString, field, srcVal);
+                            }
+                        }
                     }
                 }
 

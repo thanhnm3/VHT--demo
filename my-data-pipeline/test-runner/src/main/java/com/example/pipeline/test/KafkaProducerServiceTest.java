@@ -14,7 +14,6 @@ import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.clients.producer.*;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
-import org.apache.kafka.common.ElectionType;
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException;
 
 import java.time.Duration;
@@ -32,7 +31,6 @@ public class KafkaProducerServiceTest {
     private static final short REPLICATION_FACTOR = 2;
     private static final Random random = new Random();
     private static final String[] REGIONS = {"north", "central", "south"};
-    private static final String[] SERVICE_TYPES = {"MOBILE", "FIXED", "BROADBAND"};
 
     public static void main(String[] args) throws InterruptedException {
         // Load configuration
@@ -190,8 +188,6 @@ public class KafkaProducerServiceTest {
             // Random phone number
             String phoneNumber = String.format("09%d", random.nextInt(10000000, 100000000));
             
-            // Random service type
-            String serviceType = SERVICE_TYPES[random.nextInt(SERVICE_TYPES.length)];
 
             // Create ProtoBalance
             ProtoBalance balance = ProtoBalance.newBuilder()

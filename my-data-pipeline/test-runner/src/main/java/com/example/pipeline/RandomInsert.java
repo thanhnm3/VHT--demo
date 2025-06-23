@@ -226,7 +226,6 @@ public class RandomInsert {
                                     .putProduct(ThreadLocalRandom.current().nextLong(), product)
                                     .putCharacteristic(ThreadLocalRandom.current().nextLong(), characteristic)
                                     .putHistory(ThreadLocalRandom.current().nextLong(), history)
-                                    .setGeneration(ThreadLocalRandom.current().nextInt(10))
                                     .build();
 
                                 Key key = new Key(producerNamespace, producerSetName, userId.getBytes());
@@ -262,7 +261,7 @@ public class RandomInsert {
                                 subscriberData.put("bc", subscriber.getBccsCustId());
                                 subscriberData.put("rt", subscriber.getRegType());
                                 subscriberData.put("sc", subscriber.getSubcategory());
-                                subscriberData.put("ct", subscriber.getContractId());
+                                subscriberData.put("cid", subscriber.getContractId());
                                 subscriberData.put("ct", subscriber.getCustType());
                                 subscriberData.put("cv", subscriber.getCustVip());
                                 subscriberData.put("zl", subscriber.getZoneListList());

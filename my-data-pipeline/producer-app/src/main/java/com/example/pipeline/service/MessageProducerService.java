@@ -7,7 +7,6 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.example.pipeline.proto.ProtoSubscriberInfo;
 import com.example.pipeline.proto.ProtoSubscriber;
 import com.example.pipeline.proto.ProtoBalance;
@@ -26,7 +25,6 @@ public class MessageProducerService {
     private final Map<String, String> regionToTopicMap;
     private final Queue<ProducerRecord<byte[], byte[]>> pendingMessages;
     private final Object pendingMessagesLock;
-    private final ObjectMapper objectMapper;
     private final ConfigProducerService configService;
     private final AtomicLong totalMessagesSent = new AtomicLong(0);
     private final AtomicLong messagesInLastSecond = new AtomicLong(0);
@@ -38,7 +36,6 @@ public class MessageProducerService {
         this.regionToTopicMap = new ConcurrentHashMap<>();
         this.pendingMessages = new ConcurrentLinkedQueue<>();
         this.pendingMessagesLock = new Object();
-        this.objectMapper = new ObjectMapper();
         this.configService = ConfigProducerService.getInstance();
         
         // Initialize message rate monitor with simplified logging
@@ -158,10 +155,12 @@ public class MessageProducerService {
                 .setSubId(getLongValue(subscriberData, "si"))
                 .setCustId(getLongValue(subscriberData, "ci"))
                 .setCustType(getStringValue(subscriberData, "ct"))
+                .setContractId(getStringValue(subscriberData, "cid"))
                 .setRegion(getStringValue(subscriberData, "r"))
                 .setSubType(getIntValue(subscriberData, "st"))
                 .setStateSet(getStringValue(subscriberData, "ss"))
                 .setLastUpdate(getLongValue(subscriberData, "lu"))
+                .setRegType(getStringValue(subscriberData, "rt"))
                 .build();
             builder.setSubscriber(subscriber);
 
@@ -171,9 +170,6 @@ public class MessageProducerService {
             processProductData(record, builder);
             processCharacteristicData(record, builder);
             processHistoryData(record, builder);
-
-            // Set generation
-            builder.setGeneration(record.generation);
 
             // Build and serialize Proto message
             ProtoSubscriberInfo protoMessage = builder.build();
