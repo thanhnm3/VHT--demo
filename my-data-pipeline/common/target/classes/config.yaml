@@ -105,7 +105,7 @@ performance:
   max_retries: 5
   worker_pool:
     producer: 1
-    consumer: 2
+    consumer: 3
   rate_control:
     initial_rate: 20000.0
     max_rate: 50000.0

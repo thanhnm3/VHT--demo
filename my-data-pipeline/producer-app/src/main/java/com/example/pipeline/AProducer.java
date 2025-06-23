@@ -282,6 +282,9 @@ public class AProducer {
                 double newRate = rateControlService.calculateNewRateForProducer(totalLag);
                 rateControlService.updateRate(newRate);
                 currentRate = rateControlService.getCurrentRate();
+                if (aerospikeService != null) {
+                    aerospikeService.updateRate(currentRate);
+                }
                 logger.info("[Producer] Adjusted rate to {} messages/second based on total lag: {} for consumer groups: {}", 
                           String.format("%.2f", currentRate), totalLag, consumerGroup);
             } else {

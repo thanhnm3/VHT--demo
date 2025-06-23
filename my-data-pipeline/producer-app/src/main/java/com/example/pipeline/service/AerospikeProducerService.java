@@ -17,7 +17,7 @@ public class AerospikeProducerService {
     private final ExecutorService executor;
     private final MessageProducerService messageService;
     private final String sourceNamespace;
-
+    private volatile com.google.common.util.concurrent.RateLimiter rateLimiter;
 
     public AerospikeProducerService(ExecutorService executor, 
                                   MessageProducerService messageService,
@@ -25,6 +25,7 @@ public class AerospikeProducerService {
         this.executor = executor;
         this.messageService = messageService;
         this.sourceNamespace = sourceNamespace;
+        this.rateLimiter = null;
     }
 
     public void readDataFromAerospike(AerospikeClient client, 
@@ -37,7 +38,11 @@ public class AerospikeProducerService {
         scanPolicy.maxConcurrentNodes = 1;
         scanPolicy.recordsPerSecond = (int) currentRate;
 
-        RateLimiter rateLimiter = RateLimiter.create(currentRate);
+        if (this.rateLimiter == null) {
+            this.rateLimiter = com.google.common.util.concurrent.RateLimiter.create(currentRate);
+        } else {
+            this.rateLimiter.setRate(currentRate);
+        }
         List<ProducerRecord<byte[], byte[]>> batch = new ArrayList<>(100);
         Object batchLock = new Object();
         final AtomicLong lastBatchTime = new AtomicLong(System.currentTimeMillis());
@@ -134,6 +139,13 @@ public class AerospikeProducerService {
                 totalRecords.get());
         } catch (Exception e) {
             logger.error("Error scanning data from Aerospike: {}", e.getMessage(), e);
+        }
+    }
+
+    public void updateRate(double newRate) {
+        if (this.rateLimiter != null) {
+            this.rateLimiter.setRate(newRate);
+            logger.info("[AerospikeProducerService] Updated RateLimiter to {} msg/sec", newRate);
         }
     }
 
