@@ -14,12 +14,12 @@ consumers:
     set: users
   - name: consumer2
     host: 127.0.0.1
-    port: 4000
+    port: 5000
     namespace: consumer_central_and_south
     set: users_central
   - name: consumer3
     host: 127.0.0.1
-    port: 4000
+    port: 5000
     namespace: consumer_central_and_south
     set: users_south
 

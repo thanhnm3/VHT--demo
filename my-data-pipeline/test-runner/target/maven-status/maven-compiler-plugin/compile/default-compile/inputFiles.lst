@@ -3,6 +3,7 @@ D:\VHT3\VHT--demo\my-data-pipeline\test-runner\src\main\java\com\example\pipelin
 D:\VHT3\VHT--demo\my-data-pipeline\test-runner\src\main\java\com\example\pipeline\cdc\RandomOperations.java
 D:\VHT3\VHT--demo\my-data-pipeline\test-runner\src\main\java\com\example\pipeline\cdc\RunProducer.java
 D:\VHT3\VHT--demo\my-data-pipeline\test-runner\src\main\java\com\example\pipeline\cdc\RunRandomOperations.java
+D:\VHT3\VHT--demo\my-data-pipeline\test-runner\src\main\java\com\example\pipeline\full\AerospikeConnectionTest.java
 D:\VHT3\VHT--demo\my-data-pipeline\test-runner\src\main\java\com\example\pipeline\full\DataVerifier.java
 D:\VHT3\VHT--demo\my-data-pipeline\test-runner\src\main\java\com\example\pipeline\full\DeleteTopic.java
 D:\VHT3\VHT--demo\my-data-pipeline\test-runner\src\main\java\com\example\pipeline\full\MainAll.java

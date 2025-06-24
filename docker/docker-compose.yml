@@ -1,5 +1,6 @@
 version: '4'
 services:
+  # =============================== GRAFANA ===============================
   grafana:
     image: grafana/grafana:9.5.12
     ports:
@@ -21,6 +22,7 @@ services:
           cpus: '0.5'
           memory: 512M
 
+  # =============================== PROMETHEUS ===============================
   prometheus:
     image: prom/prometheus:v2.47.1
     ports:
@@ -37,6 +39,7 @@ services:
           cpus: '1.0'
           memory: 1.5G
 
+  # =============================== KAFKA EXPORTER ===============================
   kafka-exporter-source:
     image: danielqsj/kafka-exporter:v1.7.0
     ports:
@@ -57,7 +60,6 @@ services:
           cpus: '0.2'
           memory: 100M
 
-  # Source Zookeeper and Kafka
   zk1:
     image: confluentinc/cp-zookeeper:7.5.0
     environment:
@@ -170,47 +172,135 @@ services:
           cpus: '0.2'
           memory: 100M
 
-  # # =============================== AEROSPIKE ===============================
+  # =============================== AEROSPIKE 1 ===============================
   aerospike:
     build:
       context: .
       dockerfile: Dockerfile.aerospike1
     container_name: aerospike
+    user: root
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        echo never > /sys/kernel/mm/transparent_hugepage/enabled
+        echo never > /sys/kernel/mm/transparent_hugepage/defrag
+        sysctl -w vm.swappiness=0
+        sysctl -w vm.min_free_kbytes=131072
+        exec asd --config-file /etc/aerospike/aerospike.conf --foreground
+    networks:
+      aerospike-net:
+        ipv4_address: 172.28.0.2
+      kafka-platform:
     ports:
       - "3000:3000"
       - "3001:3001"
     volumes:
       - ./aerospike_data:/opt/aerospike/data
       - ./etc/aerospike/aerospike.conf:/etc/aerospike/aerospike.conf
-    command: ["asd", "--config-file", "/etc/aerospike/aerospike.conf", "--foreground"]
-    networks:
-      - kafka-platform
     deploy:
       resources:
         limits:
           cpus: '1.0'
           memory: 1.5G
 
+  aerospike-replica:
+    build:
+      context: .
+      dockerfile: Dockerfile.aerospike1
+    container_name: aerospike-replica
+    user: root
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        echo never > /sys/kernel/mm/transparent_hugepage/enabled
+        echo never > /sys/kernel/mm/transparent_hugepage/defrag
+        sysctl -w vm.swappiness=0
+        sysctl -w vm.min_free_kbytes=131072
+        exec asd --config-file /etc/aerospike/aerospike.conf --foreground
+    networks:
+      aerospike-net:
+        ipv4_address: 172.28.0.3
+      kafka-platform:
+    ports:
+      - "4000:3000"
+      - "4001:3001"
+    volumes:
+      - ./aerospike_replica_data:/opt/aerospike/data
+      - ./etc/aerospike/aerospike-replica.conf:/etc/aerospike/aerospike.conf
+    command: ["asd", "--config-file", "/etc/aerospike/aerospike.conf", "--foreground"]
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1.5G
+
+  # =============================== AEROSPIKE 2 ===============================
   aerospike2:
     build:
       context: .
       dockerfile: Dockerfile.aerospike2
     container_name: aerospike2
-    ports:
-      - "4000:3000"
-      - "4001:3001"
-    volumes:
-      - ./aerospike_data:/opt/aerospike/data
-      - ./etc/aerospike/aerospike2.conf:/etc/aerospike/aerospike.conf
-    command: ["asd", "--config-file", "/etc/aerospike/aerospike.conf", "--foreground"]
+    user: root
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        echo never > /sys/kernel/mm/transparent_hugepage/enabled
+        echo never > /sys/kernel/mm/transparent_hugepage/defrag
+        sysctl -w vm.swappiness=0
+        sysctl -w vm.min_free_kbytes=131072
+        exec asd --config-file /etc/aerospike/aerospike.conf --foreground
     networks:
-      - kafka-platform
+      aerospike2-net:
+        ipv4_address: 172.29.0.2
+      kafka-platform:
+    ports:
+      - "5000:3000"
+      - "5001:3001"
+    volumes:
+      - ./aerospike2_data:/opt/aerospike/data
+      - ./etc/aerospike/aerospike2.conf:/etc/aerospike/aerospike.conf
     deploy:
       resources:
         limits:
           cpus: '1.0'
           memory: 1.5G
 
+  aerospike2-replica:
+    build:
+      context: .
+      dockerfile: Dockerfile.aerospike2
+    container_name: aerospike2-replica
+    user: root
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        echo never > /sys/kernel/mm/transparent_hugepage/enabled
+        echo never > /sys/kernel/mm/transparent_hugepage/defrag
+        sysctl -w vm.swappiness=0
+        sysctl -w vm.min_free_kbytes=131072
+        exec asd --config-file /etc/aerospike/aerospike.conf --foreground
+    networks:
+      aerospike2-net:
+        ipv4_address: 172.29.0.3
+      kafka-platform:
+    ports:
+      - "6000:3000"
+      - "6001:3001"
+    volumes:
+      - ./aerospike2_replica_data:/opt/aerospike/data
+      - ./etc/aerospike/aerospike2-replica.conf:/etc/aerospike/aerospike.conf
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1.5G
+
+
+  # =============================== AEROSPIKE TOOLS ===============================
   aerospike-tools:
     image: aerospike/aerospike-tools
     container_name: aerospike-tools
@@ -218,6 +308,8 @@ services:
       - aerospike
     networks:
       - kafka-platform
+      - aerospike-net
+      - aerospike2-net
     entrypoint: [ "sleep", "infinity" ]
     deploy:
       resources:
@@ -229,6 +321,18 @@ networks:
   kafka-platform:
     name: kafka-platform
     driver: bridge
+  aerospike-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+          gateway: 172.28.0.1
+  aerospike2-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.29.0.0/16
+          gateway: 172.29.0.1
 
   # docker-compose -f zk-kafka-single-node-stack.yml up -d
 

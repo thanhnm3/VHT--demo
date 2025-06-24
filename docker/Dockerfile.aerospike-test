@@ -1,0 +1,5 @@
+FROM eclipse-temurin:21-jdk
+WORKDIR /app
+COPY ../my-data-pipeline/test-runner/target/test-runner-1.0-SNAPSHOT.jar /app/
+COPY ../my-data-pipeline/common/src/main/resources/config.yaml /app/
+CMD ["java", "-cp", "test-runner-1.0-SNAPSHOT.jar", "com.example.pipeline.full.AerospikeConnectionTest"] 

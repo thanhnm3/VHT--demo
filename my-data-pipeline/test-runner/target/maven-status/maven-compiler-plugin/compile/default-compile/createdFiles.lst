@@ -4,6 +4,7 @@ com\example\pipeline\full\MainConsumer.class
 com\example\pipeline\cdc\RunProducer.class
 com\example\pipeline\cdc\RunRandomOperations.class
 com\example\pipeline\full\MainAll.class
+com\example\pipeline\full\AerospikeConnectionTest.class
 com\example\pipeline\full\DataVerifier$RegionStats.class
 com\example\pipeline\full\DeleteTopic.class
 com\example\pipeline\Main.class
