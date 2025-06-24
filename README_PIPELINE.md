@@ -88,3 +88,22 @@ rebuild_and_run.bat
 #### Lỗi config file
 - Đảm bảo file `config-docker.yaml` tồn tại
 - Kiểm tra environment variable: `docker exec vht-data-pipeline env | grep CONFIG_FILE` 
+
+
+
+### Cách chạy file test kết nối 2 aerospike quay docker 
+
+docker build -f docker/Dockerfile.aerospike-test -t aerospike-test .
+
+docker run --rm --network kafka-platform aerospike-test
+
+
+### Cách chạy file random insert 
+docker build -f docker/Dockerfile.random-insert -t random-insert .
+
+docker run --rm --network kafka-platform random-insert
+
+docker run --rm --network kafka-platform ^
+  -v D:/VHT3/VHT--demo/my-data-pipeline/common/src/main/resources/config-docker.yaml:/app/config-docker.yaml ^
+  -e CONFIG_FILE=config-docker.yaml ^
+  random-insert

@@ -32,10 +32,11 @@ public class RandomInsert {
             }
 
             // Lay cau hinh Producer
-            String producerHost = config.getProducers().get(0).getHost();
-            int producerPort = config.getProducers().get(0).getPort();
-            String producerNamespace = config.getProducers().get(0).getNamespace();
-            String producerSetName = config.getProducers().get(0).getSet();
+            Config.Producer producer = config.getProducers().get(0);
+            String producerHost = producer.getHost();
+            int producerPort = producer.getPort();
+            String producerNamespace = producer.getNamespace();
+            String producerSetName = producer.getSet();
 
             System.out.println("=== Bat dau Random Insert ===");
             System.out.println("Producer Host: " + producerHost);
@@ -44,17 +45,30 @@ public class RandomInsert {
             System.out.println("Producer Set Name: " + producerSetName);
             System.out.println("===============================");
 
-            // Kết nối đến Aerospike
-            AerospikeClient client = new AerospikeClient(producerHost, producerPort);
+            // Tạo mảng host cho cả 2 node
+            Host[] hostsArr = new Host[] {
+                new Host("aerospike", 3000),
+                new Host("aerospike-replica", 3000)
+            };
+
+            // Tạo duy nhất một instance AerospikeClient
+            AerospikeClient client = new AerospikeClient(null, hostsArr);
             System.out.println("Ket noi den Aerospike thanh cong!");
+
+            // Cấu hình WritePolicy tối ưu cho multi-node
             WritePolicy policy = new WritePolicy();
             policy.sendKey = true;
+            policy.connectTimeout = 1000; // ms
+            policy.socketTimeout = 200;   // ms
+            policy.totalTimeout = 2000;   // ms
+            policy.maxRetries = 2;
+            policy.sleepBetweenRetries = 3000; // ms
 
-            int numThreads = 16;
+            int numThreads = 1;
             ExecutorService executor = Executors.newFixedThreadPool(numThreads);
             List<Future<?>> futures = new ArrayList<>();
 
-            int maxRecordsPerRegion = 400_000; // So ban ghi moi mien 
+            int maxRecordsPerRegion = 100_000; // So ban ghi moi mien 
             Map<String, AtomicInteger> regionCounters = new ConcurrentHashMap<>();
             for (String region : REGIONS) {
                 regionCounters.put(region, new AtomicInteger(0));
@@ -429,6 +443,7 @@ public class RandomInsert {
             }
             System.out.println("\nTong so ban ghi da ghi: " + totalRecords);
 
+            // Đảm bảo đóng client khi xong
             client.close();
         } catch (Exception e) {
             System.err.println("Loi: " + e.getMessage());

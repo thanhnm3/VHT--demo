@@ -5,3 +5,9 @@ my-data-pipeline/consumer-app/target/
 my-data-pipeline/producer-app/target/
 my-data-pipeline/test-runner/target/
 my-data-pipeline/proto/target/
+
+docker/aerospike2_data/
+docker/aerospike2_data/
+docker/aerospike2_replica_data/
+docker/aerospike2_replica_data/
+docker/aerospike_replica_data/

@@ -24,28 +24,48 @@ public class AerospikeConnectionTest {
         Config config = ConfigLoader.getConfig();
         String producerNamespace = config.getProducers().get(0).getNamespace();
         String producerSet = config.getProducers().get(0).getSet();
-        String consumerNamespace1 = config.getConsumers().get(0).getNamespace();
-        String consumerSet1 = config.getConsumers().get(0).getSet();
         String consumerNamespace2 = config.getConsumers().get(1).getNamespace();
         String consumerSet2 = config.getConsumers().get(1).getSet();
         String consumerNamespace3 = config.getConsumers().get(2).getNamespace();
         String consumerSet3 = config.getConsumers().get(2).getSet();
 
-        // Mapping cho từng node
-        String[] namespaces = {producerNamespace, consumerNamespace1, consumerNamespace2, consumerNamespace3};
-        String[] sets = {producerSet, consumerSet1, consumerSet2, consumerSet3};
-
-        for (int i = 0; i < hosts.length; i++) {
+        // Kiểm tra aerospike và aerospike-replica với namespace 'producer' và set 'users'
+        for (int i = 0; i < 2; i++) { // Chỉ lặp qua 2 node đầu
             String host = hosts[i];
             int port = ports[i];
-            String namespace = namespaces[i];
-            String set = sets[i];
             String nodeName = nodeNames[i];
+            String namespace = "producer";
+            String set = "users";
             logger.info("\n[{}] Connecting to {}:{} (namespace: {}, set: {})", nodeName, host, port, namespace, set);
             try (AerospikeClient client = new AerospikeClient(new ClientPolicy(), host, port)) {
                 if (client.isConnected()) {
                     logger.info("[{}] Connection successful!", nodeName);
-                    // Thử đọc 1 bản ghi (nếu có key 1)
+                    Key key = new Key(namespace, set, 1);
+                    Record record = client.get(null, key);
+                    if (record != null) {
+                        logger.info("[{}] Read record with key=1: {}", nodeName, record.bins);
+                    } else {
+                        logger.info("[{}] No record found with key=1", nodeName);
+                    }
+                } else {
+                    logger.error("[{}] Connection failed!", nodeName);
+                }
+            } catch (Exception e) {
+                logger.error("[{}] Exception: {}", nodeName, e.getMessage(), e);
+            }
+        }
+
+        // Kiểm tra aerospike2 và aerospike2-replica với namespace 'consumer_central_and_south', set 'users_south'
+        for (int i = 2; i < 4; i++) { // Chỉ lặp qua 2 node cuối
+            String host = hosts[i];
+            int port = ports[i];
+            String nodeName = nodeNames[i];
+            String namespace = "consumer_central_and_south";
+            String set = "users_south";
+            logger.info("\n[{}] Connecting to {}:{} (namespace: {}, set: {})", nodeName, host, port, namespace, set);
+            try (AerospikeClient client = new AerospikeClient(new ClientPolicy(), host, port)) {
+                if (client.isConnected()) {
+                    logger.info("[{}] Connection successful!", nodeName);
                     Key key = new Key(namespace, set, 1);
                     Record record = client.get(null, key);
                     if (record != null) {
