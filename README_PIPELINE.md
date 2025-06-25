@@ -107,3 +107,10 @@ docker run --rm --network kafka-platform ^
   -v D:/VHT3/VHT--demo/my-data-pipeline/common/src/main/resources/config-docker.yaml:/app/config-docker.yaml ^
   -e CONFIG_FILE=config-docker.yaml ^
   random-insert
+
+
+
+## Khoi dong toan bo Pipeline 
+### Khoi dong DB truoc, khoi dong cac service sau 
+docker-compose up aerospike aerospike-replica aerospike2 aerospike2-replica  -d  
+docker-compose up -d

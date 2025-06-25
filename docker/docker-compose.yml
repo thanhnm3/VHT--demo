@@ -179,6 +179,7 @@ services:
       dockerfile: Dockerfile.aerospike1
     container_name: aerospike
     user: root
+    privileged: true
     entrypoint:
       - /bin/sh
       - -c
@@ -186,18 +187,19 @@ services:
         echo never > /sys/kernel/mm/transparent_hugepage/enabled
         echo never > /sys/kernel/mm/transparent_hugepage/defrag
         sysctl -w vm.swappiness=0
-        sysctl -w vm.min_free_kbytes=131072
+        sysctl -w vm.min_free_kbytes=1310720
         exec asd --config-file /etc/aerospike/aerospike.conf --foreground
     networks:
-      aerospike-net:
-        ipv4_address: 172.28.0.2
       kafka-platform:
+        ipv4_address: 172.28.0.2
     ports:
-      - "3000:3000"
-      - "3001:3001"
+      - "3000:3000"  # client
+      - "3001:3001"  # fabric
+      - "3002:3002"  # heartbeat
+      - "3003:3003"  # info
     volumes:
       - ./aerospike_data:/opt/aerospike/data
-      - ./etc/aerospike/aerospike.conf:/etc/aerospike/aerospike.conf
+      - ./etc/aerospike/aerospike.conf:/etc/aerospike/aerospike.conf:ro
     deploy:
       resources:
         limits:
@@ -210,6 +212,7 @@ services:
       dockerfile: Dockerfile.aerospike1
     container_name: aerospike-replica
     user: root
+    privileged: true
     entrypoint:
       - /bin/sh
       - -c
@@ -217,19 +220,19 @@ services:
         echo never > /sys/kernel/mm/transparent_hugepage/enabled
         echo never > /sys/kernel/mm/transparent_hugepage/defrag
         sysctl -w vm.swappiness=0
-        sysctl -w vm.min_free_kbytes=131072
+        sysctl -w vm.min_free_kbytes=1310720
         exec asd --config-file /etc/aerospike/aerospike.conf --foreground
     networks:
-      aerospike-net:
-        ipv4_address: 172.28.0.3
       kafka-platform:
+        ipv4_address: 172.28.0.3
     ports:
       - "4000:3000"
       - "4001:3001"
+      - "4002:3002"
+      - "4003:3003"
     volumes:
       - ./aerospike_replica_data:/opt/aerospike/data
-      - ./etc/aerospike/aerospike-replica.conf:/etc/aerospike/aerospike.conf
-    command: ["asd", "--config-file", "/etc/aerospike/aerospike.conf", "--foreground"]
+      - ./etc/aerospike/aerospike-replica.conf:/etc/aerospike/aerospike.conf:ro
     deploy:
       resources:
         limits:
@@ -253,9 +256,8 @@ services:
         sysctl -w vm.min_free_kbytes=131072
         exec asd --config-file /etc/aerospike/aerospike.conf --foreground
     networks:
-      aerospike2-net:
-        ipv4_address: 172.29.0.2
       kafka-platform:
+        ipv4_address: 172.28.0.4
     ports:
       - "5000:3000"
       - "5001:3001"
@@ -284,9 +286,8 @@ services:
         sysctl -w vm.min_free_kbytes=131072
         exec asd --config-file /etc/aerospike/aerospike.conf --foreground
     networks:
-      aerospike2-net:
-        ipv4_address: 172.29.0.3
       kafka-platform:
+        ipv4_address: 172.28.0.5
     ports:
       - "6000:3000"
       - "6001:3001"
@@ -308,8 +309,6 @@ services:
       - aerospike
     networks:
       - kafka-platform
-      - aerospike-net
-      - aerospike2-net
     entrypoint: [ "sleep", "infinity" ]
     deploy:
       resources:
@@ -319,20 +318,12 @@ services:
 
 networks:
   kafka-platform:
+    driver: bridge
     name: kafka-platform
-    driver: bridge
-  aerospike-net:
-    driver: bridge
     ipam:
       config:
         - subnet: 172.28.0.0/16
           gateway: 172.28.0.1
-  aerospike2-net:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.29.0.0/16
-          gateway: 172.29.0.1
 
   # docker-compose -f zk-kafka-single-node-stack.yml up -d
 
