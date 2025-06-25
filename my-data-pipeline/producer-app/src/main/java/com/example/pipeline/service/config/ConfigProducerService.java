@@ -112,6 +112,15 @@ public class ConfigProducerService {
         return config.getRegion_groups().getRegionOfProvince(province);
     }
     
+    /**
+     * Tìm tên tỉnh sau sát nhập dựa trên tên tỉnh đầu vào
+     * @param provinceName Tên tỉnh cần tìm
+     * @return Tên tỉnh sau sát nhập, hoặc null nếu không tìm thấy
+     */
+    public String getMergedProvinceName(String provinceName) {
+        return config.getMergedProvinceName(provinceName);
+    }
+    
     // Producer-specific configuration getters
     public int getWorkerPoolSize() {
         return workerPoolSize;

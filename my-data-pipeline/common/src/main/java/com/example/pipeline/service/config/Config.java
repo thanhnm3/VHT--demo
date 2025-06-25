@@ -148,36 +148,136 @@ public class Config {
     }
 
     public static class RegionGroups {
-        private List<String> north;
-        private List<String> central;
-        private List<String> south;
+        private Region north;
+        private Region central;
+        private Region south;
 
-        public List<String> getNorth() { return north; }
-        public void setNorth(List<String> north) { this.north = north; }
-        public List<String> getCentral() { return central; }
-        public void setCentral(List<String> central) { this.central = central; }
-        public List<String> getSouth() { return south; }
-        public void setSouth(List<String> south) { this.south = south; }
+        public static class Region {
+            private List<String> unchanged;
+            private Map<String, List<String>> merged;
 
-        public List<String> getProvincesByRegion(String region) {
-            return switch (region.toLowerCase()) {
+            public List<String> getUnchanged() { return unchanged; }
+            public void setUnchanged(List<String> unchanged) { this.unchanged = unchanged; }
+            public Map<String, List<String>> getMerged() { return merged; }
+            public void setMerged(Map<String, List<String>> merged) { this.merged = merged; }
+        }
+
+        public Region getNorth() { return north; }
+        public void setNorth(Region north) { this.north = north; }
+        public Region getCentral() { return central; }
+        public void setCentral(Region central) { this.central = central; }
+        public Region getSouth() { return south; }
+        public void setSouth(Region south) { this.south = south; }
+
+        public Region getRegionByName(String regionName) {
+            return switch (regionName.toLowerCase()) {
                 case "north" -> north;
                 case "central" -> central;
                 case "south" -> south;
-                default -> throw new IllegalArgumentException("Invalid region: " + region);
+                default -> null;
             };
+        }
+
+        public String getRegionOfProvince(String province) {
+            if (north != null && isProvinceInRegion(province, north)) return "north";
+            if (central != null && isProvinceInRegion(province, central)) return "central";
+            if (south != null && isProvinceInRegion(province, south)) return "south";
+            return null;
+        }
+
+        private boolean isProvinceInRegion(String province, Region region) {
+            // Kiểm tra trong unchanged
+            if (region.getUnchanged() != null && region.getUnchanged().contains(province)) {
+                return true;
+            }
+            
+            // Kiểm tra trong merged (cả key và value)
+            if (region.getMerged() != null) {
+                // Kiểm tra nếu province là key (tỉnh sau sát nhập)
+                if (region.getMerged().containsKey(province)) {
+                    return true;
+                }
+                // Kiểm tra nếu province là value (tỉnh trước sát nhập)
+                for (List<String> mergedProvinces : region.getMerged().values()) {
+                    if (mergedProvinces.contains(province)) {
+                        return true;
+                    }
+                }
+            }
+            
+            return false;
+        }
+
+        /**
+         * Tìm tên tỉnh sau sát nhập dựa trên tên tỉnh đầu vào
+         * @param provinceName Tên tỉnh cần tìm
+         * @return Tên tỉnh sau sát nhập, hoặc null nếu không tìm thấy
+         */
+        public String getMergedProvinceName(String provinceName) {
+            // Kiểm tra trong tất cả các vùng
+            String result = getMergedProvinceNameInRegion(provinceName, north);
+            if (result != null) return result;
+            
+            result = getMergedProvinceNameInRegion(provinceName, central);
+            if (result != null) return result;
+            
+            result = getMergedProvinceNameInRegion(provinceName, south);
+            return result;
+        }
+
+        private String getMergedProvinceNameInRegion(String provinceName, Region region) {
+            if (region == null) return null;
+            
+            // Kiểm tra trong unchanged - nếu là tỉnh không thay đổi thì trả về chính nó
+            if (region.getUnchanged() != null && region.getUnchanged().contains(provinceName)) {
+                return provinceName;
+            }
+            
+            // Kiểm tra trong merged
+            if (region.getMerged() != null) {
+                // Nếu provinceName là key (tỉnh sau sát nhập), trả về chính nó
+                if (region.getMerged().containsKey(provinceName)) {
+                    return provinceName;
+                }
+                
+                // Nếu provinceName là value (tỉnh trước sát nhập), tìm key tương ứng
+                for (Map.Entry<String, List<String>> entry : region.getMerged().entrySet()) {
+                    if (entry.getValue().contains(provinceName)) {
+                        return entry.getKey();
+                    }
+                }
+            }
+            
+            return null;
+        }
+
+        // Backward compatibility methods
+        public List<String> getProvincesByRegion(String region) {
+            Region regionObj = getRegionByName(region);
+            if (regionObj == null) return null;
+            
+            // Tạo danh sách tổng hợp từ unchanged và merged
+            List<String> allProvinces = new java.util.ArrayList<>();
+            
+            if (regionObj.getUnchanged() != null) {
+                allProvinces.addAll(regionObj.getUnchanged());
+            }
+            
+            if (regionObj.getMerged() != null) {
+                // Thêm các tỉnh sau sát nhập (keys)
+                allProvinces.addAll(regionObj.getMerged().keySet());
+                // Thêm các tỉnh trước sát nhập (values)
+                for (List<String> mergedProvinces : regionObj.getMerged().values()) {
+                    allProvinces.addAll(mergedProvinces);
+                }
+            }
+            
+            return allProvinces;
         }
 
         public boolean isProvinceInRegion(String province, String region) {
             List<String> provinces = getProvincesByRegion(region);
             return provinces != null && provinces.contains(province);
-        }
-
-        public String getRegionOfProvince(String province) {
-            if (north != null && north.contains(province)) return "north";
-            if (central != null && central.contains(province)) return "central";
-            if (south != null && south.contains(province)) return "south";
-            return null;
         }
     }
 
@@ -216,5 +316,15 @@ public class Config {
     public List<String> getConsumersForProvince(String province) {
         String region = region_groups.getRegionOfProvince(province);
         return region != null ? getConsumersForRegion(region) : null;
+    }
+
+    /**
+     * Tìm tên tỉnh sau sát nhập dựa trên tên tỉnh đầu vào
+     * @param provinceName Tên tỉnh cần tìm
+     * @return Tên tỉnh sau sát nhập, hoặc null nếu không tìm thấy
+     */
+    public String getMergedProvinceName(String provinceName) {
+        if (region_groups == null) return null;
+        return region_groups.getMergedProvinceName(provinceName);
     }
 }

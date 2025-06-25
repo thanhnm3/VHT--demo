@@ -30,74 +30,79 @@ region_mapping:
 
 region_groups:
   north:
-    - Ha Noi
-    - Lai Chau
-    - Dien Bien
-    - Son La
-    - Lang Son
-    - Quang Ninh
-    - Cao Bang
-    - Tuyen Quang
-    - Ha Giang
-    - Lao Cai
-    - Yen Bai
-    - Thai Nguyen
-    - Bac Kan
-    - Phu Tho
-    - Vinh Phuc
-    - Hoa Binh
-    - Bac Ninh
-    - Bac Giang
-    - Hung Yen
-    - Thai Binh
-    - Hai Phong
-    - Hai Duong
-    - Ninh Binh
-    - Ha Nam
-    - Nam Dinh
+    unchanged:
+      - Ha Noi
+      - Lai Chau
+      - Dien Bien
+      - Son La
+      - Lang Son
+      - Quang Ninh
+      - Cao Bang
+    merged:
+      Tuyen Quang:
+        - Ha Giang
+      Lao Cai:
+        - Yen Bai
+      Thai Nguyen:
+        - Bac Kan
+      Phu Tho:
+        - Vinh Phuc
+        - Hoa Binh
+      Bac Ninh:
+        - Bac Giang
+      Hung Yen:
+        - Thai Binh
+      Hai Phong:
+        - Hai Duong
+      Ninh Binh:
+        - Ha Nam
+        - Nam Dinh
 
   central:
-    - Thanh Hoa
-    - Nghe An
-    - Ha Tinh
-    - Quang Tri
-    - Quang Binh
-    - Thua Thien Hue
-    - Da Nang
-    - Quang Nam
-    - Quang Ngai
-    - Kon Tum
-    - Gia Lai
-    - Binh Dinh
-    - Khanh Hoa
-    - Ninh Thuận
-    - Lam Dong
-    - Dak Nong
-    - Binh Thuan
-    - Dak Lak
-    - Phu Yen
+    unchanged:
+      - Hue
+      - Thanh Hoa
+      - Nghe An
+      - Ha Tinh
+    merged:
+      Quang Tri:
+        - Quang Binh
+      Da Nang:
+        - Quang Nam
+      Quang Ngai:
+        - Kon Tum
+      Gia Lai:
+        - Binh Dinh
+      Khanh Hoa:
+        - Ninh Thuan
+      Lam Dong:
+        - Dak Nong
+        - Binh Thuan
+      Dak Lak:
+        - Phu Yen
 
   south:
-    - TP. Ho Chi Minh
-    - Binh Duong
-    - Ba Ria Vung Tau
-    - Dong Nai
-    - Binh Phuoc
-    - Tay Ninh
-    - Long An
-    - Can Tho
-    - Soc Trang
-    - Hau Giang
-    - Vinh Long
-    - Ben Tre
-    - Tra Vinh
-    - Dong Thap
-    - Tien Giang
-    - Ca Mau
-    - Bac Lieu
-    - An Giang
-    - Kien Giang
-
+    merged:
+      TP. Ho Chi Minh:
+        - Binh Duong
+        - Ba Ria Vung Tau
+      Dong Nai:
+        - Binh Phuoc
+      Tay Ninh:
+        - Long An
+      Can Tho:
+        - Soc Trang
+        - Hau Giang
+      Vinh Long:
+        - Ben Tre
+        - Tra Vinh
+      Dong Thap:
+        - Tien Giang
+      Ca Mau:
+        - Bac Lieu
+      An Giang:
+        - Kien Giang
+        
 kafka:
   broker: source-kafka:29092,source-kafka-2:29092
 

@@ -149,6 +149,23 @@ public class MessageProducerService {
             // Create ProtoSubscriberInfo
             ProtoSubscriberInfo.Builder builder = ProtoSubscriberInfo.newBuilder();
             
+            // Lấy và chuyển đổi tên tỉnh sử dụng hàm getMergedProvinceName
+            String originalProvince = getStringValue(subscriberData, "p");
+            String mergedProvince = originalProvince;
+            if (originalProvince != null && !originalProvince.isEmpty()) {
+                try {
+                    String convertedProvince = configService.getMergedProvinceName(originalProvince);
+                    if (convertedProvince != null) {
+                        mergedProvince = convertedProvince;
+                        if (logger.isDebugEnabled()) {
+                            logger.debug("[Province Conversion] {} -> {}", originalProvince, mergedProvince);
+                        }
+                    }
+                } catch (Exception e) {
+                    logger.warn("[Province Conversion] Error converting province {}: {}", originalProvince, e.getMessage());
+                }
+            }
+            
             // Set subscriber info
             ProtoSubscriber subscriber = ProtoSubscriber.newBuilder()
                 .setMsisdn(getStringValue(subscriberData, "m"))
@@ -157,6 +174,7 @@ public class MessageProducerService {
                 .setCustType(getStringValue(subscriberData, "ct"))
                 .setContractId(getStringValue(subscriberData, "cid"))
                 .setRegion(getStringValue(subscriberData, "r"))
+                .setProvince(mergedProvince)  // Sử dụng tên tỉnh đã chuyển đổi
                 .setSubType(getIntValue(subscriberData, "st"))
                 .setStateSet(getStringValue(subscriberData, "ss"))
                 .setLastUpdate(getLongValue(subscriberData, "lu"))

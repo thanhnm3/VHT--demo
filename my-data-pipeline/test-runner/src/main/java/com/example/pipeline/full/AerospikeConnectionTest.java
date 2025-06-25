@@ -4,8 +4,6 @@ import com.aerospike.client.AerospikeClient;
 import com.aerospike.client.Key;
 import com.aerospike.client.Record;
 import com.aerospike.client.policy.ClientPolicy;
-import com.example.pipeline.service.ConfigLoader;
-import com.example.pipeline.service.config.Config;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,15 +17,6 @@ public class AerospikeConnectionTest {
         String[] hosts = {"aerospike", "aerospike-replica", "aerospike2", "aerospike2-replica"};
         int[] ports = {3000, 3000, 3000, 3000};
         String[] nodeNames = {"aerospike", "aerospike-replica", "aerospike2", "aerospike2-replica"};
-
-        // Lấy namespace và set từ config
-        Config config = ConfigLoader.getConfig();
-        String producerNamespace = config.getProducers().get(0).getNamespace();
-        String producerSet = config.getProducers().get(0).getSet();
-        String consumerNamespace2 = config.getConsumers().get(1).getNamespace();
-        String consumerSet2 = config.getConsumers().get(1).getSet();
-        String consumerNamespace3 = config.getConsumers().get(2).getNamespace();
-        String consumerSet3 = config.getConsumers().get(2).getSet();
 
         // Kiểm tra aerospike và aerospike-replica với namespace 'producer' và set 'users'
         for (int i = 0; i < 2; i++) { // Chỉ lặp qua 2 node đầu
