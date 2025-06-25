@@ -246,6 +246,7 @@ services:
       dockerfile: Dockerfile.aerospike2
     container_name: aerospike2
     user: root
+    privileged: true
     entrypoint:
       - /bin/sh
       - -c
@@ -253,7 +254,7 @@ services:
         echo never > /sys/kernel/mm/transparent_hugepage/enabled
         echo never > /sys/kernel/mm/transparent_hugepage/defrag
         sysctl -w vm.swappiness=0
-        sysctl -w vm.min_free_kbytes=131072
+        sysctl -w vm.min_free_kbytes=1310720
         exec asd --config-file /etc/aerospike/aerospike.conf --foreground
     networks:
       kafka-platform:
@@ -261,9 +262,11 @@ services:
     ports:
       - "5000:3000"
       - "5001:3001"
+      - "5002:3002"
+      - "5003:3003"
     volumes:
       - ./aerospike2_data:/opt/aerospike/data
-      - ./etc/aerospike/aerospike2.conf:/etc/aerospike/aerospike.conf
+      - ./etc/aerospike/aerospike2.conf:/etc/aerospike/aerospike.conf:ro
     deploy:
       resources:
         limits:
@@ -276,6 +279,7 @@ services:
       dockerfile: Dockerfile.aerospike2
     container_name: aerospike2-replica
     user: root
+    privileged: true
     entrypoint:
       - /bin/sh
       - -c
@@ -283,7 +287,7 @@ services:
         echo never > /sys/kernel/mm/transparent_hugepage/enabled
         echo never > /sys/kernel/mm/transparent_hugepage/defrag
         sysctl -w vm.swappiness=0
-        sysctl -w vm.min_free_kbytes=131072
+        sysctl -w vm.min_free_kbytes=1310720
         exec asd --config-file /etc/aerospike/aerospike.conf --foreground
     networks:
       kafka-platform:
@@ -291,9 +295,11 @@ services:
     ports:
       - "6000:3000"
       - "6001:3001"
+      - "6002:3002"
+      - "6003:3003"
     volumes:
       - ./aerospike2_replica_data:/opt/aerospike/data
-      - ./etc/aerospike/aerospike2-replica.conf:/etc/aerospike/aerospike.conf
+      - ./etc/aerospike/aerospike2-replica.conf:/etc/aerospike/aerospike.conf:ro
     deploy:
       resources:
         limits:

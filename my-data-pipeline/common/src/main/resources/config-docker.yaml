@@ -14,12 +14,12 @@ consumers:
     set: users
   - name: consumer2
     host: aerospike2
-    port: 5000
+    port: 3000
     namespace: consumer_central_and_south
     set: users_central
   - name: consumer3
     host: aerospike2
-    port: 5000
+    port: 3000
     namespace: consumer_central_and_south
     set: users_south
 
