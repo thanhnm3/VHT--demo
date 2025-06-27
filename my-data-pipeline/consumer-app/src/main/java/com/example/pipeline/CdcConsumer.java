@@ -3,7 +3,8 @@ package com.example.pipeline;
 
 import com.example.pipeline.service.config.ConfigurationService;
 import com.example.pipeline.service.KafkaConsumerService;
-import com.example.pipeline.service.MessageService;
+import com.example.pipeline.service.CdcMessageService;
+import com.example.pipeline.service.MessageProcessor;
 import com.aerospike.client.AerospikeClient;
 import com.aerospike.client.policy.ClientPolicy;
 import com.aerospike.client.policy.WritePolicy;
@@ -30,7 +31,7 @@ public class CdcConsumer {
     private final ConfigurationService configService;
     private final AerospikeClient aerospikeClient;
     private final KafkaConsumerService kafkaService;
-    private final MessageService messageService;
+    private final MessageProcessor messageService;
     private final ExecutorService executorService;
 
     public CdcConsumer(String[] args) {
@@ -66,8 +67,8 @@ public class CdcConsumer {
         
         this.kafkaService = new KafkaConsumerService(kafkaBroker, configService);
         
-        // Initialize MessageService - đồng bộ với AConsumer
-        this.messageService = new MessageService(
+        // Initialize CdcMessageService thay vì MessageService thông thường
+        this.messageService = new CdcMessageService(
             aerospikeClient,
             writePolicy,
             destinationNamespace,
@@ -94,13 +95,14 @@ public class CdcConsumer {
 
     private void start() {
         try {
-            logger.info("Starting CDC consumer with:");
+            logger.info("Starting CDC consumer with latency monitoring:");
             logger.info("Topic: {}", consumerTopic);
             logger.info("Consumer group: {}", consumerGroup);
             logger.info("Worker pool size: {}", workerPoolSize);
             logger.info("Aerospike namespace: {}", destinationNamespace);
+            logger.info("CDC Latency Monitor: Enabled with 20,000 record window");
 
-            // Start consuming messages from the topic using MessageService
+            // Start consuming messages from the topic using CdcMessageService
             kafkaService.startConsuming(consumerTopic, consumerGroup, messageService);
 
         } catch (Exception e) {
@@ -130,6 +132,6 @@ public class CdcConsumer {
             aerospikeClient.close();
         }
         
-        logger.info("Shutdown completed successfully");
+        logger.info("CDC Consumer shutdown completed successfully");
     }
 }

@@ -27,7 +27,7 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.concurrent.CountDownLatch;
 
-public class MessageService {
+public class MessageService implements MessageProcessor {
     private static final Logger logger = LoggerFactory.getLogger(MessageService.class);
     private final AerospikeClient destinationClient;
     private final WritePolicy writePolicy;

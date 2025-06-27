@@ -109,7 +109,7 @@ public class KafkaConsumerService {
         }
     }
 
-    public void startConsuming(String topic, String groupId, MessageService messageService) {
+    public void startConsuming(String topic, String groupId, MessageProcessor messageProcessor) {
         try {
             logger.info("Starting consumer for topic: {} with group: {}", topic, groupId);
             
@@ -137,7 +137,7 @@ public class KafkaConsumerService {
                         ConsumerRecords<byte[], byte[]> records = consumer.poll(Duration.ofMillis(100));
                         
                         if (!records.isEmpty()) {
-                            messageService.processRecords(records);
+                            messageProcessor.processRecords(records);
                             consumer.commitSync();
                             logger.debug("Committed offset for {} records", records.count());
                         }
