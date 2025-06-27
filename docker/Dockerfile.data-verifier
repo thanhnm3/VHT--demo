@@ -1,0 +1,8 @@
+FROM eclipse-temurin:21-jdk
+
+WORKDIR /app
+
+COPY my-data-pipeline/test-runner/target/test-runner-1.0-SNAPSHOT.jar /app/test-runner.jar
+COPY my-data-pipeline/common/src/main/resources/config-docker.yaml /app/config-docker.yaml
+
+ENTRYPOINT ["java", "-cp", "/app/test-runner.jar", "com.example.pipeline.DataVerifier"] 

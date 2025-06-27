@@ -1,3 +1,4 @@
+com\example\pipeline\service\config\Config$RegionGroups$Region.class
 com\example\pipeline\service\config\ConsumerConfig.class
 com\example\pipeline\service\TopicGenerator$TopicNameGenerator.class
 com\example\pipeline\service\config\Config$RegionGroups.class

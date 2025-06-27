@@ -94,9 +94,15 @@ compile_project() {
 
 # Function to run DataVerifier
 run_data_verifier() {
-    echo -e "${GREEN}Starting verification...${NC}"
-    compile_project
-    cd "$PROJECT_ROOT/test-runner" && mvn exec:java -Dexec.mainClass="com.example.pipeline.full.DataVerifier"
+    echo -e "${GREEN}Running DataVerifier in Docker...${NC}"
+    DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile.data-verifier -t data-verifier .
+    docker run --rm \
+      --name data-verifier \
+      --network kafka-platform \
+      -e JAVA_OPTS="-Xms1g -Xmx3g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication" \
+      -e CONFIG_FILE=config-docker.yaml \
+      -v $(pwd)/my-data-pipeline/common/src/main/resources/config-docker.yaml:/app/config-docker.yaml \
+      data-verifier
 }
 
 # Function to show menu

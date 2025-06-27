@@ -200,11 +200,7 @@ services:
     volumes:
       - ./aerospike_data:/opt/aerospike/data
       - ./etc/aerospike/aerospike.conf:/etc/aerospike/aerospike.conf:ro
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1.5G
+
 
   aerospike-replica:
     build:
@@ -233,11 +229,7 @@ services:
     volumes:
       - ./aerospike_replica_data:/opt/aerospike/data
       - ./etc/aerospike/aerospike-replica.conf:/etc/aerospike/aerospike.conf:ro
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1.5G
+
 
   # =============================== AEROSPIKE 2 ===============================
   aerospike2:
@@ -267,11 +259,6 @@ services:
     volumes:
       - ./aerospike2_data:/opt/aerospike/data
       - ./etc/aerospike/aerospike2.conf:/etc/aerospike/aerospike.conf:ro
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1.5G
 
   aerospike2-replica:
     build:
@@ -300,12 +287,6 @@ services:
     volumes:
       - ./aerospike2_replica_data:/opt/aerospike/data
       - ./etc/aerospike/aerospike2-replica.conf:/etc/aerospike/aerospike.conf:ro
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1.5G
-
 
   # =============================== AEROSPIKE TOOLS ===============================
   aerospike-tools:
