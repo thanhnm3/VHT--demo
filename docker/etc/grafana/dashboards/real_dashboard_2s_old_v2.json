@@ -347,8 +347,8 @@
                         "uid": "PBFA97CFB590B2093"
                     },
                     "editorMode": "code",
-                    "expr": "kafka_consumergroup_lag{instance=\"$instance\",topic=~\"$topic\"}",
-                    "legendFormat": "{{consumergroup}} (topic: {{topic}})",
+                    "expr": "clamp_min(kafka_consumergroup_lag{instance=\"$instance\",topic=~\"$topic\"}, 0)",
+                    "legendFormat": "{{consumergroup}} (topic: {{topic}}) - Lag",
                     "range": true,
                     "refId": "A"
                 }

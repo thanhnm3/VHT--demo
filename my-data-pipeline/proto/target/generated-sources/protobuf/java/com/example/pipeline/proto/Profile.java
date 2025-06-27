@@ -119,7 +119,7 @@ public final class Profile {
   static {
     java.lang.String[] descriptorData = {
       "\n\rprofile.proto\022\032com.example.pipeline.pr" +
-      "oto\"\337\007\n\023ProtoSubscriberInfo\022?\n\nsubscribe" +
+      "oto\"\361\007\n\023ProtoSubscriberInfo\022?\n\nsubscribe" +
       "r\030\001 \001(\0132+.com.example.pipeline.proto.Pro" +
       "toSubscriber\022M\n\007balance\030\002 \003(\0132<.com.exam" +
       "ple.pipeline.proto.ProtoSubscriberInfo.B" +
@@ -132,95 +132,96 @@ public final class Profile {
       "iberInfo.CharacteristicEntry\022M\n\007history\030" +
       "\010 \003(\0132<.com.example.pipeline.proto.Proto" +
       "SubscriberInfo.HistoryEntry\022\022\n\ngeneratio" +
-      "n\030\n \001(\005\032X\n\014BalanceEntry\022\013\n\003key\030\001 \001(\003\0227\n\005" +
-      "value\030\002 \001(\0132(.com.example.pipeline.proto" +
-      ".ProtoBalance:\0028\001\032^\n\017AcmBalanceEntry\022\013\n\003" +
-      "key\030\001 \001(\003\022:\n\005value\030\002 \001(\0132+.com.example.p" +
-      "ipeline.proto.ProtoAcmBalance:\0028\001\032X\n\014Pro" +
-      "ductEntry\022\013\n\003key\030\001 \001(\003\0227\n\005value\030\002 \001(\0132(." +
-      "com.example.pipeline.proto.ProtoProduct:" +
-      "\0028\001\032f\n\023CharacteristicEntry\022\013\n\003key\030\001 \001(\003\022" +
-      ">\n\005value\030\002 \001(\0132/.com.example.pipeline.pr" +
-      "oto.ProtoCharacteristic:\0028\001\032X\n\014HistoryEn" +
-      "try\022\013\n\003key\030\001 \001(\003\0227\n\005value\030\002 \001(\0132(.com.ex" +
-      "ample.pipeline.proto.ProtoHistory:\0028\001\"\371\t" +
-      "\n\017ProtoSubscriber\022\016\n\006msisdn\030\001 \001(\t\022\r\n\005sub" +
-      "Id\030\002 \001(\003\022\016\n\006custId\030\003 \001(\003\022\021\n\tisDefault\030\004 " +
-      "\001(\010\022\017\n\007subType\030\005 \001(\005\022\020\n\010stateSet\030\006 \001(\t\022\021" +
-      "\n\tprecharge\030\007 \001(\003\022\025\n\rbalanceIdList\030\010 \003(\003" +
-      "\022\030\n\020acmBalanceIdList\030\t \003(\003\022\025\n\rproductIdL" +
-      "ist\030\n \003(\003\022\023\n\013groupIdList\030\013 \003(\003\022\030\n\020member" +
-      "shipIdList\030\014 \003(\003\022\030\n\020vpnGroupNameList\030\r \003" +
-      "(\t\022e\n\025mapSessionTypeLastest\030\016 \003(\0132F.com." +
+      "n\030\n \001(\005\022\020\n\010ctrlData\030\013 \001(\014\032X\n\014BalanceEntr" +
+      "y\022\013\n\003key\030\001 \001(\003\0227\n\005value\030\002 \001(\0132(.com.exam" +
+      "ple.pipeline.proto.ProtoBalance:\0028\001\032^\n\017A" +
+      "cmBalanceEntry\022\013\n\003key\030\001 \001(\003\022:\n\005value\030\002 \001" +
+      "(\0132+.com.example.pipeline.proto.ProtoAcm" +
+      "Balance:\0028\001\032X\n\014ProductEntry\022\013\n\003key\030\001 \001(\003" +
+      "\0227\n\005value\030\002 \001(\0132(.com.example.pipeline.p" +
+      "roto.ProtoProduct:\0028\001\032f\n\023CharacteristicE" +
+      "ntry\022\013\n\003key\030\001 \001(\003\022>\n\005value\030\002 \001(\0132/.com.e" +
+      "xample.pipeline.proto.ProtoCharacteristi" +
+      "c:\0028\001\032X\n\014HistoryEntry\022\013\n\003key\030\001 \001(\003\0227\n\005va" +
+      "lue\030\002 \001(\0132(.com.example.pipeline.proto.P" +
+      "rotoHistory:\0028\001\"\371\t\n\017ProtoSubscriber\022\016\n\006m" +
+      "sisdn\030\001 \001(\t\022\r\n\005subId\030\002 \001(\003\022\016\n\006custId\030\003 \001" +
+      "(\003\022\021\n\tisDefault\030\004 \001(\010\022\017\n\007subType\030\005 \001(\005\022\020" +
+      "\n\010stateSet\030\006 \001(\t\022\021\n\tprecharge\030\007 \001(\003\022\025\n\rb" +
+      "alanceIdList\030\010 \003(\003\022\030\n\020acmBalanceIdList\030\t" +
+      " \003(\003\022\025\n\rproductIdList\030\n \003(\003\022\023\n\013groupIdLi" +
+      "st\030\013 \003(\003\022\030\n\020membershipIdList\030\014 \003(\003\022\030\n\020vp" +
+      "nGroupNameList\030\r \003(\t\022e\n\025mapSessionTypeLa" +
+      "stest\030\016 \003(\0132F.com.example.pipeline.proto" +
+      ".ProtoSubscriber.MapSessionTypeLastestEn" +
+      "try\022\025\n\rmainProductId\030\017 \001(\003\022\020\n\010cellList\030\020" +
+      " \003(\t\022\016\n\006langId\030\021 \001(\005\022\016\n\006region\030\022 \001(\t\022\023\n\013" +
+      "last_update\030\023 \001(\003\022\017\n\007effDate\030\024 \001(\003\022\017\n\007ex" +
+      "pDate\030\025 \001(\003\022\022\n\nupdateDate\030\026 \001(\003\022\r\n\005state" +
+      "\030\027 \001(\003\022\022\n\ncharIdList\030\030 \003(\003\022\r\n\005level\030\031 \001(" +
+      "\005\022\n\n\002of\030\032 \001(\003\022O\n\nmapExtProp\030\033 \003(\0132;.com." +
       "example.pipeline.proto.ProtoSubscriber.M" +
-      "apSessionTypeLastestEntry\022\025\n\rmainProduct" +
-      "Id\030\017 \001(\003\022\020\n\010cellList\030\020 \003(\t\022\016\n\006langId\030\021 \001" +
-      "(\005\022\016\n\006region\030\022 \001(\t\022\023\n\013last_update\030\023 \001(\003\022" +
-      "\017\n\007effDate\030\024 \001(\003\022\017\n\007expDate\030\025 \001(\003\022\022\n\nupd" +
-      "ateDate\030\026 \001(\003\022\r\n\005state\030\027 \001(\003\022\022\n\ncharIdLi" +
-      "st\030\030 \003(\003\022\r\n\005level\030\031 \001(\005\022\n\n\002of\030\032 \001(\003\022O\n\nm" +
-      "apExtProp\030\033 \003(\0132;.com.example.pipeline.p" +
-      "roto.ProtoSubscriber.MapExtPropEntry\022\014\n\004" +
-      "imsi\030\037 \001(\t\022\r\n\005iccid\030  \001(\t\022\020\n\010password\030! " +
-      "\001(\t\022\021\n\tbccsSubId\030\" \001(\t\022\022\n\nbccsCustId\030# \001" +
-      "(\t\022\022\n\nbccsAcctId\030$ \001(\t\022\017\n\007regType\030% \001(\t\022" +
-      "\023\n\013subcategory\030& \001(\t\022\022\n\ncontractId\030\' \001(\t" +
-      "\022\020\n\010custType\030( \001(\t\022\017\n\007custVip\030) \001(\t\022\020\n\010z" +
-      "oneList\030* \003(\t\022\020\n\010province\030+ \001(\t\022\r\n\005email" +
-      "\030, \001(\t\022\017\n\007address\030- \001(\t\022\021\n\tfirstName\030. \001" +
-      "(\t\022\020\n\010lastName\030/ \001(\t\022\024\n\014completeDate\0303 \001" +
-      "(\003\022\020\n\010birthDay\0304 \001(\003\022\027\n\017startNotifyTime\030" +
-      "5 \001(\003\022\025\n\rendNotifyTime\0306 \001(\003\022\027\n\017countTop" +
-      "upTotal\0307 \001(\003\022\031\n\021countTopupFailure\0308 \001(\003" +
-      "\022\031\n\021countTopupSuccess\0309 \001(\003\022\013\n\003sex\030: \001(\005" +
-      "\032<\n\032MapSessionTypeLastestEntry\022\013\n\003key\030\001 " +
-      "\001(\005\022\r\n\005value\030\002 \001(\t:\0028\001\0321\n\017MapExtPropEntr" +
-      "y\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001\"\215\003\n\014Pr" +
-      "otoBalance\022\n\n\002id\030\001 \001(\003\022\r\n\005gross\030\002 \001(\003\022\017\n" +
-      "\007consume\030\003 \001(\003\022\017\n\007reserve\030\004 \001(\003\022\017\n\007balTy" +
-      "pe\030\005 \001(\003\022\020\n\010quotaMax\030\006 \001(\003\022\024\n\014recurringD" +
-      "ay\030\007 \001(\003\022\022\n\nownerValue\030\010 \001(\t\022\017\n\007effDate\030" +
-      "\024 \001(\003\022\017\n\007expDate\030\025 \001(\003\022\022\n\nupdateDate\030\026 \001" +
-      "(\003\022\r\n\005state\030\027 \001(\003\022\022\n\ncharIdList\030\030 \003(\003\022\r\n" +
-      "\005level\030\031 \001(\005\022\n\n\002of\030\032 \001(\003\022L\n\nmapExtProp\030\033" +
-      " \003(\01328.com.example.pipeline.proto.ProtoB" +
-      "alance.MapExtPropEntry\0321\n\017MapExtPropEntr" +
-      "y\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001\"\355\002\n\017Pr" +
-      "otoAcmBalance\022\n\n\002id\030\001 \001(\003\022\r\n\005value\030\002 \001(\003" +
-      "\022\017\n\007reserve\030\003 \001(\003\022\017\n\007balType\030\004 \001(\003\022\026\n\016bi" +
-      "llingCycleId\030\005 \001(\003\022\r\n\005limit\030\006 \001(\003\022\017\n\007eff" +
-      "Date\030\024 \001(\003\022\017\n\007expDate\030\025 \001(\003\022\022\n\nupdateDat" +
-      "e\030\026 \001(\003\022\r\n\005state\030\027 \001(\003\022\022\n\ncharIdList\030\030 \003" +
-      "(\003\022\r\n\005level\030\031 \001(\005\022\n\n\002of\030\032 \001(\003\022O\n\nmapExtP" +
-      "rop\030\033 \003(\0132;.com.example.pipeline.proto.P" +
-      "rotoAcmBalance.MapExtPropEntry\0321\n\017MapExt" +
-      "PropEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028" +
-      "\001\"\324\002\n\014ProtoProduct\022\n\n\002id\030\001 \001(\003\022\031\n\021produc" +
-      "tOfferingId\030\002 \001(\003\022\022\n\nmemberList\030\003 \003(\t\022\024\n" +
-      "\014recurringDay\030\004 \001(\003\022\017\n\007effDate\030\024 \001(\003\022\017\n\007" +
-      "expDate\030\025 \001(\003\022\022\n\nupdateDate\030\026 \001(\003\022\r\n\005sta" +
-      "te\030\027 \001(\003\022\022\n\ncharIdList\030\030 \003(\003\022\r\n\005level\030\031 " +
-      "\001(\005\022\n\n\002of\030\032 \001(\003\022L\n\nmapExtProp\030\033 \003(\01328.co" +
-      "m.example.pipeline.proto.ProtoProduct.Ma" +
-      "pExtPropEntry\0321\n\017MapExtPropEntry\022\013\n\003key\030" +
-      "\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001\"\256\002\n\014ProtoHistor" +
-      "y\022\n\n\002id\030\001 \001(\003\022\014\n\004type\030\002 \001(\005\022\017\n\007effDate\030\024" +
-      " \001(\003\022\017\n\007expDate\030\025 \001(\003\022\022\n\nupdateDate\030\026 \001(" +
-      "\003\022\r\n\005state\030\027 \001(\003\022\022\n\ncharIdList\030\030 \003(\003\022\r\n\005" +
-      "level\030\031 \001(\005\022\n\n\002of\030\032 \001(\003\022L\n\nmapExtProp\030\033 " +
-      "\003(\01328.com.example.pipeline.proto.ProtoHi" +
-      "story.MapExtPropEntry\022\017\n\007content\030\034 \001(\t\0321" +
-      "\n\017MapExtPropEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030" +
-      "\002 \001(\t:\0028\001\"\353\002\n\023ProtoCharacteristic\022\n\n\002id\030" +
-      "\001 \001(\003\022\022\n\ncharSpecId\030\002 \001(\003\022\026\n\016billingCycl" +
-      "eId\030\003 \001(\003\022\r\n\005value\030\004 \001(\t\022\021\n\tlongValue\030\005 " +
-      "\001(\003\022\017\n\007effDate\030\024 \001(\003\022\017\n\007expDate\030\025 \001(\003\022\022\n" +
-      "\nupdateDate\030\026 \001(\003\022\r\n\005state\030\027 \001(\003\022\022\n\nchar" +
-      "IdList\030\030 \003(\003\022\r\n\005level\030\031 \001(\005\022\n\n\002of\030\032 \001(\003\022" +
-      "S\n\nmapExtProp\030\033 \003(\0132?.com.example.pipeli" +
-      "ne.proto.ProtoCharacteristic.MapExtPropE" +
-      "ntry\0321\n\017MapExtPropEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005" +
-      "value\030\002 \001(\t:\0028\001B\002P\001b\006proto3"
+      "apExtPropEntry\022\014\n\004imsi\030\037 \001(\t\022\r\n\005iccid\030  " +
+      "\001(\t\022\020\n\010password\030! \001(\t\022\021\n\tbccsSubId\030\" \001(\t" +
+      "\022\022\n\nbccsCustId\030# \001(\t\022\022\n\nbccsAcctId\030$ \001(\t" +
+      "\022\017\n\007regType\030% \001(\t\022\023\n\013subcategory\030& \001(\t\022\022" +
+      "\n\ncontractId\030\' \001(\t\022\020\n\010custType\030( \001(\t\022\017\n\007" +
+      "custVip\030) \001(\t\022\020\n\010zoneList\030* \003(\t\022\020\n\010provi" +
+      "nce\030+ \001(\t\022\r\n\005email\030, \001(\t\022\017\n\007address\030- \001(" +
+      "\t\022\021\n\tfirstName\030. \001(\t\022\020\n\010lastName\030/ \001(\t\022\024" +
+      "\n\014completeDate\0303 \001(\003\022\020\n\010birthDay\0304 \001(\003\022\027" +
+      "\n\017startNotifyTime\0305 \001(\003\022\025\n\rendNotifyTime" +
+      "\0306 \001(\003\022\027\n\017countTopupTotal\0307 \001(\003\022\031\n\021count" +
+      "TopupFailure\0308 \001(\003\022\031\n\021countTopupSuccess\030" +
+      "9 \001(\003\022\013\n\003sex\030: \001(\005\032<\n\032MapSessionTypeLast" +
+      "estEntry\022\013\n\003key\030\001 \001(\005\022\r\n\005value\030\002 \001(\t:\0028\001" +
+      "\0321\n\017MapExtPropEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005valu" +
+      "e\030\002 \001(\t:\0028\001\"\215\003\n\014ProtoBalance\022\n\n\002id\030\001 \001(\003" +
+      "\022\r\n\005gross\030\002 \001(\003\022\017\n\007consume\030\003 \001(\003\022\017\n\007rese" +
+      "rve\030\004 \001(\003\022\017\n\007balType\030\005 \001(\003\022\020\n\010quotaMax\030\006" +
+      " \001(\003\022\024\n\014recurringDay\030\007 \001(\003\022\022\n\nownerValue" +
+      "\030\010 \001(\t\022\017\n\007effDate\030\024 \001(\003\022\017\n\007expDate\030\025 \001(\003" +
+      "\022\022\n\nupdateDate\030\026 \001(\003\022\r\n\005state\030\027 \001(\003\022\022\n\nc" +
+      "harIdList\030\030 \003(\003\022\r\n\005level\030\031 \001(\005\022\n\n\002of\030\032 \001" +
+      "(\003\022L\n\nmapExtProp\030\033 \003(\01328.com.example.pip" +
+      "eline.proto.ProtoBalance.MapExtPropEntry" +
+      "\0321\n\017MapExtPropEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005valu" +
+      "e\030\002 \001(\t:\0028\001\"\355\002\n\017ProtoAcmBalance\022\n\n\002id\030\001 " +
+      "\001(\003\022\r\n\005value\030\002 \001(\003\022\017\n\007reserve\030\003 \001(\003\022\017\n\007b" +
+      "alType\030\004 \001(\003\022\026\n\016billingCycleId\030\005 \001(\003\022\r\n\005" +
+      "limit\030\006 \001(\003\022\017\n\007effDate\030\024 \001(\003\022\017\n\007expDate\030" +
+      "\025 \001(\003\022\022\n\nupdateDate\030\026 \001(\003\022\r\n\005state\030\027 \001(\003" +
+      "\022\022\n\ncharIdList\030\030 \003(\003\022\r\n\005level\030\031 \001(\005\022\n\n\002o" +
+      "f\030\032 \001(\003\022O\n\nmapExtProp\030\033 \003(\0132;.com.exampl" +
+      "e.pipeline.proto.ProtoAcmBalance.MapExtP" +
+      "ropEntry\0321\n\017MapExtPropEntry\022\013\n\003key\030\001 \001(\t" +
+      "\022\r\n\005value\030\002 \001(\t:\0028\001\"\324\002\n\014ProtoProduct\022\n\n\002" +
+      "id\030\001 \001(\003\022\031\n\021productOfferingId\030\002 \001(\003\022\022\n\nm" +
+      "emberList\030\003 \003(\t\022\024\n\014recurringDay\030\004 \001(\003\022\017\n" +
+      "\007effDate\030\024 \001(\003\022\017\n\007expDate\030\025 \001(\003\022\022\n\nupdat" +
+      "eDate\030\026 \001(\003\022\r\n\005state\030\027 \001(\003\022\022\n\ncharIdList" +
+      "\030\030 \003(\003\022\r\n\005level\030\031 \001(\005\022\n\n\002of\030\032 \001(\003\022L\n\nmap" +
+      "ExtProp\030\033 \003(\01328.com.example.pipeline.pro" +
+      "to.ProtoProduct.MapExtPropEntry\0321\n\017MapEx" +
+      "tPropEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\002" +
+      "8\001\"\256\002\n\014ProtoHistory\022\n\n\002id\030\001 \001(\003\022\014\n\004type\030" +
+      "\002 \001(\005\022\017\n\007effDate\030\024 \001(\003\022\017\n\007expDate\030\025 \001(\003\022" +
+      "\022\n\nupdateDate\030\026 \001(\003\022\r\n\005state\030\027 \001(\003\022\022\n\nch" +
+      "arIdList\030\030 \003(\003\022\r\n\005level\030\031 \001(\005\022\n\n\002of\030\032 \001(" +
+      "\003\022L\n\nmapExtProp\030\033 \003(\01328.com.example.pipe" +
+      "line.proto.ProtoHistory.MapExtPropEntry\022" +
+      "\017\n\007content\030\034 \001(\t\0321\n\017MapExtPropEntry\022\013\n\003k" +
+      "ey\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001\"\353\002\n\023ProtoCha" +
+      "racteristic\022\n\n\002id\030\001 \001(\003\022\022\n\ncharSpecId\030\002 " +
+      "\001(\003\022\026\n\016billingCycleId\030\003 \001(\003\022\r\n\005value\030\004 \001" +
+      "(\t\022\021\n\tlongValue\030\005 \001(\003\022\017\n\007effDate\030\024 \001(\003\022\017" +
+      "\n\007expDate\030\025 \001(\003\022\022\n\nupdateDate\030\026 \001(\003\022\r\n\005s" +
+      "tate\030\027 \001(\003\022\022\n\ncharIdList\030\030 \003(\003\022\r\n\005level\030" +
+      "\031 \001(\005\022\n\n\002of\030\032 \001(\003\022S\n\nmapExtProp\030\033 \003(\0132?." +
+      "com.example.pipeline.proto.ProtoCharacte" +
+      "ristic.MapExtPropEntry\0321\n\017MapExtPropEntr" +
+      "y\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\002P\001b\006p" +
+      "roto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,
@@ -231,7 +232,7 @@ public final class Profile {
     internal_static_com_example_pipeline_proto_ProtoSubscriberInfo_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_com_example_pipeline_proto_ProtoSubscriberInfo_descriptor,
-        new java.lang.String[] { "Subscriber", "Balance", "AcmBalance", "Product", "Characteristic", "History", "Generation", });
+        new java.lang.String[] { "Subscriber", "Balance", "AcmBalance", "Product", "Characteristic", "History", "Generation", "CtrlData", });
     internal_static_com_example_pipeline_proto_ProtoSubscriberInfo_BalanceEntry_descriptor =
       internal_static_com_example_pipeline_proto_ProtoSubscriberInfo_descriptor.getNestedTypes().get(0);
     internal_static_com_example_pipeline_proto_ProtoSubscriberInfo_BalanceEntry_fieldAccessorTable = new

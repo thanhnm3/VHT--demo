@@ -82,6 +82,15 @@ public class AerospikeProducerService {
                             return;
                         }
 
+                        // Đọc bin "ctrl" để kiểm soát kích cỡ dữ liệu (không bắt buộc)
+                        Object ctrlObj = record.getValue("ctrl");
+                        if (ctrlObj instanceof byte[]) {
+                            byte[] ctrlData = (byte[]) ctrlObj;
+                            if (logger.isDebugEnabled()) {
+                                logger.debug("[AerospikeProducer] Control data size: {} bytes for key: {}", ctrlData.length, key.userKey);
+                            }
+                        }
+
                         // Kiểm tra consumers cho region này
                         List<String> consumers = messageService.getConsumersForRegion(recordRegion);
                         if (consumers == null || consumers.isEmpty()) {

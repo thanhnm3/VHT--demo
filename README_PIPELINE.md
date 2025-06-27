@@ -113,3 +113,6 @@ docker run --rm --network kafka-platform ^
 ### Khoi dong DB truoc, khoi dong cac service sau 
 docker-compose up aerospike aerospike-replica aerospike2 aerospike2-replica  -d  
 docker-compose up -d
+
+
+docker restart aerospike aerospike-replica aerospike2 aerospike2-replica

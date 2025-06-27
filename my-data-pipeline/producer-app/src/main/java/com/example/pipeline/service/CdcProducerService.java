@@ -70,9 +70,17 @@ public class CdcProducerService {
                             }
                             if (sub != null) {
                                 long updateTime = System.currentTimeMillis();
-                                if (sub.get("lu") instanceof Number) {
-                                    updateTime = ((Number) sub.get("lu")).longValue();
+                                Object luObj = record.getValue("lu");
+                                if (luObj instanceof Number) {
+                                    updateTime = ((Number) luObj).longValue();
                                 }
+                                
+                                Object ctrlObj = record.getValue("ctrl");
+                                if (ctrlObj instanceof byte[]) {
+                                    byte[] ctrlData = (byte[]) ctrlObj;
+                                    logger.debug("[CDC] Control data size: {} bytes for key: {}", ctrlData.length, key.userKey);
+                                }
+                                
                                 if (updateTime >= windowStart && updateTime < windowEnd) {
                                     String region = (String) sub.get("r");
                                     if (region != null) {

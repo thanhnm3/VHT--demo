@@ -197,4 +197,10 @@ com.example.pipeline.proto.ProtoHistory defaultValue);
    * @return The generation.
    */
   int getGeneration();
+
+  /**
+   * <code>bytes ctrlData = 11;</code>
+   * @return The ctrlData.
+   */
+  com.google.protobuf.ByteString getCtrlData();
 }

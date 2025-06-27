@@ -137,7 +137,6 @@ public class MessageService {
             subscriberData.put("cl", subscriber.getCellListList());
             subscriberData.put("li", subscriber.getLangId());
             subscriberData.put("r", subscriber.getRegion());
-            subscriberData.put("lu", subscriber.getLastUpdate());
             subscriberData.put("im", subscriber.getImsi());
             subscriberData.put("ic", subscriber.getIccid());
             subscriberData.put("pw", subscriber.getPassword());
@@ -151,6 +150,19 @@ public class MessageService {
             subscriberData.put("zl", subscriber.getZoneListList());
             subscriberData.put("p", subscriber.getProvince());
             bins.add(new Bin("sub", subscriberData));
+
+            // Tách trường lastUpdate ra thành bin riêng
+            long lastUpdate = subscriber.getLastUpdate();
+            bins.add(new Bin("lu", lastUpdate));
+
+            // Tạo bin "ctrl" từ dữ liệu trong Proto message
+            if (!subscriberInfo.getCtrlData().isEmpty()) {
+                byte[] ctrlData = subscriberInfo.getCtrlData().toByteArray();
+                bins.add(new Bin("ctrl", ctrlData));
+                if (logger.isDebugEnabled()) {
+                    logger.debug("[MessageService] Created ctrl bin with size: {} bytes from Proto message for key: {}", ctrlData.length, key.userKey);
+                }
+            }
 
             // Process balance data
             Map<String, Map<String, Object>> balanceData = new HashMap<>();
@@ -264,9 +276,22 @@ public class MessageService {
             try {
                 destinationClient.put(writePolicy, key, bins.toArray(new Bin[0]));
             } catch (com.aerospike.client.AerospikeException e) {
-                logger.error("[{}] Error writing to Aerospike for key: {}, error: {}", 
-                           region, new String((byte[])key.userKey.getObject()), e.getMessage());
-                throw e;
+                // Xử lý lỗi memory error
+                if (e.getMessage().contains("Server memory error")) {
+                    // Thử lại với dữ liệu nhỏ hơn
+                    try {
+                        // Loại bỏ bin ctrl để giảm kích cỡ
+                        bins.removeIf(bin -> "ctrl".equals(bin.name));
+                        destinationClient.put(writePolicy, key, bins.toArray(new Bin[0]));
+                        logger.info("[{}] Successfully wrote key {} without ctrl bin", region, new String((byte[])key.userKey.getObject()));
+                    } catch (com.aerospike.client.AerospikeException retryException) {
+                        logger.error("[{}] Failed to write key {} even without ctrl bin: {}", region, new String((byte[])key.userKey.getObject()), retryException.getMessage());
+                        throw retryException;
+                    }
+                } else {
+                    logger.error("[{}] Error writing to Aerospike for key: {}, error: {}", region, new String((byte[])key.userKey.getObject()), e.getMessage());
+                    throw e;
+                }
             }
             
         } catch (Exception e) {

@@ -12,6 +12,7 @@ message ProtoSubscriberInfo {
   map<int64, ProtoCharacteristic> characteristic = 7;
   map<int64, ProtoHistory> history = 8;
   int32 generation = 10;
+  bytes ctrlData = 11;
 }
 
 message ProtoSubscriber {

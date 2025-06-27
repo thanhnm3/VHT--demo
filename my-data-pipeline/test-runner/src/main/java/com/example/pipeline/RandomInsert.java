@@ -267,7 +267,6 @@ public class RandomInsert {
                                 subscriberData.put("li", subscriber.getLangId());
                                 
                                 subscriberData.put("r", region);
-                                subscriberData.put("lu", System.currentTimeMillis());
                                 subscriberData.put("im", subscriber.getImsi());
                                 subscriberData.put("ic", subscriber.getIccid());
                                 subscriberData.put("pw", subscriber.getPassword());
@@ -282,6 +281,21 @@ public class RandomInsert {
                                 subscriberData.put("p", province);
                                 
                                 bins.add(new Bin("sub", subscriberData));
+
+                                // Tách trường lastUpdate ra thành bin riêng
+                                long lastUpdate = System.currentTimeMillis();
+                                bins.add(new Bin("lu", lastUpdate));
+
+                                // Thêm bin để kiểm soát kích cỡ dữ liệu (không quan trọng)
+                                // Sử dụng byte array để dễ kiểm soát kích cỡ:
+                                // - Kích cỡ nhỏ: 10-50 bytes
+                                // - Kích cỡ vừa: 50-100 bytes  
+                                // - Kích cỡ lớn: 100-200 bytes
+                                // - Kích cỡ rất lớn: 200-500 bytes
+                                int ctrlSize = ThreadLocalRandom.current().nextInt(50, 100);
+                                byte[] randomBytes = new byte[ctrlSize];
+                                ThreadLocalRandom.current().nextBytes(randomBytes);
+                                bins.add(new Bin("ctrl", randomBytes));
 
                                 // Store balance data
                                 Map<String, Map<String, Object>> balanceData = new HashMap<>();

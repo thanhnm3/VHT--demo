@@ -16,6 +16,7 @@ private static final long serialVersionUID = 0L;
     super(builder);
   }
   private ProtoSubscriberInfo() {
+    ctrlData_ = com.google.protobuf.ByteString.EMPTY;
   }
 
   @java.lang.Override
@@ -491,6 +492,17 @@ com.example.pipeline.proto.ProtoHistory defaultValue) {
     return generation_;
   }
 
+  public static final int CTRLDATA_FIELD_NUMBER = 11;
+  private com.google.protobuf.ByteString ctrlData_ = com.google.protobuf.ByteString.EMPTY;
+  /**
+   * <code>bytes ctrlData = 11;</code>
+   * @return The ctrlData.
+   */
+  @java.lang.Override
+  public com.google.protobuf.ByteString getCtrlData() {
+    return ctrlData_;
+  }
+
   private byte memoizedIsInitialized = -1;
   @java.lang.Override
   public final boolean isInitialized() {
@@ -540,6 +552,9 @@ com.example.pipeline.proto.ProtoHistory defaultValue) {
         8);
     if (generation_ != 0) {
       output.writeInt32(10, generation_);
+    }
+    if (!ctrlData_.isEmpty()) {
+      output.writeBytes(11, ctrlData_);
     }
     getUnknownFields().writeTo(output);
   }
@@ -608,6 +623,10 @@ com.example.pipeline.proto.ProtoHistory defaultValue) {
       size += com.google.protobuf.CodedOutputStream
         .computeInt32Size(10, generation_);
     }
+    if (!ctrlData_.isEmpty()) {
+      size += com.google.protobuf.CodedOutputStream
+        .computeBytesSize(11, ctrlData_);
+    }
     size += getUnknownFields().getSerializedSize();
     memoizedSize = size;
     return size;
@@ -640,6 +659,8 @@ com.example.pipeline.proto.ProtoHistory defaultValue) {
         other.internalGetHistory())) return false;
     if (getGeneration()
         != other.getGeneration()) return false;
+    if (!getCtrlData()
+        .equals(other.getCtrlData())) return false;
     if (!getUnknownFields().equals(other.getUnknownFields())) return false;
     return true;
   }
@@ -677,6 +698,8 @@ com.example.pipeline.proto.ProtoHistory defaultValue) {
     }
     hash = (37 * hash) + GENERATION_FIELD_NUMBER;
     hash = (53 * hash) + getGeneration();
+    hash = (37 * hash) + CTRLDATA_FIELD_NUMBER;
+    hash = (53 * hash) + getCtrlData().hashCode();
     hash = (29 * hash) + getUnknownFields().hashCode();
     memoizedHashCode = hash;
     return hash;
@@ -863,6 +886,7 @@ com.example.pipeline.proto.ProtoHistory defaultValue) {
       internalGetMutableCharacteristic().clear();
       internalGetMutableHistory().clear();
       generation_ = 0;
+      ctrlData_ = com.google.protobuf.ByteString.EMPTY;
       return this;
     }
 
@@ -925,6 +949,9 @@ com.example.pipeline.proto.ProtoHistory defaultValue) {
       }
       if (((from_bitField0_ & 0x00000040) != 0)) {
         result.generation_ = generation_;
+      }
+      if (((from_bitField0_ & 0x00000080) != 0)) {
+        result.ctrlData_ = ctrlData_;
       }
       result.bitField0_ |= to_bitField0_;
     }
@@ -993,6 +1020,9 @@ com.example.pipeline.proto.ProtoHistory defaultValue) {
       bitField0_ |= 0x00000020;
       if (other.getGeneration() != 0) {
         setGeneration(other.getGeneration());
+      }
+      if (other.getCtrlData() != com.google.protobuf.ByteString.EMPTY) {
+        setCtrlData(other.getCtrlData());
       }
       this.mergeUnknownFields(other.getUnknownFields());
       onChanged();
@@ -1077,6 +1107,11 @@ com.example.pipeline.proto.ProtoHistory defaultValue) {
               bitField0_ |= 0x00000040;
               break;
             } // case 80
+            case 90: {
+              ctrlData_ = input.readBytes();
+              bitField0_ |= 0x00000080;
+              break;
+            } // case 90
             default: {
               if (!super.parseUnknownField(input, extensionRegistry, tag)) {
                 done = true; // was an endgroup tag
@@ -1878,6 +1913,38 @@ com.example.pipeline.proto.ProtoHistory defaultValue) {
     public Builder clearGeneration() {
       bitField0_ = (bitField0_ & ~0x00000040);
       generation_ = 0;
+      onChanged();
+      return this;
+    }
+
+    private com.google.protobuf.ByteString ctrlData_ = com.google.protobuf.ByteString.EMPTY;
+    /**
+     * <code>bytes ctrlData = 11;</code>
+     * @return The ctrlData.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString getCtrlData() {
+      return ctrlData_;
+    }
+    /**
+     * <code>bytes ctrlData = 11;</code>
+     * @param value The ctrlData to set.
+     * @return This builder for chaining.
+     */
+    public Builder setCtrlData(com.google.protobuf.ByteString value) {
+      if (value == null) { throw new NullPointerException(); }
+      ctrlData_ = value;
+      bitField0_ |= 0x00000080;
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>bytes ctrlData = 11;</code>
+     * @return This builder for chaining.
+     */
+    public Builder clearCtrlData() {
+      bitField0_ = (bitField0_ & ~0x00000080);
+      ctrlData_ = getDefaultInstance().getCtrlData();
       onChanged();
       return this;
     }

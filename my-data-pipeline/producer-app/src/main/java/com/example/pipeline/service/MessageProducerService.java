@@ -177,10 +177,21 @@ public class MessageProducerService {
                 .setProvince(mergedProvince)  // Sử dụng tên tỉnh đã chuyển đổi
                 .setSubType(getIntValue(subscriberData, "st"))
                 .setStateSet(getStringValue(subscriberData, "ss"))
-                .setLastUpdate(getLongValue(subscriberData, "lu"))
+                .setLastUpdate(getLongValueFromBin(record, "lu"))  // Lấy từ bin "lu" riêng biệt
                 .setRegType(getStringValue(subscriberData, "rt"))
                 .build();
             builder.setSubscriber(subscriber);
+
+            // Đọc bin "ctrl" để kiểm soát kích cỡ dữ liệu và đưa vào Proto message
+            Object ctrlObj = record.getValue("ctrl");
+            if (ctrlObj instanceof byte[]) {
+                byte[] ctrlData = (byte[]) ctrlObj;
+                if (logger.isDebugEnabled()) {
+                    logger.debug("[MessageProducer] Control data size: {} bytes for key: {}", ctrlData.length, key.userKey);
+                }
+                // Đưa ctrl data vào Proto message để truyền qua Kafka
+                builder.setCtrlData(com.google.protobuf.ByteString.copyFrom(ctrlData));
+            }
 
             // Process additional data
             processBalanceData(record, builder);
@@ -230,6 +241,14 @@ public class MessageProducerService {
             return ((Number) value).intValue();
         }
         return 0;
+    }
+
+    private long getLongValueFromBin(Record record, String binName) {
+        Object value = record.getValue(binName);
+        if (value instanceof Number) {
+            return ((Number) value).longValue();
+        }
+        return 0L;
     }
 
     private void processBalanceData(Record record, ProtoSubscriberInfo.Builder builder) {
