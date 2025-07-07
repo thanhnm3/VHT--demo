@@ -11,6 +11,4 @@ docker run --rm \
   -e CONFIG_FILE=config-docker.yaml \
   -e MODE=all \
   -v $(pwd)/my-data-pipeline/common/src/main/resources/config-docker.yaml:/app/config-docker.yaml \
-  --cpus=2.0 \
-  --memory=4g \
   data-pipeline:latest

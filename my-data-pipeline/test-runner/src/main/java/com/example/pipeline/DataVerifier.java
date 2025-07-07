@@ -5,6 +5,8 @@ import com.aerospike.client.policy.QueryPolicy;
 import com.aerospike.client.policy.ScanPolicy;
 import com.example.pipeline.service.config.Config;
 import com.example.pipeline.service.ConfigLoader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Map;
@@ -16,7 +18,8 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class DataVerifier {
-    private static final int SAMPLE_SIZE = 1000; // Số lượng key cần kiểm tra 16547
+    private static final Logger logger = LoggerFactory.getLogger(DataVerifier.class);
+    private static final int SAMPLE_SIZE = 16547; // Số lượng key cần kiểm tra 16547
     private static final int SLEEP_INTERVAL = 1000; // Sleep sau moi 1000 record
     private static final int SLEEP_DURATION = 3000; // Sleep 3 giay
 
@@ -25,11 +28,11 @@ public class DataVerifier {
         
         for (int port : ports) {
             try {
-                System.out.println("Thu ket noi den " + host + ":" + port);
+                logger.info("Thu ket noi den " + host + ":" + port);
                 return new AerospikeClient(host, port);
             } catch (AerospikeException e) {
                 lastException = e;
-                System.out.println("Khong the ket noi den " + host + ":" + port + " - " + e.getMessage());
+                logger.error("Khong the ket noi den " + host + ":" + port + " - " + e.getMessage());
             }
         }
         
@@ -53,11 +56,11 @@ public class DataVerifier {
             String producerSetName = producer.getSet();
 
             // Connect to source Aerospike
-            System.out.println("Ket noi den source DB...");
+            logger.info("Ket noi den source DB...");
             AerospikeClient sourceClient = connectToAerospike(producerHost, new int[]{producerPort});
             
             // Connect to destination Aerospike
-            System.out.println("Ket noi den destination DB...");
+            logger.info("Ket noi den destination DB...");
             // Lấy host và port từ consumer đầu tiên làm destination
             Config.Consumer firstConsumer = config.getConsumers().get(0);
             String destHost = firstConsumer.getHost();
@@ -79,7 +82,7 @@ public class DataVerifier {
 
             // Lay danh sach key tu DB1
             List<Key> randomKeys = getRandomKeys(sourceClient, producerNamespace, producerSetName, SAMPLE_SIZE);
-            System.out.println("Da lay " + randomKeys.size() + " key ngau nhien tu DB1");
+            logger.info("Da lay " + randomKeys.size() + " key ngau nhien tu DB1");
 
             // Kiem tra tung key
             for (int i = 0; i < randomKeys.size(); i++) {
@@ -89,28 +92,28 @@ public class DataVerifier {
                 // Check for duplicates
                 if (processedKeys.contains(keyString)) {
                     duplicates.incrementAndGet();
-                    System.out.printf("Duplicate key found: %s%n", keyString);
+                    logger.debug("Duplicate key found: " + keyString);
                     continue;
                 }
                 processedKeys.add(keyString);
                 
                 // Sleep sau moi SLEEP_INTERVAL record
                 if (i > 0 && i % SLEEP_INTERVAL == 0) {
-                    System.out.println("Da kiem tra " + i + " record, tam dung " + (SLEEP_DURATION/1000) + " giay...");
+                    logger.info("Da kiem tra " + i + " record, tam dung " + (SLEEP_DURATION/1000) + " giay...");
                     Thread.sleep(SLEEP_DURATION);
                 }
 
                 // Doc record tu DB1
                 com.aerospike.client.Record sourceRecord = sourceClient.get(policy, sourceKey);
                 if (sourceRecord == null) {
-                    System.out.println("[SKIP] sourceRecord null for key: " + keyString);
+                    logger.debug("[SKIP] sourceRecord null for key: " + keyString);
                     continue;
                 }
 
                 // Lấy bin 'sub' từ sourceRecord
                 Object sourceSubObj = sourceRecord.getValue("sub");
                 if (!(sourceSubObj instanceof Map)) {
-                    System.out.println("[SKIP] bin 'sub' null hoặc không phải Map cho key: " + keyString);
+                    logger.debug("[SKIP] bin 'sub' null hoặc không phải Map cho key: " + keyString);
                     continue;
                 }
                 @SuppressWarnings("unchecked")
@@ -118,7 +121,7 @@ public class DataVerifier {
                 // Lấy region từ trường 'r' trong sub
                 String region = (String) sourceSub.get("r");
                 if (region == null) {
-                    System.out.println("[SKIP] region (sub.r) null for key: " + keyString);
+                    logger.debug("[SKIP] region (sub.r) null for key: " + keyString);
                     continue;
                 }
 
@@ -128,7 +131,7 @@ public class DataVerifier {
                 // Lay consumer tuong ung voi region
                 List<String> consumerNames = config.getConsumersForRegion(region);
                 if (consumerNames == null || consumerNames.isEmpty()) {
-                    System.out.println("[SKIP] No consumerNames for region: " + region + ", key: " + keyString);
+                    logger.debug("[SKIP] No consumerNames for region: " + region + ", key: " + keyString);
                     continue;
                 }
 
@@ -139,7 +142,7 @@ public class DataVerifier {
                     .orElse(null);
 
                 if (consumer == null) {
-                    System.out.println("[SKIP] No consumer config for: " + consumerName + ", key: " + keyString);
+                    logger.debug("[SKIP] No consumer config for: " + consumerName + ", key: " + keyString);
                     continue;
                 }
 
@@ -151,17 +154,14 @@ public class DataVerifier {
                 stats.totalVerified++;
 
                 if (destRecord == null) {
-                    System.out.printf("Mismatch: Key %s khong ton tai trong DB dich (region: %s, namespace: %s)%n",
-                        keyString, region, consumer.getNamespace());
+                    logger.debug("Mismatch: Key " + keyString + " khong ton tai trong DB dich (region: " + region + ", namespace: " + consumer.getNamespace() + ")");
                     mismatches.incrementAndGet();
                     stats.mismatches++;
                 } else {
                     // Lấy bin 'sub' từ cả hai record
                     Object destSubObj = destRecord.getValue("sub");
                     if (!(destSubObj instanceof Map)) {
-                        System.out.printf("Mismatch: Key %s, bin 'sub' khong phai Map (DB1: %s, DB2: %s)%n",
-                            keyString, sourceSubObj == null ? "null" : sourceSubObj.getClass(),
-                            destSubObj == null ? "null" : destSubObj.getClass());
+                        logger.debug("Mismatch: Key " + keyString + ", bin 'sub' khong phai Map (DB1: " + (sourceSubObj == null ? "null" : sourceSubObj.getClass()) + ", DB2: " + (destSubObj == null ? "null" : destSubObj.getClass()) + ")");
                         mismatches.incrementAndGet();
                         stats.mismatches++;
                     } else {
@@ -177,15 +177,15 @@ public class DataVerifier {
                             Object srcVal = sourceSub.get(field);
                             Object dstVal = destSub.get(field);
                             if (srcVal == null && dstVal == null) {
-                                System.out.printf("[INFO] Key %s, field '%s' both null\n", keyString, field);
+                                logger.debug("[INFO] Key " + keyString + ", field '" + field + "' both null");
                                 continue;
                             }
                             if (srcVal == null || dstVal == null || !srcVal.equals(dstVal)) {
-                                System.out.printf("Mismatch: Key %s, field '%s' differs (DB1: %s, DB2: %s)%n", keyString, field, srcVal, dstVal);
+                                logger.debug("Mismatch: Key " + keyString + ", field '" + field + "' differs (DB1: " + srcVal + ", DB2: " + dstVal + ")");
                                 mismatches.incrementAndGet();
                                 stats.mismatches++;
                             } else {
-                                System.out.printf("[OK] Key %s, field '%s' match: %s\n", keyString, field, srcVal);
+                                logger.debug("[OK] Key " + keyString + ", field '" + field + "' match: " + srcVal);
                             }
                         }
                     }
@@ -195,24 +195,24 @@ public class DataVerifier {
             }
 
             // In ket qua tong hop
-            System.out.println("\n=== Verification Results ===");
-            System.out.println("Total records verified: " + totalVerified.get());
-            System.out.println("Total mismatches found: " + mismatches.get());
-            System.out.println("Total duplicates found: " + duplicates.get());
-            System.out.println("Overall verification accuracy: " + 
+            logger.info("\n=== Verification Results ===");
+            logger.info("Total records verified: " + totalVerified.get());
+            logger.info("Total mismatches found: " + mismatches.get());
+            logger.info("Total duplicates found: " + duplicates.get());
+            logger.info("Overall verification accuracy: " + 
                 String.format("%.2f%%", (totalVerified.get() - mismatches.get()) * 100.0 / totalVerified.get()));
 
             // In ket qua theo tung region
-            System.out.println("\n=== Results by Region ===");
+            logger.info("\n=== Results by Region ===");
             for (Map.Entry<String, RegionStats> entry : regionStats.entrySet()) {
                 String region = entry.getKey();
                 RegionStats stats = entry.getValue();
                 double accuracy = (stats.totalVerified - stats.mismatches) * 100.0 / stats.totalVerified;
-                System.out.printf("Region: %s%n", region);
-                System.out.printf("  Total verified: %d%n", stats.totalVerified);
-                System.out.printf("  Mismatches: %d%n", stats.mismatches);
-                System.out.printf("  Accuracy: %.2f%%%n", accuracy);
-                System.out.println();
+                logger.info("Region: " + region);
+                logger.info("  Total verified: " + stats.totalVerified);
+                logger.info("  Mismatches: " + stats.mismatches);
+                logger.info("  Accuracy: " + String.format("%.2f%%", accuracy));
+                logger.info("");
             }
 
             // Close connections
@@ -220,7 +220,7 @@ public class DataVerifier {
             destClient.close();
 
         } catch (Exception e) {
-            System.err.println("Error during verification: " + e.getMessage());
+            logger.error("Error during verification: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -256,7 +256,7 @@ public class DataVerifier {
                 return sampledKeys;
             }
         } catch (Exception e) {
-            System.err.println("Error getting random keys: " + e.getMessage());
+            logger.error("Error getting random keys: " + e.getMessage());
         }
 
         return keys;

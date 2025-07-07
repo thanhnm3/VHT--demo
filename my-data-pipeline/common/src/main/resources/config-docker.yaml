@@ -112,8 +112,8 @@ performance:
     producer: 1
     consumer: 2
   rate_control:
-    initial_rate: 20000.0
-    max_rate: 50000.0
+    initial_rate: 10000.0
+    max_rate: 30000.0
     min_rate: 4000.0
     lag_threshold: 3000
     monitoring_interval_seconds: 10

@@ -113,6 +113,14 @@ public class Maincdc {
             logger.info("Waiting for topics to be created and ready...");
             Thread.sleep(1000);
 
+            // Đợi thêm thời gian để index được tạo và build xong
+            logger.info("Waiting for Aerospike index to be created and built (35 seconds)...");
+            for (int i = 35; i > 0; i--) {
+                logger.info("Index preparation in progress... {} seconds remaining", i);
+                Thread.sleep(1000);
+            }
+            logger.info("Index preparation completed. Starting CDC consumers...");
+
             // Khởi động Consumer cho CDC
             for (Map.Entry<String, List<String>> entry : config.getRegion_mapping().entrySet()) {
                 String region = entry.getKey();

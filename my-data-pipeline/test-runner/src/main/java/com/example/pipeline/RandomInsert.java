@@ -64,11 +64,11 @@ public class RandomInsert {
             policy.maxRetries = 2;
             policy.sleepBetweenRetries = 3000; // ms
 
-            int numThreads = 1;
+            int numThreads = 10;
             ExecutorService executor = Executors.newFixedThreadPool(numThreads);
             List<Future<?>> futures = new ArrayList<>();
 
-            int maxRecordsPerRegion = 100_000; // So ban ghi moi mien 
+            int maxRecordsPerRegion = 3_000_000; // So ban ghi moi mien 
             Map<String, AtomicInteger> regionCounters = new ConcurrentHashMap<>();
             for (String region : REGIONS) {
                 regionCounters.put(region, new AtomicInteger(0));
@@ -292,7 +292,7 @@ public class RandomInsert {
                                 // - Kích cỡ vừa: 50-100 bytes  
                                 // - Kích cỡ lớn: 100-200 bytes
                                 // - Kích cỡ rất lớn: 200-500 bytes
-                                int ctrlSize = ThreadLocalRandom.current().nextInt(50, 100);
+                                int ctrlSize = ThreadLocalRandom.current().nextInt(10, 20);
                                 byte[] randomBytes = new byte[ctrlSize];
                                 ThreadLocalRandom.current().nextBytes(randomBytes);
                                 bins.add(new Bin("ctrl", randomBytes));

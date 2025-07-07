@@ -60,8 +60,13 @@ public class CdcProducerService {
                            LU_INDEX_NAME, sourceNamespace, setName);
                 indexCreated = true;
                 
-                // Đợi index được tạo xong
-                Thread.sleep(2000);
+                // Đợi 30 giây để index được build xong hoàn toàn
+                logger.info("[CDC Producer] Waiting 30 seconds for index to be fully built...");
+                for (int i = 30; i > 0; i--) {
+                    logger.info("[CDC Producer] Index building in progress... {} seconds remaining", i);
+                    Thread.sleep(1000);
+                }
+                logger.info("[CDC Producer] Index build wait completed. Proceeding with CDC operations.");
                 return true;
                 
             } catch (Exception e) {
