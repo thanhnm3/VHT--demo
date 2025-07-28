@@ -201,6 +201,36 @@ services:
       - ./aerospike_data:/opt/aerospike/data
       - ./etc/aerospike/aerospike.conf:/etc/aerospike/aerospike.conf:ro
 
+
+  aerospike-replica:
+    build:
+      context: .
+      dockerfile: Dockerfile.aerospike1
+    container_name: aerospike-replica
+    user: root
+    privileged: true
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        echo never > /sys/kernel/mm/transparent_hugepage/enabled
+        echo never > /sys/kernel/mm/transparent_hugepage/defrag
+        sysctl -w vm.swappiness=0
+        sysctl -w vm.min_free_kbytes=1310720
+        exec asd --config-file /etc/aerospike/aerospike.conf --foreground
+    networks:
+      kafka-platform:
+        ipv4_address: 172.28.0.3
+    ports:
+      - "4000:3000"
+      - "4001:3001"
+      - "4002:3002"
+      - "4003:3003"
+    volumes:
+      - ./aerospike_replica_data:/opt/aerospike/data
+      - ./etc/aerospike/aerospike-replica.conf:/etc/aerospike/aerospike.conf:ro
+
+
   # =============================== AEROSPIKE 2 ===============================
   aerospike2:
     build:
@@ -229,6 +259,34 @@ services:
     volumes:
       - ./aerospike2_data:/opt/aerospike/data
       - ./etc/aerospike/aerospike2.conf:/etc/aerospike/aerospike.conf:ro
+
+  aerospike2-replica:
+    build:
+      context: .
+      dockerfile: Dockerfile.aerospike2
+    container_name: aerospike2-replica
+    user: root
+    privileged: true
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        echo never > /sys/kernel/mm/transparent_hugepage/enabled
+        echo never > /sys/kernel/mm/transparent_hugepage/defrag
+        sysctl -w vm.swappiness=0
+        sysctl -w vm.min_free_kbytes=1310720
+        exec asd --config-file /etc/aerospike/aerospike.conf --foreground
+    networks:
+      kafka-platform:
+        ipv4_address: 172.28.0.5
+    ports:
+      - "6000:3000"
+      - "6001:3001"
+      - "6002:3002"
+      - "6003:3003"
+    volumes:
+      - ./aerospike2_replica_data:/opt/aerospike/data
+      - ./etc/aerospike/aerospike2-replica.conf:/etc/aerospike/aerospike.conf:ro
 
   # =============================== AEROSPIKE TOOLS ===============================
   aerospike-tools:
